@@ -51,7 +51,7 @@ def test_export_writes_only_inside_pitch_kit():
 def test_kit_has_all_the_pieces():
     export()
     assert (OUT_DIR / "explain.md").read_text().count("\n## ") == 17          # 17 questions
-    assert (OUT_DIR / "story.md").read_text().count("\n## ") == 4             # 4 moments
+    assert (OUT_DIR / "story.md").read_text().count("\n## ") == 5             # 5 moments (4 + the canal plan)
     for name in ("four_week_policies", "twelve_month_error", "other_rivers", "this_week_map"):
         assert (OUT_DIR / "charts" / f"{name}.html").exists()
     # Charts load the chart library from the same folder, never from the internet.
