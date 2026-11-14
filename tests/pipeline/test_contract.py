@@ -90,7 +90,9 @@ def test_metrics_file(files):
     assert 0.40 <= metrics["shuffled_auc_mean"] <= 0.60
     assert len(metrics["failure_examples"]) >= 2
     assert isinstance(metrics["headline"]["honesty_check_pass"], bool)
-    assert any("river flow" in limit for limit in metrics["limits"])
+    assert any("River flow" in limit for limit in metrics["limits"])
+    products = {example["product"] for example in metrics["failure_examples"]}
+    assert products == {"4-week alert", "6-month outlook", "12-month outlook"}
 
 
 def test_headline_numbers_can_be_recomputed_from_the_predictions_file(files):

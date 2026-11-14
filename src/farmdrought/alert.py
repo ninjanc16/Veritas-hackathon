@@ -185,6 +185,9 @@ def run_alert():
 
     results = {
         "threshold": threshold,
+        # Costs on the VALIDATION years, where the threshold was picked (for reports/decision.md)
+        "validation": {"Our system": tally(vf["y"], vf["alarm_system"])["cost"],
+                       **{name: tally(vf["y"], vf[col])["cost"] for col, name in BASELINES.items()}},
         "rows": {"train": int((train & focus).sum()), "val": int((val & focus).sum()),
                  "test_focus": len(rg), "test_all": int(test.sum())},
         "policies": policies, "headline": headline, "onset": onset,
@@ -203,7 +206,8 @@ if __name__ == "__main__":
     _, r = run_alert()
     table = lambda rows: print(pd.DataFrame(rows).to_string(index=False), "\n")
     print("Alarm threshold (picked on Rio Grande validation years):", r["threshold"])
-    print("Rio Grande rows:", r["rows"], "\n")
+    print("Rio Grande rows:", r["rows"])
+    print("Costs on the validation years 2015-2018:", r["validation"], "\n")
     print("=== Rio Grande, test years: our system against the baselines (lower cost is better) ===")
     table(r["policies"])
     print("Headline:", r["headline"])

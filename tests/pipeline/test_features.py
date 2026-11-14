@@ -71,3 +71,27 @@ def test_enso_uses_only_seasons_that_ended_before_the_issue_month():
     feats_changed = enso_features(pd.to_datetime(["2010-03-02"]), changed)
     for name in FEATURES_E:
         assert feats[name][0] == feats_changed[name][0], name
+
+
+# ---------------- River flow and snowpack percentiles ----------------
+from farmdrought.flow import past_percentile
+
+
+def test_percentile_compares_only_with_earlier_years():
+    days = pd.date_range("1990-01-01", "2012-12-31", freq="D")
+    daily = pd.Series(np.random.default_rng(0).random(len(days)), index=days)
+    dates = pd.to_datetime(["2005-06-07", "2010-03-02"])
+    before = past_percentile(daily, dates, 90)
+    assert ((before >= 0) & (before <= 1)).all()
+
+    # Rewrite every day after the last forecast date. Nothing may change.
+    changed = daily.copy()
+    changed[changed.index > dates[-1]] = 1e9
+    np.testing.assert_array_equal(before, past_percentile(changed, dates, 90))
+
+    # A record high must rank above every earlier year, and a record low below them
+    high, low = daily.copy(), daily.copy()
+    high["2010-01-01":"2010-03-02"] = 1e9
+    low["2010-01-01":"2010-03-02"] = -1e9
+    assert past_percentile(high, dates, 90)[1] == 1.0
+    assert past_percentile(low, dates, 90)[1] == 0.0

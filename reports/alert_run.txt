@@ -1,5 +1,6 @@
 Alarm threshold (picked on Rio Grande validation years): 0.36
-Rio Grande rows: {'train': 22537, 'val': 6324, 'test_focus': 12617, 'test_all': 177452} 
+Rio Grande rows: {'train': 22537, 'val': 6324, 'test_focus': 12617, 'test_all': 177452}
+Costs on the validation years 2015-2018: {'Our system': 636, 'Persistence': 715, 'D1 now': 933, 'Worsening': 655, 'Calendar': 3651} 
 
 === Rio Grande, test years: our system against the baselines (lower cost is better) ===
        name            column  cost  alarms  caught  missed  false_alarms  precision  recall   auc
