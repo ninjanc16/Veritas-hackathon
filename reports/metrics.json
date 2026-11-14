@@ -1,6 +1,6 @@
 {
   "contract_version": 2,
-  "generated_at": "2026-11-14T07:21:26-08:00",
+  "generated_at": "2026-11-14T08:02:28-08:00",
   "is_final": true,
   "focus_river": "Rio Grande",
   "training_scope": "Rio Grande counties only",
@@ -582,10 +582,147 @@
     "Counties are chosen by a 50 km rule from the river's main line. A different width gives a different set.",
     "The Drought Monitor map is drawn by people each week, so the target includes their judgment.",
     "A warning is not a payment decision. The grazing-period rule of the aid program is not modeled.",
-    "Nothing here measures crop yields or dollars saved.",
+    "The 6-month target (8 weeks in a row at D2) matches the aid rule for years up to 2025. For 2026 USDA lowered the trigger to 4 weeks in a row (FSA Notice LFP-8).",
+    "The damage figure on the map is an estimate, not a tested forecast. It assumes every week of severe drought is a week of bought feed, priced at USDA's 2026 monthly feed cost for an adult beef cow. It was not checked against real losses, and it inherits the 12-month outlook's error.",
+    "Nothing here measures crop yields.",
     "River flow and snowpack were tested as extra inputs and are not part of the system. See ablations. The El Paso gauge had no daily flow data and was dropped. The Del Norte gauge ends in 2024.",
     "Weather inputs (rain, temperature, soil moisture) were not tested.",
-    "A random forest cannot predict a drought longer or deeper than any it saw in training."
+    "A random forest cannot predict a drought longer or deeper than any it saw in training.",
+    "Seed check: retrained with 10 random seeds, the system beat the best simple rule in 8/10 runs for the 4-week alert, 3/10 for the 6-month outlook and 10/10 for the 12-month outlook.",
+    "Buffer check: with a 100 km county rule (53 counties), the 4-week system cost 3269 against 3243 for the best simple rule (Worsening).",
+    "An outside review suggested two simple rules that were not in our baseline list. They were scored after the final run. 4-week rule 'D2 now, or D1 and worse than 4 or 8 weeks ago': cost 1840 on the test years, against 1912 for the system. 12-month rule 'average of 'same as now' and 'same as the last 52 weeks'': average error 13.21 weeks, against 14.0 for the system.",
+    "The 6-month outlook uses an El Nino value that NOAA publishes a few days into the month, around the same days the outlook is issued. A real-time forecast might have to use the value from a month earlier."
   ],
-  "alert_threshold": 0.36
+  "alert_threshold": 0.36,
+  "map_fields": {
+    "columns": {
+      "risk_level": "Overall level for the map: the worse of the 4-week tier and the 6-month tier",
+      "weeks_low": "Low end of the 12-month estimate: weeks_model minus the average error measured on that river",
+      "weeks_high": "High end of the 12-month estimate: weeks_model plus that average error, at most 52",
+      "typical_drought_weeks": "Median length of the county's past severe-drought spells, in weeks (0 if none)",
+      "longest_drought_weeks": "The county's longest severe-drought spell on record, in weeks",
+      "damage_months": "Months of bought feed if every expected severe-drought week needs bought feed",
+      "damage_usd_per_100_head": "damage_months x monthly feed cost per head x 100 cattle, in dollars"
+    },
+    "feed_cost_per_head_month": 35.66,
+    "feed_cost_source": "USDA Farm Service Agency, Notice LFP-7, 2026 LFP Payment Rates, adult beef cattle",
+    "length_range_coverage_focus": 0.557,
+    "tested": "risk_level and the length range come from tested forecasts. The damage columns are untested estimates."
+  },
+  "seed_check": {
+    "runs": [
+      {
+        "seed": 0,
+        "alert_cost": 1912,
+        "season_cost": 2324,
+        "year_mae": 14.0
+      },
+      {
+        "seed": 1,
+        "alert_cost": 1940,
+        "season_cost": 2453,
+        "year_mae": 14.14
+      },
+      {
+        "seed": 2,
+        "alert_cost": 1899,
+        "season_cost": 2407,
+        "year_mae": 13.95
+      },
+      {
+        "seed": 3,
+        "alert_cost": 1888,
+        "season_cost": 2429,
+        "year_mae": 14.02
+      },
+      {
+        "seed": 4,
+        "alert_cost": 1883,
+        "season_cost": 2446,
+        "year_mae": 13.94
+      },
+      {
+        "seed": 5,
+        "alert_cost": 2005,
+        "season_cost": 2432,
+        "year_mae": 13.93
+      },
+      {
+        "seed": 6,
+        "alert_cost": 2063,
+        "season_cost": 2391,
+        "year_mae": 14.03
+      },
+      {
+        "seed": 7,
+        "alert_cost": 1915,
+        "season_cost": 2380,
+        "year_mae": 14.11
+      },
+      {
+        "seed": 8,
+        "alert_cost": 1922,
+        "season_cost": 2421,
+        "year_mae": 14.05
+      },
+      {
+        "seed": 9,
+        "alert_cost": 1931,
+        "season_cost": 2378,
+        "year_mae": 13.96
+      }
+    ],
+    "summary": {
+      "alert_cost": {
+        "lowest": 1883,
+        "highest": 2063,
+        "best_baseline": 1971,
+        "seeds_beating_best_baseline": "8/10"
+      },
+      "season_cost": {
+        "lowest": 2324,
+        "highest": 2453,
+        "best_baseline": 2382,
+        "seeds_beating_best_baseline": "3/10"
+      },
+      "year_mae": {
+        "lowest": 13.93,
+        "highest": 14.14,
+        "best_baseline": 14.52,
+        "seeds_beating_best_baseline": "10/10"
+      }
+    }
+  },
+  "buffer_check": {
+    "buffer_km": 100,
+    "n_focus_counties": 53,
+    "alert": {
+      "system_cost": 3269,
+      "best_baseline": "Worsening",
+      "best_baseline_cost": 3243,
+      "beats_every_baseline": false
+    },
+    "season": {
+      "system_cost": 4081,
+      "d1_rule_cost": 4168,
+      "persistence_cost": 5423,
+      "beats_every_baseline": true
+    },
+    "year": {
+      "mae_system": 13.99,
+      "mae_same_as_now": 14.39,
+      "mae_last_year": 14.94,
+      "beats_every_baseline": true
+    }
+  },
+  "extra_rules_check": {
+    "alert_rule": "D2 now, or D1 and worse than 4 or 8 weeks ago",
+    "alert_rule_cost_validation": 622,
+    "system_cost_validation": 636,
+    "alert_rule_cost_test": 1840,
+    "system_cost_test": 1912,
+    "year_rule": "average of 'same as now' and 'same as the last 52 weeks'",
+    "year_rule_mae": 13.21,
+    "system_mae": 14.0
+  }
 }

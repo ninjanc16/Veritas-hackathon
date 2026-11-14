@@ -19,7 +19,8 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score
 
 from farmdrought.baselines import BASELINES, add_baselines
-from farmdrought.config import ALERT_WEEKS, D2_CLASS, FOCUS_RIVER, MISS_COST, RIVERS, TEST_START, TRAIN, VAL
+from farmdrought.config import (ALERT_WEEKS, BUFFER_KM, D2_CLASS, FOCUS_RIVER, MISS_COST, RIVERS, TEST_START, TRAIN,
+                                VAL)
 from farmdrought.drought import build_panel
 from farmdrought.evaluate import events, pick_threshold, tally
 from farmdrought.features import FEATURES_H
@@ -42,15 +43,18 @@ def split_masks(panel):
     return train, val, test
 
 
-def make_forest():
-    """The 4-week forest. Settings were fixed before the build (architecture doc, P5)."""
+def make_forest(seed=0):
+    """The 4-week forest. Settings come from the plan and were not tuned on test years by this code.
+
+    seed : the random seed. The system uses 0. Other seeds are only used by the seed check.
+    """
     return RandomForestClassifier(
         n_estimators=100,        # 100 trees vote
         max_depth=12,            # each tree asks at most 12 questions in a row
         min_samples_leaf=100,    # each final group holds 100+ rows, so no memorizing
         max_features="sqrt",     # each split looks at a random few inputs
         class_weight="balanced_subsample",  # drought and no-drought rows count equally
-        random_state=0,          # same result every run
+        random_state=seed,       # same seed, same result every run
         n_jobs=-1,               # use all CPU cores
     )
 
@@ -60,7 +64,8 @@ def fit_alert(panel, train, val, model=None):
 
     Returns (model, threshold). Test rows are never used here.
     """
-    model = model or make_forest()
+    if model is None:
+        model = make_forest()
     model.fit(panel.loc[train, FEATURES_H], panel.loc[train, "y"])
     val_score = model.predict_proba(panel.loc[val, FEATURES_H])[:, 1]
     return model, pick_threshold(val_score, panel.loc[val, "y"])
@@ -80,9 +85,12 @@ def shuffled_auc(panel, train, test, runs=3):
     return float(np.mean(scores))
 
 
-def run_alert():
-    """Run the whole 4-week experiment. Returns (panel with scores and alarms, results)."""
-    panel = build_panel()
+def run_alert(buffer_km=BUFFER_KM):
+    """Run the whole 4-week experiment. Returns (panel with scores and alarms, results).
+
+    buffer_km : how close to the river a county must be. The system uses 50 km.
+    """
+    panel = build_panel(buffer_km)
     train, val, test = split_masks(panel)
     focus = panel["river"] == FOCUS_RIVER
     panel = add_baselines(panel, train, val)

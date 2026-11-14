@@ -1,0 +1,118 @@
+{
+  "seed_check": {
+    "runs": [
+      {
+        "seed": 0,
+        "alert_cost": 1912,
+        "season_cost": 2324,
+        "year_mae": 14.0
+      },
+      {
+        "seed": 1,
+        "alert_cost": 1940,
+        "season_cost": 2453,
+        "year_mae": 14.14
+      },
+      {
+        "seed": 2,
+        "alert_cost": 1899,
+        "season_cost": 2407,
+        "year_mae": 13.95
+      },
+      {
+        "seed": 3,
+        "alert_cost": 1888,
+        "season_cost": 2429,
+        "year_mae": 14.02
+      },
+      {
+        "seed": 4,
+        "alert_cost": 1883,
+        "season_cost": 2446,
+        "year_mae": 13.94
+      },
+      {
+        "seed": 5,
+        "alert_cost": 2005,
+        "season_cost": 2432,
+        "year_mae": 13.93
+      },
+      {
+        "seed": 6,
+        "alert_cost": 2063,
+        "season_cost": 2391,
+        "year_mae": 14.03
+      },
+      {
+        "seed": 7,
+        "alert_cost": 1915,
+        "season_cost": 2380,
+        "year_mae": 14.11
+      },
+      {
+        "seed": 8,
+        "alert_cost": 1922,
+        "season_cost": 2421,
+        "year_mae": 14.05
+      },
+      {
+        "seed": 9,
+        "alert_cost": 1931,
+        "season_cost": 2378,
+        "year_mae": 13.96
+      }
+    ],
+    "summary": {
+      "alert_cost": {
+        "lowest": 1883,
+        "highest": 2063,
+        "best_baseline": 1971,
+        "seeds_beating_best_baseline": "8/10"
+      },
+      "season_cost": {
+        "lowest": 2324,
+        "highest": 2453,
+        "best_baseline": 2382,
+        "seeds_beating_best_baseline": "3/10"
+      },
+      "year_mae": {
+        "lowest": 13.93,
+        "highest": 14.14,
+        "best_baseline": 14.52,
+        "seeds_beating_best_baseline": "10/10"
+      }
+    }
+  },
+  "buffer_check": {
+    "buffer_km": 100,
+    "n_focus_counties": 53,
+    "alert": {
+      "system_cost": 3269,
+      "best_baseline": "Worsening",
+      "best_baseline_cost": 3243,
+      "beats_every_baseline": false
+    },
+    "season": {
+      "system_cost": 4081,
+      "d1_rule_cost": 4168,
+      "persistence_cost": 5423,
+      "beats_every_baseline": true
+    },
+    "year": {
+      "mae_system": 13.99,
+      "mae_same_as_now": 14.39,
+      "mae_last_year": 14.94,
+      "beats_every_baseline": true
+    }
+  },
+  "extra_rules_check": {
+    "alert_rule": "D2 now, or D1 and worse than 4 or 8 weeks ago",
+    "alert_rule_cost_validation": 622,
+    "system_cost_validation": 636,
+    "alert_rule_cost_test": 1840,
+    "system_cost_test": 1912,
+    "year_rule": "average of 'same as now' and 'same as the last 52 weeks'",
+    "year_rule_mae": 13.21,
+    "system_mae": 14.0
+  }
+}

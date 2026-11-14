@@ -17,13 +17,15 @@ import numpy as np
 import pandas as pd
 
 from farmdrought.alert import make_forest, run_alert, split_masks
-from farmdrought.config import (ALERT_WEEKS, FOCUS_RIVER, LATEST, METRICS, MISS_COST, OUTLOOK, OUTLOOK_TEST,
+from farmdrought.config import (ALERT_WEEKS, FEED_COST_PER_HEAD_MONTH, FOCUS_RIVER, LATEST, METRICS, MISS_COST, OUTLOOK, OUTLOOK_TEST,
                                 PREDICTIONS, PROCESSED, REPORTS, SEASON_THRESHOLD, SEASON_WEEKS, TEST_START,
                                 TRAIN, VAL, YEAR_WEEKS)
 from farmdrought.features import FEATURES_H
 from farmdrought.flow import FEATURES_F, add_flow_features
+from farmdrought.mapfields import MAP_COLUMNS, add_map_fields, range_coverage
 from farmdrought.outlook import (FEATURES_SEASON, FEATURES_YEAR, extra_inputs_test, issue_rows, make_classifier,
                                  make_regressor, run_outlook)
+from farmdrought.robustness import ROBUSTNESS
 from farmdrought.snow import FEATURES_S, add_snow_features
 
 IS_FINAL = True  # the numbers are locked: reports/decision.md was committed before this run
@@ -236,7 +238,12 @@ def build_metrics(alert, season, year, predictions, scored, panel):
             "Counties are chosen by a 50 km rule from the river's main line. A different width gives a different set.",
             "The Drought Monitor map is drawn by people each week, so the target includes their judgment.",
             "A warning is not a payment decision. The grazing-period rule of the aid program is not modeled.",
-            "Nothing here measures crop yields or dollars saved.",
+            "The 6-month target (8 weeks in a row at D2) matches the aid rule for years up to 2025. For 2026 USDA "
+            "lowered the trigger to 4 weeks in a row (FSA Notice LFP-8).",
+            "The damage figure on the map is an estimate, not a tested forecast. It assumes every week of severe "
+            "drought is a week of bought feed, priced at USDA's 2026 monthly feed cost for an adult beef cow. "
+            "It was not checked against real losses, and it inherits the 12-month outlook's error.",
+            "Nothing here measures crop yields.",
             "River flow and snowpack were tested as extra inputs and are not part of the system. See ablations. "
             "The El Paso gauge had no daily flow data and was dropped. The Del Norte gauge ends in 2024.",
             "Weather inputs (rain, temperature, soil moisture) were not tested.",
@@ -259,7 +266,28 @@ def main():
     metrics = build_metrics(alert, season, year, predictions, scored, panel)
     predictions = finish(predictions, PREDICTION_COLUMNS, ["date", "fips"])
     outlook = finish(scored, OUTLOOK_COLUMNS, ["date", "fips"])
-    latest = finish(latest_table(panel, alert["threshold"]), LATEST_COLUMNS, ["fips"])
+    # This week's rows, plus the extra columns for the risk map (added at the end, which
+    # contract rule 2 allows). The length range uses each river's measured 12-month error.
+    error_by_river = {entry["river"]: entry["mae_system"] for entry in year["per_river"]}
+    latest = add_map_fields(latest_table(panel, alert["threshold"]), panel, error_by_river)
+    latest = finish(latest, LATEST_COLUMNS + MAP_COLUMNS, ["fips"])
+    rg_scored = scored[scored["river"] == FOCUS_RIVER]
+    metrics["map_fields"] = {
+        "columns": {
+            "risk_level": "Overall level for the map: the worse of the 4-week tier and the 6-month tier",
+            "weeks_low": "Low end of the 12-month estimate: weeks_model minus the average error measured on that river",
+            "weeks_high": "High end of the 12-month estimate: weeks_model plus that average error, at most 52",
+            "typical_drought_weeks": "Median length of the county's past severe-drought spells, in weeks (0 if none)",
+            "longest_drought_weeks": "The county's longest severe-drought spell on record, in weeks",
+            "damage_months": "Months of bought feed if every expected severe-drought week needs bought feed",
+            "damage_usd_per_100_head": "damage_months x monthly feed cost per head x 100 cattle, in dollars",
+        },
+        "feed_cost_per_head_month": FEED_COST_PER_HEAD_MONTH,
+        "feed_cost_source": "USDA Farm Service Agency, Notice LFP-7, 2026 LFP Payment Rates, adult beef cattle",
+        # In testing, how often the truth fell inside weeks_low..weeks_high on the Rio Grande
+        "length_range_coverage_focus": range_coverage(rg_scored, error_by_river[FOCUS_RIVER]),
+        "tested": "risk_level and the length range come from tested forecasts. The damage columns are untested estimates.",
+    }
 
     # 3. Write the four files
     PROCESSED.mkdir(parents=True, exist_ok=True)
@@ -267,6 +295,30 @@ def main():
     predictions.to_parquet(PREDICTIONS, index=False)
     outlook.to_parquet(OUTLOOK, index=False)
     latest.to_parquet(LATEST, index=False)
+    # Add the robustness checks (seeds and county buffer) if they have been run.
+    # They are extra keys at the end, which contract rule 2 allows.
+    if ROBUSTNESS.exists():
+        with open(ROBUSTNESS) as f:
+            checks = json.load(f)
+        metrics.update(checks)
+        seeds, wide, extra = checks["seed_check"]["summary"], checks["buffer_check"], checks["extra_rules_check"]
+        metrics["limits"] += [
+            f"Seed check: retrained with {len(checks['seed_check']['runs'])} random seeds, the system beat the best simple rule in "
+            f"{seeds['alert_cost']['seeds_beating_best_baseline']} runs for the 4-week alert, "
+            f"{seeds['season_cost']['seeds_beating_best_baseline']} for the 6-month outlook and "
+            f"{seeds['year_mae']['seeds_beating_best_baseline']} for the 12-month outlook.",
+            f"Buffer check: with a {wide['buffer_km']} km county rule ({wide['n_focus_counties']} counties), the 4-week "
+            f"system cost {wide['alert']['system_cost']} against {wide['alert']['best_baseline_cost']} for the best "
+            f"simple rule ({wide['alert']['best_baseline']}).",
+            "An outside review suggested two simple rules that were not in our baseline list. They were scored "
+            "after the final run. "
+            f"4-week rule '{extra['alert_rule']}': cost {extra['alert_rule_cost_test']} on the test years, against "
+            f"{extra['system_cost_test']} for the system. "
+            f"12-month rule '{extra['year_rule']}': average error {extra['year_rule_mae']} weeks, against "
+            f"{extra['system_mae']} for the system.",
+            "The 6-month outlook uses an El Nino value that NOAA publishes a few days into the month, around the "
+            "same days the outlook is issued. A real-time forecast might have to use the value from a month earlier.",
+        ]
     with open(METRICS, "w") as f:
         # default=... turns numpy numbers into plain numbers that JSON accepts
         json.dump(metrics, f, indent=2, default=lambda value: value.item())

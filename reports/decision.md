@@ -73,3 +73,20 @@ These numbers come from `reports/alert_run.txt`.
 - `honesty_check_pass` for the 4-week alert.
 - `beats_every_baseline` for both outlooks.
 - The onset result, the transfer result on each river, and the flow and snowpack ablations.
+
+## Addendum, written after the final run (Nov 14, 2026)
+
+This section was added after the final run. Nothing above was edited.
+
+**What "fixed before the final run" does and does not mean.** This record was committed about two minutes before the final run, but after a provisional run of the same code had already shown test-year results. The model settings, inputs and targets came from exploratory scripts in `notebooks/`, which tried several horizons, targets and input sets on the same 2008 to 2025 test years. So this is a record of what was frozen for the final run. It is not a blind pre-registration.
+
+**What an outside review and our own checks found afterwards** (all numbers are in `reports/robustness.json`):
+
+- **No leakage was found.** Features, labels, splits and thresholds were checked and are clean.
+- **6-month outlook:** its win over the "D1 or worse now" rule depends on the random seed. Across 10 seeds it beat that rule 3 times. Treat it as a tie.
+- **4-week alert:** it beat the Worsening rule with 8 of 10 seeds. A rule that was not in our list, "D2 now, or D1 and worse than 4 or 8 weeks ago", costs 1,840 on the test years against 1,912 for the system, and it was also cheaper on the validation years (622 against 636).
+- **12-month outlook:** it beat our three listed baselines with all 10 seeds. But the plain average of two of them ("same as now" and "same as the last 52 weeks") is off by 13.21 weeks, against 14.00 for the system.
+- **100 km county rule (53 counties):** the 4-week alert narrowly loses to the Worsening rule (3,269 against 3,243). Both outlooks still beat their listed baselines.
+- **El Nino timing:** the 6-month outlook uses a value NOAA publishes a few days into the month, around the days the outlook is issued.
+
+The system was not changed in response to any of this. Changing it now would be tuning on the test years.

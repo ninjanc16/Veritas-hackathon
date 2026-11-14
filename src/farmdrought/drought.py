@@ -96,8 +96,8 @@ def d2_streak(classes):
     return streak
 
 
-def build_panel():
-    """Build the county-week table for the 436 river counties.
+def build_panel(buffer_km=BUFFER_KM):
+    """Build the county-week table for the river counties (436 of them at the default 50 km).
 
     Columns: date, fips, county, state, river, lat, lon, d2_streak, the inputs (sets H, L
     and E), and the three truths: y (4-week), y_season (6-month) and y_weeks (12-month).
@@ -117,7 +117,7 @@ def build_panel():
 
     # 2. A river county is one whose center is within 50 km of one of the five rivers.
     river, distance = nearest_river(lon, lat, load_river_points())
-    chosen = np.where(distance <= BUFFER_KM)[0]
+    chosen = np.where(distance <= buffer_km)[0]
 
     # 3. Neighbors of each river county: ALL counties within 150 km, except itself.
     neighbors = []
