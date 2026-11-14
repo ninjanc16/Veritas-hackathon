@@ -79,3 +79,44 @@ PREDICTIONS = PROCESSED / "predictions.parquet"
 OUTLOOK = PROCESSED / "outlook.parquet"
 LATEST = PROCESSED / "latest.parquet"
 METRICS = REPORTS / "metrics.json"
+
+# ---------- 8. Pivot: should an irrigation district seal its canals before the season? ----------
+# 8a. Reservoir storage (Texas Water Development Board, waterdatafortexas.org, one CSV per lake)
+RESERVOIR_DIR = RAW / "reservoirs"
+# Amistad and Falcon are run as one system, so their storage is added together.
+RESERVOIR_FILES = {
+    "Amistad-Falcon": ["amistad.csv", "falcon.csv"],
+    "Elephant Butte": ["elephant-butte.csv"],
+}
+# Which county draws from which reservoir system, keyed by county FIPS code.
+# THIS TABLE IS OUR ASSUMPTION, not a published mapping. Counties upstream of a reservoir
+# cannot draw from it, so the other 17 Rio Grande counties are not listed (they get "none").
+COUNTY_RESERVOIR = {
+    # Amistad-Falcon: Texas counties from Lake Amistad down to the Gulf
+    "48465": "Amistad-Falcon",  # Val Verde
+    "48271": "Amistad-Falcon",  # Kinney
+    "48323": "Amistad-Falcon",  # Maverick
+    "48127": "Amistad-Falcon",  # Dimmit
+    "48479": "Amistad-Falcon",  # Webb
+    "48505": "Amistad-Falcon",  # Zapata
+    "48427": "Amistad-Falcon",  # Starr
+    "48215": "Amistad-Falcon",  # Hidalgo
+    "48061": "Amistad-Falcon",  # Cameron
+    "48489": "Amistad-Falcon",  # Willacy
+    # Elephant Butte: the reservoir's own county and the three below it
+    "35051": "Elephant Butte",  # Sierra, New Mexico
+    "35013": "Elephant Butte",  # Dona Ana, New Mexico
+    "48141": "Elephant Butte",  # El Paso, Texas
+    "48229": "Elephant Butte",  # Hudspeth, Texas
+}
+
+# 8b. Pre-season trigger test: canal work is decided before the irrigation season,
+# so only outlooks issued in January, February and March are scored.
+TRIGGER_MONTHS = [1, 2, 3]
+# "Cost ratio" = cost of sealing a canal / loss avoided if a drought season then comes.
+# We do not know the true ratio, so the test reports all of these.
+COST_RATIOS = [0.02, 0.05, 0.10, 0.18, 0.25, 0.50]
+
+# 8c. Measured drought losses (USDA Risk Management Agency, Cause of Loss files)
+LOSS_YEARS = (2000, 2025)
+LOSSES_CSV = RAW / "rma" / "colsom_rio_grande.csv"  # the 31 Rio Grande counties only

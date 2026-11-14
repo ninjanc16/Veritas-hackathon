@@ -17,16 +17,19 @@ import numpy as np
 import pandas as pd
 
 from farmdrought.alert import make_forest, run_alert, split_masks
-from farmdrought.config import (ALERT_WEEKS, FEED_COST_PER_HEAD_MONTH, FOCUS_RIVER, LATEST, METRICS, MISS_COST, OUTLOOK, OUTLOOK_TEST,
+from farmdrought.config import (ALERT_WEEKS, COUNTY_RESERVOIR, D2_CLASS, FEED_COST_PER_HEAD_MONTH, FOCUS_RIVER, LATEST, METRICS, MISS_COST, OUTLOOK, OUTLOOK_TEST,
                                 PREDICTIONS, PROCESSED, REPORTS, SEASON_THRESHOLD, SEASON_WEEKS, TEST_START,
                                 TRAIN, VAL, YEAR_WEEKS)
 from farmdrought.features import FEATURES_H
 from farmdrought.flow import FEATURES_F, add_flow_features
+from farmdrought.losses import run_losses
 from farmdrought.mapfields import MAP_COLUMNS, add_map_fields, range_coverage
-from farmdrought.outlook import (FEATURES_SEASON, FEATURES_YEAR, extra_inputs_test, issue_rows, make_classifier,
+from farmdrought.outlook import (FEATURES_SEASON, FEATURES_SEASON_RES, FEATURES_YEAR, extra_inputs_test, issue_rows, make_classifier,
                                  make_regressor, run_outlook)
+from farmdrought.reservoirs import add_reservoir_features, reservoir_summary
 from farmdrought.robustness import ROBUSTNESS
 from farmdrought.snow import FEATURES_S, add_snow_features
+from farmdrought.trigger import run_trigger
 
 IS_FINAL = True  # the numbers are locked: reports/decision.md was committed before this run
 
@@ -39,6 +42,9 @@ OUTLOOK_COLUMNS = ["date", "fips", "county", "state", "river", "cls", "y_season"
                    "weeks_last_year", "weeks_same_as_now", "weeks_usual"]
 LATEST_COLUMNS = ["date", "fips", "county", "state", "river", "lat", "lon", "cls", "d2_streak", "p_model",
                   "tier", "alarm_system", "p_season", "season_tier", "weeks_model", "weeks_usual"]
+# Pivot columns (canal action). Added at the END of the files, which contract rule 2 allows.
+PIVOT_OUTLOOK_COLUMNS = ["p_season_res"]
+PIVOT_LATEST_COLUMNS = ["p_season_res", "d2_share_history", "res_name", "res_pct_full"]
 WHOLE_NUMBERS = ["y", "cls", "d2_streak", "y_season", "y_weeks"]
 
 
@@ -75,11 +81,20 @@ def latest_table(panel, threshold):
     now["alarm_system"] = now["p_model"] >= threshold
     now["tier"] = tiers(now["p_model"], threshold)
 
-    monthly = issue_rows(panel)  # the outlooks learn from monthly rows, as in testing
+    # The outlooks learn from monthly rows, as in testing. The reservoir inputs are added to
+    # the training rows and to this week's rows. Only p_season_res uses them.
+    monthly = add_reservoir_features(issue_rows(panel))
+    now = add_reservoir_features(now)
     rg = monthly[monthly["river"] == FOCUS_RIVER]
     known = rg[rg["y_season"].notna()]
     now["p_season"] = make_classifier().fit(known[FEATURES_SEASON], known["y_season"]).predict_proba(now[FEATURES_SEASON])[:, 1]
     now["season_tier"] = tiers(now["p_season"], SEASON_THRESHOLD)
+    # Pivot: the second 6-month forecast, which also sees reservoir storage
+    now["p_season_res"] = make_classifier().fit(known[FEATURES_SEASON_RES], known["y_season"]).predict_proba(now[FEATURES_SEASON_RES])[:, 1]
+    # Pivot: plain facts for the canal screen (no model involved)
+    now["res_name"] = now["fips"].map(COUNTY_RESERVOIR).fillna("none")
+    now["res_pct_full"] = now["res_pct"].round(1)  # already -1 for counties with no reservoir
+    now["d2_share_history"] = now["fips"].map((panel["cls"] >= D2_CLASS).groupby(panel["fips"]).mean())
     known = rg[rg["y_weeks"].notna()]
     now["weeks_model"] = make_regressor().fit(known[FEATURES_YEAR], known["y_weeks"]).predict(now[FEATURES_YEAR])
     # "Usual" = each county's own average over every month whose answer is known
@@ -254,6 +269,46 @@ def build_metrics(alert, season, year, predictions, scored, panel):
     }
 
 
+def pivot_metrics(scored, season, panel, metrics_limits):
+    """The three pivot keys (trigger, reservoir, losses), plus their limit sentences added to the
+    existing list of limits (metrics_limits)."""
+    trigger = run_trigger(scored)
+    rg = panel[panel["river"] == FOCUS_RIVER]
+    counties = rg[["fips", "county", "state"]].drop_duplicates()
+    losses = run_losses(counties)
+    rule = {r["name"]: r for r in trigger["rules"]}
+    ours, with_res, d1 = rule["Our forecast"], rule["Our forecast with reservoirs"], rule["D1 or worse now"]
+    at_threshold = next(v for v in trigger["value_sweep"] if v["cost_ratio"] == SEASON_THRESHOLD)
+    cost, cost_res = season["focus"]["system_cost"], season["reservoir_cost"]
+    reservoir = {
+        "systems": reservoir_summary(),
+        "counties_without_reservoir": int(counties["fips"].nunique() - len(COUNTY_RESERVOIR)),
+        "note": "Counties were matched to reservoirs by us, not from a published list. The ten Texas counties "
+                "from Val Verde to Cameron use Amistad-Falcon (the two lakes added together). Sierra, Dona Ana, "
+                "El Paso and Hudspeth use Elephant Butte. Counties upstream of a reservoir cannot draw from it, "
+                "so they get no reservoir input. Storage data: Texas Water Development Board, waterdatafortexas.org.",
+        # ---- extra, beyond the agreed keys: did reservoir storage help the 6-month outlook? ----
+        "season_cost_without": cost,
+        "season_cost_with": cost_res,
+        "helped": bool(cost_res < cost),
+    }
+    limits = [
+        f"Pre-season trigger (outlooks issued January to March): our forecast caught {ours['caught']} of "
+        f"{trigger['drought_seasons']} drought seasons with {ours['false_alarms']} false alarms. The simple rule "
+        f"'D1 or worse now' caught {d1['caught']} with {d1['false_alarms']}. At a cost ratio of 0.25 the forecast is "
+        f"worth {at_threshold['forecast']} per decision against {at_threshold['d1_rule']} for the rule. "
+        "That is a tie, not a win.",
+        f"Reservoir storage did {'' if reservoir['helped'] else 'not '}help. The 6-month outlook costs {cost_res} "
+        f"with reservoir inputs, against {cost} without them. As a pre-season trigger the reservoir forecast caught "
+        f"{with_res['caught']} drought seasons with {with_res['false_alarms']} false alarms.",
+        "Only 14 of the 31 Rio Grande counties are matched to a reservoir, and that matching is our assumption.",
+        "County drought is not the same as water supply. Water in the canals also depends on reservoir releases "
+        "and on Mexico's deliveries under the 1944 water treaty, which are not modeled.",
+        "The loss figures are insured crop losses only, not all drought losses, and are not adjusted for inflation.",
+    ]
+    return {"limits": metrics_limits + limits, "trigger": trigger, "reservoir": reservoir, "losses": losses}
+
+
 def main():
     # 1. Run the three experiments
     panel, alert = run_alert()
@@ -265,12 +320,12 @@ def main():
     predictions["tier"] = tiers(predictions["p_model"], alert["threshold"])
     metrics = build_metrics(alert, season, year, predictions, scored, panel)
     predictions = finish(predictions, PREDICTION_COLUMNS, ["date", "fips"])
-    outlook = finish(scored, OUTLOOK_COLUMNS, ["date", "fips"])
+    outlook = finish(scored, OUTLOOK_COLUMNS + PIVOT_OUTLOOK_COLUMNS, ["date", "fips"])
     # This week's rows, plus the extra columns for the risk map (added at the end, which
     # contract rule 2 allows). The length range uses each river's measured 12-month error.
     error_by_river = {entry["river"]: entry["mae_system"] for entry in year["per_river"]}
     latest = add_map_fields(latest_table(panel, alert["threshold"]), panel, error_by_river)
-    latest = finish(latest, LATEST_COLUMNS + MAP_COLUMNS, ["fips"])
+    latest = finish(latest, LATEST_COLUMNS + MAP_COLUMNS + PIVOT_LATEST_COLUMNS, ["fips"])
     rg_scored = scored[scored["river"] == FOCUS_RIVER]
     metrics["map_fields"] = {
         "columns": {
@@ -319,6 +374,8 @@ def main():
             "The 6-month outlook uses an El Nino value that NOAA publishes a few days into the month, around the "
             "same days the outlook is issued. A real-time forecast might have to use the value from a month earlier.",
         ]
+    # ---- Pivot keys (canal action), at the very end ----
+    metrics.update(pivot_metrics(scored, season, panel, metrics["limits"]))
     with open(METRICS, "w") as f:
         # default=... turns numpy numbers into plain numbers that JSON accepts
         json.dump(metrics, f, indent=2, default=lambda value: value.item())

@@ -9,7 +9,8 @@ import pandas as pd
 import pytest
 
 from farmdrought.config import LATEST, METRICS, OUTLOOK, PREDICTIONS, RIVERS
-from farmdrought.export import LATEST_COLUMNS, OUTLOOK_COLUMNS, PREDICTION_COLUMNS
+from farmdrought.export import (LATEST_COLUMNS, OUTLOOK_COLUMNS, PIVOT_LATEST_COLUMNS, PIVOT_OUTLOOK_COLUMNS,
+                                PREDICTION_COLUMNS)
 from farmdrought.mapfields import MAP_COLUMNS
 
 TIERS = {"Low", "Watch", "Warning"}
@@ -47,7 +48,8 @@ def test_predictions_file(files):
 
 def test_outlook_file(files):
     _, outlook, _, metrics = files
-    check_common(outlook, OUTLOOK_COLUMNS)
+    check_common(outlook, OUTLOOK_COLUMNS + PIVOT_OUTLOOK_COLUMNS)  # pivot column at the end
+    assert outlook["p_season_res"].between(0, 1).all()
     assert outlook[["date", "fips"]].equals(outlook[["date", "fips"]].sort_values(["date", "fips"]).reset_index(drop=True))
     assert set(outlook["y_season"]) == {0, 1} and outlook["y_weeks"].between(0, 52).all()
     assert outlook["p_season"].between(0, 1).all() and outlook["weeks_model"].between(0, 52).all()
@@ -61,8 +63,9 @@ def test_outlook_file(files):
 
 def test_latest_file(files):
     _, _, latest, metrics = files
-    # The contract columns come first, then the map columns added at the end
-    assert list(latest.columns) == LATEST_COLUMNS + MAP_COLUMNS and not latest.isna().any().any()
+    # The contract columns come first, then the map columns, then the pivot columns
+    assert list(latest.columns) == LATEST_COLUMNS + MAP_COLUMNS + PIVOT_LATEST_COLUMNS
+    assert not latest.isna().any().any()
     assert len(latest) == 436 and latest["fips"].is_unique and latest["fips"].is_monotonic_increasing
     assert {str(d) for d in latest["date"]} == {metrics["latest_week"]}  # one week only
     assert set(latest["tier"]) <= TIERS and set(latest["season_tier"]) <= TIERS
@@ -106,3 +109,34 @@ def test_headline_numbers_can_be_recomputed_from_the_predictions_file(files):
         missed = int((~alarm & (rio["y"] == 1)).sum())
         false_alarms = int((alarm & (rio["y"] == 0)).sum())
         assert policy["cost"] == metrics["miss_cost"] * missed + false_alarms
+
+
+def test_pivot_columns_and_keys(files):
+    """The canal-action additions: new columns in the latest file, three new keys in metrics.json."""
+    _, outlook, latest, metrics = files
+    assert latest["p_season_res"].between(0, 1).all() and latest["d2_share_history"].between(0, 1).all()
+    assert set(latest["res_name"]) == {"Amistad-Falcon", "Elephant Butte", "none"}
+    # 10 + 4 counties have a reservoir. Every other county has "none" and -1.
+    assert (latest["res_name"] != "none").sum() == 14
+    assert (latest.loc[latest["res_name"] == "none", "res_pct_full"] == -1).all()
+    assert latest.loc[latest["res_name"] != "none", "res_pct_full"].between(0, 100).all()
+
+    assert list(metrics)[-3:] == ["trigger", "reservoir", "losses"]   # the new keys are at the end
+    trigger = metrics["trigger"]
+    assert [r["name"] for r in trigger["rules"]] == ["Our forecast", "Our forecast with reservoirs",
+                                                     "D1 or worse now", "D2 or worse now", "Seal every year"]
+    for rule in trigger["rules"]:
+        assert rule["caught"] + rule["missed"] == trigger["drought_seasons"]
+        assert rule["caught"] + rule["false_alarms"] == rule["fires"]
+    assert trigger["rules"][-1]["fires"] == trigger["rows"]            # "seal every year" always fires
+    assert isinstance(trigger["forecast_beats_d1_rule"], bool)
+    assert isinstance(trigger["reservoir_forecast_beats_d1_rule"], bool)
+    # The trigger counts can be recomputed from the outlook file by anyone
+    rio = outlook[(outlook["river"] == "Rio Grande") & outlook["date"].map(lambda d: d.month <= 3)]
+    assert len(rio) == trigger["rows"] and rio["y_season"].sum() == trigger["drought_seasons"]
+    assert ((rio["p_season"] >= 0.25) & (rio["y_season"] == 1)).sum() == trigger["rules"][0]["caught"]
+
+    assert metrics["reservoir"]["counties_without_reservoir"] == 17
+    losses = metrics["losses"]
+    assert losses["total_usd"] == sum(entry["usd"] for entry in losses["by_year"])
+    assert len(losses["by_county"]) == 31 and losses["causes_included"] == ["Drought"]

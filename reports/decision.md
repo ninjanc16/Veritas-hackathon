@@ -90,3 +90,19 @@ This section was added after the final run. Nothing above was edited.
 - **El Nino timing:** the 6-month outlook uses a value NOAA publishes a few days into the month, around the days the outlook is issued.
 
 The system was not changed in response to any of this. Changing it now would be tuning on the test years.
+
+## Pivot: canal action (written Nov 14, 2026, before the first run of the reservoir forecast or the trigger test in this code)
+
+The project now asks a decision question: before the irrigation season, should a district seal its leakiest canals this year? Nothing above changes. The settings below were fixed before this code produced any result.
+
+**What we had already seen.** A sandbox run of the trigger test on the existing forecast, before this section was written: issued January to March, the forecast caught 93% of drought seasons and the "D1 or worse now" rule caught 92%. So we expected a tie for the existing forecast. The reservoir forecast had never been run.
+
+**Reservoir forecast (`p_season_res`).** The same 6-month forest with the same settings, trained on Rio Grande rows with the same forward chaining. Inputs are H + L + E plus five reservoir inputs (set R): percent full, its change over 12 and 52 weeks, its rank against the same calendar month in earlier years (back to 1990), and a flag for whether the county has a reservoir. The existing forecast `p_season` is not changed, and the reservoir forecast does not replace it whichever way the test falls.
+
+**County-to-reservoir table.** Ten Texas counties from Val Verde to Cameron use Amistad-Falcon (the two lakes summed). Sierra, Dona Ana, El Paso and Hudspeth use Elephant Butte. The other 17 counties have none. This table is our assumption.
+
+**Trigger test.** Rio Grande rows of the outlook test years, issued in January, February or March. Five rules: our forecast at 0.25, our forecast with reservoirs at 0.25, D1 or worse now, D2 or worse now, seal every year. Value = (drought seasons caught - cost ratio x times fired) / rows, for cost ratios 0.02, 0.05, 0.10, 0.18, 0.25 and 0.50. A forecast "beats the D1 rule" only if its value is higher at cost ratio 0.25.
+
+**Losses.** USDA crop insurance payouts for the cause "Drought", the 31 counties, 2000 to 2025, not adjusted for inflation. "Failure of Irrigation Supply" is reported on its own line and is not in the total.
+
+**What will be reported, whichever way it falls:** both `beats_d1_rule` flags, the 6-month cost with and without reservoir inputs, and the trigger table for the 14 reservoir counties alone.

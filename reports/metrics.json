@@ -1,6 +1,6 @@
 {
   "contract_version": 2,
-  "generated_at": "2026-11-14T08:02:28-08:00",
+  "generated_at": "2026-11-14T11:53:38-08:00",
   "is_final": true,
   "focus_river": "Rio Grande",
   "training_scope": "Rio Grande counties only",
@@ -591,7 +591,12 @@
     "Seed check: retrained with 10 random seeds, the system beat the best simple rule in 8/10 runs for the 4-week alert, 3/10 for the 6-month outlook and 10/10 for the 12-month outlook.",
     "Buffer check: with a 100 km county rule (53 counties), the 4-week system cost 3269 against 3243 for the best simple rule (Worsening).",
     "An outside review suggested two simple rules that were not in our baseline list. They were scored after the final run. 4-week rule 'D2 now, or D1 and worse than 4 or 8 weeks ago': cost 1840 on the test years, against 1912 for the system. 12-month rule 'average of 'same as now' and 'same as the last 52 weeks'': average error 13.21 weeks, against 14.0 for the system.",
-    "The 6-month outlook uses an El Nino value that NOAA publishes a few days into the month, around the same days the outlook is issued. A real-time forecast might have to use the value from a month earlier."
+    "The 6-month outlook uses an El Nino value that NOAA publishes a few days into the month, around the same days the outlook is issued. A real-time forecast might have to use the value from a month earlier.",
+    "Pre-season trigger (outlooks issued January to March): our forecast caught 790 of 852 drought seasons with 271 false alarms. The simple rule 'D1 or worse now' caught 780 with 243. At a cost ratio of 0.25 the forecast is worth 0.3135 per decision against 0.3132 for the rule. That is a tie, not a win.",
+    "Reservoir storage did not help. The 6-month outlook costs 2452 with reservoir inputs, against 2324 without them. As a pre-season trigger the reservoir forecast caught 771 drought seasons with 261 false alarms.",
+    "Only 14 of the 31 Rio Grande counties are matched to a reservoir, and that matching is our assumption.",
+    "County drought is not the same as water supply. Water in the canals also depends on reservoir releases and on Mexico's deliveries under the 1944 water treaty, which are not modeled.",
+    "The loss figures are insured crop losses only, not all drought losses, and are not adjusted for inflation."
   ],
   "alert_threshold": 0.36,
   "map_fields": {
@@ -724,5 +729,566 @@
     "year_rule": "average of 'same as now' and 'same as the last 52 weeks'",
     "year_rule_mae": 13.21,
     "system_mae": 14.0
+  },
+  "trigger": {
+    "issue_months": [
+      1,
+      2,
+      3
+    ],
+    "threshold": 0.25,
+    "rows": 1674,
+    "drought_seasons": 852,
+    "rules": [
+      {
+        "name": "Our forecast",
+        "fires": 1061,
+        "caught": 790,
+        "missed": 62,
+        "false_alarms": 271,
+        "recall": 0.927,
+        "precision": 0.745
+      },
+      {
+        "name": "Our forecast with reservoirs",
+        "fires": 1032,
+        "caught": 771,
+        "missed": 81,
+        "false_alarms": 261,
+        "recall": 0.905,
+        "precision": 0.747
+      },
+      {
+        "name": "D1 or worse now",
+        "fires": 1023,
+        "caught": 780,
+        "missed": 72,
+        "false_alarms": 243,
+        "recall": 0.915,
+        "precision": 0.762
+      },
+      {
+        "name": "D2 or worse now",
+        "fires": 661,
+        "caught": 591,
+        "missed": 261,
+        "false_alarms": 70,
+        "recall": 0.694,
+        "precision": 0.894
+      },
+      {
+        "name": "Seal every year",
+        "fires": 1674,
+        "caught": 852,
+        "missed": 0,
+        "false_alarms": 822,
+        "recall": 1.0,
+        "precision": 0.509
+      }
+    ],
+    "value_sweep": [
+      {
+        "cost_ratio": 0.02,
+        "forecast": 0.4893,
+        "forecast_reservoir": 0.4896,
+        "d1_rule": 0.4537,
+        "persistence": 0.3451,
+        "seal_every_year": 0.489
+      },
+      {
+        "cost_ratio": 0.05,
+        "forecast": 0.4628,
+        "forecast_reservoir": 0.4632,
+        "d1_rule": 0.4354,
+        "persistence": 0.3333,
+        "seal_every_year": 0.459
+      },
+      {
+        "cost_ratio": 0.1,
+        "forecast": 0.4216,
+        "forecast_reservoir": 0.4179,
+        "d1_rule": 0.4048,
+        "persistence": 0.3136,
+        "seal_every_year": 0.409
+      },
+      {
+        "cost_ratio": 0.18,
+        "forecast": 0.3612,
+        "forecast_reservoir": 0.3599,
+        "d1_rule": 0.3559,
+        "persistence": 0.282,
+        "seal_every_year": 0.329
+      },
+      {
+        "cost_ratio": 0.25,
+        "forecast": 0.3135,
+        "forecast_reservoir": 0.3065,
+        "d1_rule": 0.3132,
+        "persistence": 0.2543,
+        "seal_every_year": 0.259
+      },
+      {
+        "cost_ratio": 0.5,
+        "forecast": 0.158,
+        "forecast_reservoir": 0.1679,
+        "d1_rule": 0.1604,
+        "persistence": 0.1556,
+        "seal_every_year": 0.009
+      }
+    ],
+    "forecast_beats_d1_rule": true,
+    "reservoir_forecast_beats_d1_rule": false,
+    "reservoir_counties_only": {
+      "counties": 14,
+      "rows": 756,
+      "drought_seasons": 402,
+      "rules": [
+        {
+          "name": "Our forecast",
+          "fires": 493,
+          "caught": 379,
+          "missed": 23,
+          "false_alarms": 114,
+          "recall": 0.943,
+          "precision": 0.769
+        },
+        {
+          "name": "Our forecast with reservoirs",
+          "fires": 513,
+          "caught": 381,
+          "missed": 21,
+          "false_alarms": 132,
+          "recall": 0.948,
+          "precision": 0.743
+        },
+        {
+          "name": "D1 or worse now",
+          "fires": 477,
+          "caught": 369,
+          "missed": 33,
+          "false_alarms": 108,
+          "recall": 0.918,
+          "precision": 0.774
+        },
+        {
+          "name": "D2 or worse now",
+          "fires": 308,
+          "caught": 285,
+          "missed": 117,
+          "false_alarms": 23,
+          "recall": 0.709,
+          "precision": 0.925
+        },
+        {
+          "name": "Seal every year",
+          "fires": 756,
+          "caught": 402,
+          "missed": 0,
+          "false_alarms": 354,
+          "recall": 1.0,
+          "precision": 0.532
+        }
+      ],
+      "value_sweep": [
+        {
+          "cost_ratio": 0.02,
+          "forecast": 0.5121,
+          "forecast_reservoir": 0.512,
+          "d1_rule": 0.4755,
+          "persistence": 0.3688,
+          "seal_every_year": 0.5117
+        },
+        {
+          "cost_ratio": 0.05,
+          "forecast": 0.487,
+          "forecast_reservoir": 0.4861,
+          "d1_rule": 0.4565,
+          "persistence": 0.3566,
+          "seal_every_year": 0.4817
+        },
+        {
+          "cost_ratio": 0.1,
+          "forecast": 0.4497,
+          "forecast_reservoir": 0.4472,
+          "d1_rule": 0.425,
+          "persistence": 0.3362,
+          "seal_every_year": 0.4317
+        },
+        {
+          "cost_ratio": 0.18,
+          "forecast": 0.3891,
+          "forecast_reservoir": 0.3828,
+          "d1_rule": 0.3745,
+          "persistence": 0.3037,
+          "seal_every_year": 0.3517
+        },
+        {
+          "cost_ratio": 0.25,
+          "forecast": 0.3383,
+          "forecast_reservoir": 0.3343,
+          "d1_rule": 0.3304,
+          "persistence": 0.2751,
+          "seal_every_year": 0.2817
+        },
+        {
+          "cost_ratio": 0.5,
+          "forecast": 0.1799,
+          "forecast_reservoir": 0.1971,
+          "d1_rule": 0.1726,
+          "persistence": 0.1733,
+          "seal_every_year": 0.0317
+        }
+      ]
+    }
+  },
+  "reservoir": {
+    "systems": [
+      {
+        "name": "Amistad-Falcon",
+        "counties": 10,
+        "first_date": "1990-01-01",
+        "last_date": "2026-11-14"
+      },
+      {
+        "name": "Elephant Butte",
+        "counties": 4,
+        "first_date": "1990-01-01",
+        "last_date": "2026-11-14"
+      }
+    ],
+    "counties_without_reservoir": 17,
+    "note": "Counties were matched to reservoirs by us, not from a published list. The ten Texas counties from Val Verde to Cameron use Amistad-Falcon (the two lakes added together). Sierra, Dona Ana, El Paso and Hudspeth use Elephant Butte. Counties upstream of a reservoir cannot draw from it, so they get no reservoir input. Storage data: Texas Water Development Board, waterdatafortexas.org.",
+    "season_cost_without": 2324,
+    "season_cost_with": 2452,
+    "helped": false
+  },
+  "losses": {
+    "source": "USDA Risk Management Agency, Cause of Loss files",
+    "years": [
+      2000,
+      2025
+    ],
+    "causes_included": [
+      "Drought"
+    ],
+    "total_usd": 361225400,
+    "by_year": [
+      {
+        "year": 2000,
+        "usd": 8803452
+      },
+      {
+        "year": 2001,
+        "usd": 31484632
+      },
+      {
+        "year": 2002,
+        "usd": 33054222
+      },
+      {
+        "year": 2003,
+        "usd": 1589818
+      },
+      {
+        "year": 2004,
+        "usd": 9421
+      },
+      {
+        "year": 2005,
+        "usd": 8306741
+      },
+      {
+        "year": 2006,
+        "usd": 33664730
+      },
+      {
+        "year": 2007,
+        "usd": 262393
+      },
+      {
+        "year": 2008,
+        "usd": 10746466
+      },
+      {
+        "year": 2009,
+        "usd": 18496014
+      },
+      {
+        "year": 2010,
+        "usd": 24238
+      },
+      {
+        "year": 2011,
+        "usd": 20864908
+      },
+      {
+        "year": 2012,
+        "usd": 5325326
+      },
+      {
+        "year": 2013,
+        "usd": 60813172
+      },
+      {
+        "year": 2014,
+        "usd": 1751048
+      },
+      {
+        "year": 2015,
+        "usd": 45642
+      },
+      {
+        "year": 2016,
+        "usd": 706208
+      },
+      {
+        "year": 2017,
+        "usd": 5483716
+      },
+      {
+        "year": 2018,
+        "usd": 40572558
+      },
+      {
+        "year": 2019,
+        "usd": 2963112
+      },
+      {
+        "year": 2020,
+        "usd": 20049947
+      },
+      {
+        "year": 2021,
+        "usd": 21878262
+      },
+      {
+        "year": 2022,
+        "usd": 8544004
+      },
+      {
+        "year": 2023,
+        "usd": 12155007
+      },
+      {
+        "year": 2024,
+        "usd": 9577369
+      },
+      {
+        "year": 2025,
+        "usd": 4052994
+      }
+    ],
+    "by_county": [
+      {
+        "fips": "48489",
+        "county": "Willacy",
+        "state": "Texas",
+        "usd": 149710654
+      },
+      {
+        "fips": "48215",
+        "county": "Hidalgo",
+        "state": "Texas",
+        "usd": 88326018
+      },
+      {
+        "fips": "48061",
+        "county": "Cameron",
+        "state": "Texas",
+        "usd": 85659348
+      },
+      {
+        "fips": "48427",
+        "county": "Starr",
+        "state": "Texas",
+        "usd": 29831166
+      },
+      {
+        "fips": "08109",
+        "county": "Saguache",
+        "state": "Colorado",
+        "usd": 2794237
+      },
+      {
+        "fips": "48271",
+        "county": "Kinney",
+        "state": "Texas",
+        "usd": 1737209
+      },
+      {
+        "fips": "48505",
+        "county": "Zapata",
+        "state": "Texas",
+        "usd": 1149666
+      },
+      {
+        "fips": "48127",
+        "county": "Dimmit",
+        "state": "Texas",
+        "usd": 842424
+      },
+      {
+        "fips": "48229",
+        "county": "Hudspeth",
+        "state": "Texas",
+        "usd": 584419
+      },
+      {
+        "fips": "48141",
+        "county": "El Paso",
+        "state": "Texas",
+        "usd": 417930
+      },
+      {
+        "fips": "48323",
+        "county": "Maverick",
+        "state": "Texas",
+        "usd": 53322
+      },
+      {
+        "fips": "35053",
+        "county": "Socorro",
+        "state": "New Mexico",
+        "usd": 32759
+      },
+      {
+        "fips": "08003",
+        "county": "Alamosa",
+        "state": "Colorado",
+        "usd": 32594
+      },
+      {
+        "fips": "08021",
+        "county": "Conejos",
+        "state": "Colorado",
+        "usd": 26023
+      },
+      {
+        "fips": "35013",
+        "county": "Do\u00f1a Ana",
+        "state": "New Mexico",
+        "usd": 14722
+      },
+      {
+        "fips": "08105",
+        "county": "Rio Grande",
+        "state": "Colorado",
+        "usd": 12908
+      },
+      {
+        "fips": "08023",
+        "county": "Costilla",
+        "state": "Colorado",
+        "usd": 0
+      },
+      {
+        "fips": "08053",
+        "county": "Hinsdale",
+        "state": "Colorado",
+        "usd": 0
+      },
+      {
+        "fips": "08079",
+        "county": "Mineral",
+        "state": "Colorado",
+        "usd": 0
+      },
+      {
+        "fips": "08111",
+        "county": "San Juan",
+        "state": "Colorado",
+        "usd": 0
+      },
+      {
+        "fips": "35001",
+        "county": "Bernalillo",
+        "state": "New Mexico",
+        "usd": 0
+      },
+      {
+        "fips": "35028",
+        "county": "Los Alamos",
+        "state": "New Mexico",
+        "usd": 0
+      },
+      {
+        "fips": "35043",
+        "county": "Sandoval",
+        "state": "New Mexico",
+        "usd": 0
+      },
+      {
+        "fips": "35049",
+        "county": "Santa Fe",
+        "state": "New Mexico",
+        "usd": 0
+      },
+      {
+        "fips": "35051",
+        "county": "Sierra",
+        "state": "New Mexico",
+        "usd": 0
+      },
+      {
+        "fips": "35055",
+        "county": "Taos",
+        "state": "New Mexico",
+        "usd": 0
+      },
+      {
+        "fips": "35061",
+        "county": "Valencia",
+        "state": "New Mexico",
+        "usd": 0
+      },
+      {
+        "fips": "48043",
+        "county": "Brewster",
+        "state": "Texas",
+        "usd": 0
+      },
+      {
+        "fips": "48377",
+        "county": "Presidio",
+        "state": "Texas",
+        "usd": 0
+      },
+      {
+        "fips": "48465",
+        "county": "Val Verde",
+        "state": "Texas",
+        "usd": 0
+      },
+      {
+        "fips": "48479",
+        "county": "Webb",
+        "state": "Texas",
+        "usd": 0
+      }
+    ],
+    "note": "Insured crop losses only, paid for the cause 'Drought'. Not all drought losses: uninsured crops and most pasture and cattle losses are missing. Dollars are not adjusted for inflation. The latest year may still be incomplete. Losses for the separate cause 'Failure of Irrigation Supply' are not in the total. They were $375,345,508 over the same years.",
+    "irrigation_supply_usd": 375345508,
+    "top_crops": [
+      {
+        "crop": "Cotton",
+        "usd": 203254495
+      },
+      {
+        "crop": "Grain Sorghum",
+        "usd": 125747507
+      },
+      {
+        "crop": "Corn",
+        "usd": 13859527
+      },
+      {
+        "crop": "Sunflowers",
+        "usd": 4971454
+      },
+      {
+        "crop": "Sesame",
+        "usd": 4366448
+      }
+    ]
   }
 }
