@@ -10,6 +10,7 @@ import pytest
 
 from farmdrought.config import LATEST, METRICS, OUTLOOK, PREDICTIONS, RIVERS
 from farmdrought.export import LATEST_COLUMNS, OUTLOOK_COLUMNS, PREDICTION_COLUMNS
+from farmdrought.mapfields import MAP_COLUMNS
 
 TIERS = {"Low", "Watch", "Warning"}
 
@@ -60,7 +61,8 @@ def test_outlook_file(files):
 
 def test_latest_file(files):
     _, _, latest, metrics = files
-    assert list(latest.columns) == LATEST_COLUMNS and not latest.isna().any().any()
+    # The contract columns come first, then the map columns added at the end
+    assert list(latest.columns) == LATEST_COLUMNS + MAP_COLUMNS and not latest.isna().any().any()
     assert len(latest) == 436 and latest["fips"].is_unique and latest["fips"].is_monotonic_increasing
     assert {str(d) for d in latest["date"]} == {metrics["latest_week"]}  # one week only
     assert set(latest["tier"]) <= TIERS and set(latest["season_tier"]) <= TIERS

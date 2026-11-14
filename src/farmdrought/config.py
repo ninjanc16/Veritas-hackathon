@@ -35,6 +35,14 @@ MISS_COST = 3
 # break-even point when a miss costs 3 false alarms: 1 / (1 + 3) = 0.25.
 SEASON_THRESHOLD = 0.25
 
+# ---------- 4b. Damage estimate for the risk map ----------
+# USDA's monthly cost of feeding one adult beef cow, for program year 2026: $35.66.
+# Source: USDA Farm Service Agency, Notice LFP-7, "2026 LFP Payment Rates" (April 22, 2026),
+# https://www.fsa.usda.gov/Internet/FSA_Notice/lfp_7.pdf
+# This is the full feed cost. The aid program pays 60% of it per payment month.
+FEED_COST_PER_HEAD_MONTH = 35.66
+WEEKS_PER_MONTH = 52 / 12  # about 4.33
+
 # ---------- 5. Time splits (always by time, never random) ----------
 TRAIN = (2000, 2014)         # 4-week alert: fit the forest on these years
 VAL = (2015, 2018)           # pick the alarm threshold on these years

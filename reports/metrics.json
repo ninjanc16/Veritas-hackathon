@@ -1,6 +1,6 @@
 {
   "contract_version": 2,
-  "generated_at": "2026-11-14T07:48:52-08:00",
+  "generated_at": "2026-11-14T08:02:28-08:00",
   "is_final": true,
   "focus_river": "Rio Grande",
   "training_scope": "Rio Grande counties only",
@@ -582,7 +582,9 @@
     "Counties are chosen by a 50 km rule from the river's main line. A different width gives a different set.",
     "The Drought Monitor map is drawn by people each week, so the target includes their judgment.",
     "A warning is not a payment decision. The grazing-period rule of the aid program is not modeled.",
-    "Nothing here measures crop yields or dollars saved.",
+    "The 6-month target (8 weeks in a row at D2) matches the aid rule for years up to 2025. For 2026 USDA lowered the trigger to 4 weeks in a row (FSA Notice LFP-8).",
+    "The damage figure on the map is an estimate, not a tested forecast. It assumes every week of severe drought is a week of bought feed, priced at USDA's 2026 monthly feed cost for an adult beef cow. It was not checked against real losses, and it inherits the 12-month outlook's error.",
+    "Nothing here measures crop yields.",
     "River flow and snowpack were tested as extra inputs and are not part of the system. See ablations. The El Paso gauge had no daily flow data and was dropped. The Del Norte gauge ends in 2024.",
     "Weather inputs (rain, temperature, soil moisture) were not tested.",
     "A random forest cannot predict a drought longer or deeper than any it saw in training.",
@@ -592,6 +594,21 @@
     "The 6-month outlook uses an El Nino value that NOAA publishes a few days into the month, around the same days the outlook is issued. A real-time forecast might have to use the value from a month earlier."
   ],
   "alert_threshold": 0.36,
+  "map_fields": {
+    "columns": {
+      "risk_level": "Overall level for the map: the worse of the 4-week tier and the 6-month tier",
+      "weeks_low": "Low end of the 12-month estimate: weeks_model minus the average error measured on that river",
+      "weeks_high": "High end of the 12-month estimate: weeks_model plus that average error, at most 52",
+      "typical_drought_weeks": "Median length of the county's past severe-drought spells, in weeks (0 if none)",
+      "longest_drought_weeks": "The county's longest severe-drought spell on record, in weeks",
+      "damage_months": "Months of bought feed if every expected severe-drought week needs bought feed",
+      "damage_usd_per_100_head": "damage_months x monthly feed cost per head x 100 cattle, in dollars"
+    },
+    "feed_cost_per_head_month": 35.66,
+    "feed_cost_source": "USDA Farm Service Agency, Notice LFP-7, 2026 LFP Payment Rates, adult beef cattle",
+    "length_range_coverage_focus": 0.557,
+    "tested": "risk_level and the length range come from tested forecasts. The damage columns are untested estimates."
+  },
   "seed_check": {
     "runs": [
       {
