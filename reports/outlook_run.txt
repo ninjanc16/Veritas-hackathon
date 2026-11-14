@@ -1,0 +1,44 @@
+=== 6-month outlook, Rio Grande (cost: lower is better) ===
+rows                             6665
+base_rate                       0.489
+precision                       0.733
+recall                          0.868
+auc                             0.868
+system_cost                      2324
+persistence_cost                 3133
+d1_rule_cost                     2382
+usual_cost                       3871
+always_warn_cost                 3403
+never_warn_cost                  9786
+pct_cheaper_than_persistence     25.8
+beats_every_baseline             True
+years_better_than_usual         16/18 
+
+Trained on all five rivers: 2708 | Without El Nino inputs: 2489 
+
+      river  system_cost  persistence_cost   best_rule  best_rule_cost  pct_cheaper_than_best_rule  own_river_cost
+ Rio Grande         2324              3133      D1 now            2382                         2.4            2324
+Mississippi        13807              9208 Persistence            9208                       -49.9           10086
+   Missouri         8142              6220 Persistence            6220                       -30.9            6162
+   Colorado         1059              1215      D1 now            1048                        -1.0            1072
+       Ohio         5258              2488 Persistence            2488                      -111.3            2658 
+
+=== 12-month outlook, Rio Grande (average error in weeks: lower is better) ===
+rows                            6665
+mean_weeks                      22.1
+mae_system                      14.0
+mae_same_as_now                14.52
+mae_last_year                  15.18
+mae_usual                      17.39
+beats_every_baseline            True
+years_better_than_last_year    11/18
+years_better_than_usual        14/18 
+
+Trained on all five rivers: 13.38 
+
+      river  mae_system best_baseline  mae_best_baseline  mae_own_river
+ Rio Grande       14.00   same as now              14.52          14.00
+Mississippi       12.31         usual               6.49           5.83
+   Missouri       12.83   same as now               8.63           7.64
+   Colorado       13.55   same as now              13.21          12.79
+       Ohio       11.78         usual               2.63           2.71
