@@ -440,18 +440,11 @@ def build_charts(latest, metrics, status):
                       barmode="group", height=900)
     save_chart(fig, "other_rivers.html", status)
 
-    # 4) This week's map of the focus river.
+    # 4) This week's map of the focus river: a real zoomable map (needs internet to draw the tiles).
     now = latest[latest["river"] == m["focus_river"]]
-    fig = go.Figure()
-    for tier, color in TIER_COLOR.items():
-        sub = now[now["tier"] == tier]
-        fig.add_trace(go.Scatter(x=sub["lon"], y=sub["lat"], mode="markers", name=tier,
-                                 text=[html.escape(f"{c}, {s}") for c, s in zip(sub["county"], sub["state"])],
-                                 hoverinfo="text",
-                                 marker=dict(size=14, color=color)))
-    fig.update_yaxes(scaleanchor="x", scaleratio=1, title="Latitude")
-    fig.update_xaxes(title="Longitude")
-    fig.update_layout(title_text=f"This week: {m['focus_river']} counties by 4-week tier")
+    fig = theme.risk_map(now, selected_fips=None)
+    fig.update_layout(title_text=f"This week: {m['focus_river']} counties by 4-week tier",
+                      margin=dict(l=0, r=0, t=50, b=0))
     save_chart(fig, "this_week_map.html", status)
 
 

@@ -126,6 +126,15 @@ else:
     st.sidebar.success("App counts match metrics.json")
 
 
+def pick_county_from_map():
+    """Runs when a dot on the map is clicked: make that county the selected one."""
+    points = st.session_state.get("risk_map", {}).get("selection", {}).get("points", [])
+    if points:
+        clicked = str(points[0].get("customdata", [""])[0])
+        if clicked in set(latest["fips"]):          # only accept a real county code
+            st.session_state["fips"] = clicked
+
+
 def transfer_note():
     """Grey note shown at the top of every tab when a non-focus river is picked."""
     if is_transfer:
@@ -161,32 +170,17 @@ def tab_this_week():
         theme.callout(note)
     st.caption("This is a forecast tool, not a payment decision.")
 
-    # Map on the left, the counties on Warning on the right. No base map, so it works offline.
-    left, right = st.columns([2, 3], gap="large")
-    with left:
-        st.markdown("#### Where the risk is")
-        fig = go.Figure()
-        for tier in TIER_COLOR:
-            sub = river_latest[river_latest["tier"] == tier]
-            # html.escape: a county name from the data can never inject HTML into the hover box.
-            hover = [f"{html.escape(r.county)}, {html.escape(r.state)}<br>4-week: {r.tier}<br>6-month: {round(r.p_season * 100)}%"
-                     f"<br>12-month: about {round(r.weeks_model)} weeks" for r in sub.itertuples()]
-            fig.add_trace(go.Scatter(x=sub["lon"], y=sub["lat"], mode="markers", name=tier,
-                                     text=hover, hoverinfo="text",
-                                     marker=dict(size=13, color=TIER_COLOR[tier],
-                                                 line=dict(width=1.5, color="#fbf9f3"))))
-        fig.add_trace(go.Scatter(x=[row["lon"]], y=[row["lat"]], mode="markers", name="Selected county",
-                                 hoverinfo="skip",
-                                 marker=dict(size=26, symbol="circle-open", color=theme.palette()["heading"],
-                                             line=dict(width=3))))
-        fig.update_yaxes(scaleanchor="x", scaleratio=1, title="Latitude")   # equal aspect = no stretching
-        fig.update_xaxes(title="Longitude")
-        fig.update_layout(margin=dict(l=10, r=10, t=30, b=10))
-        st.plotly_chart(theme.style_fig(fig, 560), width="stretch")
-    with right:
-        # Two small tables: the counties on Warning, then the ones on Watch.
-        for tier, note in (("Warning", "Review stocking, feed and water plans."),
-                           ("Watch", "Keep an eye on hay and water plans.")):
+    # A real map: scroll to zoom, drag to move, hover for the forecasts, click a county to select it.
+    st.markdown("#### Where the risk is")
+    st.caption("Scroll to zoom, drag to move, click a county to select it.")
+    st.plotly_chart(theme.risk_map(river_latest, fips), key="risk_map", on_select=pick_county_from_map,
+                    selection_mode="points", config={"scrollZoom": True}, width="stretch")
+
+    # Two small tables under the map: the counties on Warning, then the ones on Watch.
+    cols = st.columns(2, gap="large")
+    for col, (tier, note) in zip(cols, (("Warning", "Review stocking, feed and water plans."),
+                                        ("Watch", "Keep an eye on hay and water plans."))):
+        with col:
             st.markdown(f"#### Counties on {tier}")
             hot = river_latest[river_latest["tier"] == tier].sort_values("p_model", ascending=False)
             if hot.empty:

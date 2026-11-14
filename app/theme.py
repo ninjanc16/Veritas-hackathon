@@ -15,8 +15,10 @@ Safety note: the only HTML we write is built here, and every piece of text that 
 data goes through html.escape() first. The CSS itself is fixed text.
 """
 import html
+import math
 from string import Template
 
+import plotly.graph_objects as go
 import streamlit as st
 
 # ---------------------------------------------------------------------------
@@ -26,12 +28,12 @@ LIGHT = dict(
     bg="#f4f1e8", surface="#fbf9f3", ink="#1d2b24", muted="#5b6a60", line="#d8d2c2",
     forest="#2f5d46", forest_deep="#1d3a2c", river="#2c6e7f", sidebar="#1f3d30",
     sidebar_ink="#eef0e4", tint="#e6eadb", paper_plot="rgba(0,0,0,0)",
-    heading="#1d3a2c", field_ink="#1d2b24")      # heading = titles and big numbers; field_ink = text inside inputs
+    heading="#1d3a2c", field_ink="#1d2b24", map_style="carto-positron")      # heading = titles and big numbers; field_ink = text inside inputs
 DARK = dict(
     bg="#121a16", surface="#1a2520", ink="#e8e4d6", muted="#9fada4", line="#2c3a32",
     forest="#86bb97", forest_deep="#0f1914", river="#6fb3c4", sidebar="#0d1511",
     sidebar_ink="#e8e4d6", tint="#22302a", paper_plot="rgba(0,0,0,0)",
-    heading="#eae6d6", field_ink="#e8e4d6")
+    heading="#eae6d6", field_ink="#e8e4d6", map_style="carto-darkmatter")
 
 # Warning tiers, as earth tones: sage -> ochre -> clay.
 TIER_COLOR = {"Low": "#7a9e7e", "Watch": "#d4a031", "Warning": "#b5472f"}
@@ -210,3 +212,40 @@ def style_fig(fig, height=None):
     if height:
         fig.update_layout(height=height)
     return fig
+
+
+def risk_map(df, selected_fips, height=520, width_px=980):
+    """
+    A real, zoomable map of the counties in `df` (one river), colored by 4-week tier.
+    Needs: fips, county, state, lat, lon, tier, p_season, weeks_model.
+    - Hover shows the county's three forecasts. Click a county to select it (customdata = its code).
+    - The map tiles (streets, rivers, terrain) are fetched by the viewer's browser from a free
+      public tile server (no account or key). If the tiles can't load, the dots still show.
+    """
+    p = palette()
+    fig = go.Figure()
+
+    # A soft halo behind the selected county, drawn first so it sits under the dots.
+    sel = df[df["fips"] == selected_fips]
+    fig.add_trace(go.Scattermap(lat=sel["lat"], lon=sel["lon"], mode="markers", hoverinfo="skip",
+                                name="Selected county", marker=dict(size=34, color=p["forest"], opacity=0.35)))
+
+    for tier, color in TIER_COLOR.items():
+        sub = df[df["tier"] == tier]
+        hover = [f"{html.escape(r.county)}, {html.escape(r.state)}<br>4-week: {r.tier}"
+                 f"<br>6-month: {round(r.p_season * 100)}%<br>12-month: about {round(r.weeks_model)} weeks"
+                 for r in sub.itertuples()]
+        fig.add_trace(go.Scattermap(lat=sub["lat"], lon=sub["lon"], mode="markers", name=tier,
+                                    text=hover, hoverinfo="text", customdata=sub[["fips"]],
+                                    marker=dict(size=15, color=color)))
+
+    # Zoom so every county fits: work out how many degrees we must show, then the zoom level
+    # (a world map tile is 512 px wide at zoom 0 and the width halves with every zoom step).
+    lat_span = max(df["lat"].max() - df["lat"].min(), 0.5)
+    lon_span = max((df["lon"].max() - df["lon"].min()) * math.cos(math.radians(df["lat"].mean())), 0.5)
+    zoom = min(math.log2(height * 360 / (512 * lat_span * 1.5)),
+               math.log2(width_px * 360 / (512 * lon_span * 1.5)), 9)
+    fig.update_layout(map=dict(style=p["map_style"], zoom=zoom,
+                               center=dict(lat=float(df["lat"].mean()), lon=float(df["lon"].mean()))),
+                      margin=dict(l=0, r=0, t=0, b=0))
+    return style_fig(fig, height)

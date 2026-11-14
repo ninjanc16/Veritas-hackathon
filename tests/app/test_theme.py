@@ -46,3 +46,27 @@ def test_style_fig_makes_the_background_transparent():
     import plotly.graph_objects as go
     fig = theme.style_fig(go.Figure(), 300)
     assert fig.layout.paper_bgcolor == "rgba(0,0,0,0)" and fig.layout.height == 300
+
+
+def _two_counties():
+    import pandas as pd
+    return pd.DataFrame({
+        "fips": ["08003", "35001"], "county": ["Alamosa", "<b>Bad</b>"], "state": ["Colorado", "New Mexico"],
+        "lat": [37.5, 35.0], "lon": [-105.8, -106.6], "tier": ["Low", "Warning"],
+        "p_season": [0.2, 0.6], "weeks_model": [14.0, 30.0]})
+
+
+def test_risk_map_has_a_dot_layer_per_tier_and_keeps_the_county_codes():
+    fig = theme.risk_map(_two_counties(), "08003")
+    names = [t.name for t in fig.data]
+    assert names == ["Selected county", "Low", "Watch", "Warning"]
+    assert list(fig.data[3].customdata[:, 0]) == ["35001"]       # a click can tell which county it was
+
+
+def test_risk_map_is_centered_on_the_data_and_escapes_names():
+    df = _two_counties()
+    fig = theme.risk_map(df, "08003")
+    assert min(df["lat"]) <= fig.layout.map.center.lat <= max(df["lat"])
+    assert 3 < fig.layout.map.zoom < 9                              # sensible zoom for two nearby counties
+    hover = "".join(fig.data[3].text)
+    assert "<b>Bad" not in hover and "&lt;b&gt;Bad" in hover
