@@ -43,3 +43,8 @@ def test_replay_buttons_work():
     at = _run_app()
     at.button[2].click().run()                            # "Next week"
     assert not at.exception
+
+
+def test_data_checks_are_green_on_demo_data():
+    at = _run_app()
+    assert any("App counts match metrics.json" in s.value for s in at.sidebar.success)

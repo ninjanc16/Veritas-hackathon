@@ -1,5 +1,5 @@
 """
-streamlit_app.py - the demo app (five tabs so far).
+streamlit_app.py - the demo app (six tabs).
 
 How it works, in plain English:
   * It gets ALL its data from app/contract.py -> load(). Nothing else. No internet.
@@ -8,6 +8,7 @@ How it works, in plain English:
   * Tabs so far:  "This week" (today's forecast), "Replay" (step through a past year),
                   "Outlook check" (past 6/12-month outlooks vs what happened),
                   "Farm brief" (plain-English page to download),
+                  "Other rivers and misses" (heat-maps of a whole river, plus the alarm's mistakes),
                   "How good is it" (the honest scorecard).
 Run it with:  streamlit run app/streamlit_app.py
 """
@@ -23,7 +24,8 @@ import streamlit as st                   # noqa: E402
 
 from app.brief import CLASS_WORDS, build_brief, streak_sentence   # noqa: E402
 from app.contract import load            # noqa: E402
-from app.tallies import tally, weeks_error                        # noqa: E402
+from app.tallies import (errors_table, reconcile, river_grid, tally,   # noqa: E402
+                         weeks_error)
 
 st.set_page_config(page_title="Rio Grande Farm Drought Outlook", layout="wide")
 
@@ -79,6 +81,16 @@ labels = {f"{r.county}, {r.state}": r.fips for r in river_latest.itertuples()}
 county_label = st.sidebar.selectbox("County", sorted(labels))
 fips = labels[county_label]
 is_transfer = river != focus
+
+# Sidebar "Data checks": re-count the alarms in the app and compare with metrics.json.
+# If they disagree, the files are suspect. We never patch them - we tell the Pipeline owner.
+st.sidebar.markdown("#### Data checks")
+mismatches = reconcile(pred, metrics)
+if mismatches:
+    st.sidebar.warning("App counts do not match metrics.json:\n\n" + "\n".join(f"- {m}" for m in mismatches)
+                       + "\n\nTell the Pipeline owner. Do not edit the files.")
+else:
+    st.sidebar.success("App counts match metrics.json")
 
 
 def transfer_note():
@@ -228,6 +240,12 @@ def tab_replay():
 # ---------------------------------------------------------------------------
 # TAB 3: How good is it - every number here comes straight from metrics.json
 # ---------------------------------------------------------------------------
+def show_failures():
+    """List the failure examples written by the pipeline (used on two tabs)."""
+    for f in metrics["failure_examples"]:
+        st.write(f"- **{f['product']}**, {f['date']}, {f['county']}, {f['state']}: {f['what_happened']}")
+
+
 def kv_table(d):
     """Turn the single values of a dict into a two-column table."""
     rows = [(k.replace("_", " "), str(v)) for k, v in d.items() if not isinstance(v, (dict, list))]
@@ -307,8 +325,7 @@ def tab_how_good():
 
     # 5) Where it fails.
     st.header("Where it fails")
-    for f in m["failure_examples"]:
-        st.write(f"- **{f['product']}**, {f['date']}, {f['county']}, {f['state']}: {f['what_happened']}")
+    show_failures()
 
     # 6) Extra checks and the plain list of limits.
     st.header("Extra checks and limits")
@@ -383,9 +400,65 @@ def tab_farm_brief():
 
 
 # ---------------------------------------------------------------------------
+# TAB: Other rivers and misses - a whole river for one year, plus the alarm's mistakes
+# ---------------------------------------------------------------------------
+COUNT_LABEL = "counted in the app, not a reported result"
+
+
+def heat(matrix, title, scale, zmax, ticks):
+    """One county-by-week heat-map. `ticks` maps color-bar numbers to words."""
+    fig = go.Figure(go.Heatmap(
+        z=matrix.values, x=matrix.columns, y=list(matrix.index), colorscale=scale, zmin=0, zmax=zmax,
+        colorbar=dict(tickvals=list(ticks), ticktext=list(ticks.values()))))
+    fig.update_yaxes(autorange="reversed")                 # first county (northernmost) at the top
+    fig.update_layout(title=title, height=120 + 28 * len(matrix), margin=dict(l=10, r=10, t=40, b=10))
+    return fig
+
+
+def tab_other_rivers():
+    transfer_note()
+    mine = pred[pred["river"] == river]
+    years = sorted(mine["date"].dt.year.unique())
+    worst = mine.groupby(mine["date"].dt.year)["y"].sum().idxmax()      # year with the most droughts
+    year = st.selectbox("Year", years, index=years.index(worst), key=f"rivers_year_{river}")
+
+    # Two heat-maps side by side in time: what our alert said, then what really happened.
+    tiers, cls = river_grid(pred, river, year)
+    st.plotly_chart(heat(tiers, f"Our alert - {river}, {year}",
+                         [[0, TIER_COLOR["Low"]], [0.5, TIER_COLOR["Watch"]], [1, TIER_COLOR["Warning"]]],
+                         2, {0: "Low", 1: "Watch", 2: "Warning"}), width="stretch")
+    st.plotly_chart(heat(cls, f"Actual drought class - {river}, {year}", "YlOrRd", 5, CLASS_WORDS),
+                    width="stretch")
+    st.caption("Counties run north (top) to south (bottom). Compare the two maps: "
+               "red in the lower one with grey in the upper one is a miss.")
+
+    # The mistakes of one alarm for this river and year.
+    st.markdown("#### Misses and false alarms")
+    policy = st.selectbox("Which alarm", [p["name"] for p in metrics["policies"]])
+    col = next(p["column"] for p in metrics["policies"] if p["name"] == policy)
+    missed, false_alarms = errors_table(mine[mine["date"].dt.year == year], col)
+    st.caption(f"{river}, {year} - {COUNT_LABEL}.")
+    for title, table in (("Missed (no alarm, severe drought followed)", missed),
+                         ("False alarms (alarm, no severe drought followed)", false_alarms)):
+        st.markdown(f"**{title}: {len(table)}**")
+        if not table.empty:
+            shown = table.assign(date=table["date"].dt.strftime("%b %d, %Y"),
+                                 cls=table["cls"].map(CLASS_WORDS),
+                                 p_model=(table["p_model"] * 100).round().astype(int).astype(str) + "%")
+            st.dataframe(shown.rename(columns={"date": "Week", "county": "County", "state": "State",
+                                               "river": "River", "cls": "Drought class",
+                                               "p_model": "Risk score"}),
+                         hide_index=True, width="stretch")
+
+    st.markdown("#### Failure examples (from the pipeline)")
+    show_failures()
+
+
+# ---------------------------------------------------------------------------
 # Put the tabs on the page
 # ---------------------------------------------------------------------------
-tabs = st.tabs(["This week", "Replay", "Outlook check", "Farm brief", "How good is it"])
+tabs = st.tabs(["This week", "Replay", "Outlook check", "Farm brief",
+                "Other rivers and misses", "How good is it"])
 with tabs[0]:
     tab_this_week()
 with tabs[1]:
@@ -395,6 +468,8 @@ with tabs[2]:
 with tabs[3]:
     tab_farm_brief()
 with tabs[4]:
+    tab_other_rivers()
+with tabs[5]:
     tab_how_good()
 
 st.divider()
