@@ -15,11 +15,13 @@ Rules it follows (plain English, for the judges):
 
 Run:  python app/export_pitch_kit.py
 """
+import html
 import sys
 from pathlib import Path
 from urllib.parse import urlencode
 
 import plotly.graph_objects as go
+from plotly.offline import get_plotlyjs
 from plotly.subplots import make_subplots
 
 # Make "import app.xxx" work when this file is run as a script.
@@ -389,12 +391,15 @@ def save_chart(fig, name, status):
     """Add the status to the title (unless FINAL) and save as an HTML file."""
     if status != "FINAL":
         fig.update_layout(title_text=f"{fig.layout.title.text} ({STATUS_LINES[status][8:]})")
-    html = fig.to_html(include_plotlyjs="cdn", full_html=True, div_id="chart")  # fixed id = same file each run
-    write_text(OUT_DIR / "charts" / name, html)
+    # "directory" = the page loads plotly.min.js from the SAME folder (written once in build_charts),
+    # so opening a chart never downloads a script from the internet. Fixed div id = same file each run.
+    page = fig.to_html(include_plotlyjs="directory", full_html=True, div_id="chart")
+    write_text(OUT_DIR / "charts" / name, page)
 
 
 def build_charts(latest, metrics, status):
     m = metrics
+    write_text(OUT_DIR / "charts" / "plotly.min.js", get_plotlyjs())   # local copy of the chart library
     # 1) The 4-week rules compared by cost (lower is better). Our system in blue.
     names = [p["name"] for p in m["policies"]]
     colors = ["#1f77b4" if p["column"] == "alarm_system" else "#b0b0b0" for p in m["policies"]]
@@ -436,7 +441,8 @@ def build_charts(latest, metrics, status):
     for tier, color in TIER_COLOR.items():
         sub = now[now["tier"] == tier]
         fig.add_trace(go.Scatter(x=sub["lon"], y=sub["lat"], mode="markers", name=tier,
-                                 text=sub["county"] + ", " + sub["state"], hoverinfo="text",
+                                 text=[html.escape(f"{c}, {s}") for c, s in zip(sub["county"], sub["state"])],
+                                 hoverinfo="text",
                                  marker=dict(size=14, color=color)))
     fig.update_yaxes(scaleanchor="x", scaleratio=1, title="Latitude")
     fig.update_xaxes(title="Longitude")

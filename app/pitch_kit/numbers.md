@@ -1,4 +1,4 @@
-STATUS: PROVISIONAL - DO NOT USE IN THE FINAL VIDEO OR WRITE-UP
+STATUS: FINAL
 
 # Numbers for the video and write-up
 Copy numbers only from this file, and only when the first line says STATUS: FINAL.
@@ -7,8 +7,8 @@ Every value below is copied from reports/metrics.json. Nothing is computed here.
 ## Setup
 
 - `contract_version`: 2
-- `generated_at`: 2026-11-14T07:13:12-08:00
-- `is_final`: False
+- `generated_at`: 2026-11-14T07:21:26-08:00
+- `is_final`: True
 - `focus_river`: Rio Grande
 - `training_scope`: Rio Grande counties only
 - `n_rows`: 177452
@@ -313,6 +313,16 @@ Every value below is copied from reports/metrics.json. Nothing is computed here.
 - `failure_examples[1].county`: Rio Grande
 - `failure_examples[1].state`: Colorado
 - `failure_examples[1].what_happened`: Miss: the risk score was only 0.00, so there was no warning, but the county reached severe drought within 4 weeks.
+- `failure_examples[2].product`: 6-month outlook
+- `failure_examples[2].date`: 2021-06-01
+- `failure_examples[2].county`: Hudspeth
+- `failure_examples[2].state`: Texas
+- `failure_examples[2].what_happened`: False alarm: the outlook gave a 100% chance of 8 or more severe-drought weeks in a row within 6 months, but it did not happen.
+- `failure_examples[3].product`: 12-month outlook
+- `failure_examples[3].date`: 2011-03-01
+- `failure_examples[3].county`: Santa Fe
+- `failure_examples[3].state`: New Mexico
+- `failure_examples[3].what_happened`: The outlook estimated 3 weeks of severe drought in the next 52, but there were 49. The largest errors fall on forecasts issued in 2011. The deepest drought followed forecasts issued in 2012.
 
 ## Ablations and checks
 
@@ -331,6 +341,24 @@ Every value below is copied from reports/metrics.json. Nothing is computed here.
 - `ablations[4].name`: 12-month forest trained on all five rivers
 - `ablations[4].product`: 12-month outlook
 - `ablations[4].result`: Average error 13.38 weeks on the Rio Grande, against 14.0 for the Rio Grande-trained system.
+- `ablations[5].name`: River flow added as an input
+- `ablations[5].product`: 6-month outlook
+- `ablations[5].result`: Cost 2378 with it, against 2272 without it, on the same 6577 Rio Grande rows.
+- `ablations[6].name`: River flow added as an input
+- `ablations[6].product`: 12-month outlook
+- `ablations[6].result`: Average error 14.64 weeks with it, against 14.07 without it, on the same 6577 Rio Grande rows.
+- `ablations[7].name`: Snowpack (snowmelt supply) added as an input
+- `ablations[7].product`: 6-month outlook
+- `ablations[7].result`: Cost 2338 with it, against 2324 without it, on the same 6665 Rio Grande rows.
+- `ablations[8].name`: Snowpack (snowmelt supply) added as an input
+- `ablations[8].product`: 12-month outlook
+- `ablations[8].result`: Average error 13.75 weeks with it, against 14.0 without it, on the same 6665 Rio Grande rows.
+- `ablations[9].name`: River flow and snowpack together added as an input
+- `ablations[9].product`: 6-month outlook
+- `ablations[9].result`: Cost 2342 with it, against 2272 without it, on the same 6577 Rio Grande rows.
+- `ablations[10].name`: River flow and snowpack together added as an input
+- `ablations[10].product`: 12-month outlook
+- `ablations[10].result`: Average error 14.18 weeks with it, against 14.07 without it, on the same 6577 Rio Grande rows.
 - `shuffled_auc_mean`: 0.44
 - `feature_importance[0].feature`: cls
 - `feature_importance[0].importance`: 0.172
@@ -383,15 +411,24 @@ Every value below is copied from reports/metrics.json. Nothing is computed here.
 
 ## Limits
 
-- `limits[0]`: Provisional: river flow not tested yet.
-- `limits[1]`: The cost rule (a miss costs 3 false alarms) is our assumption.
-- `limits[2]`: The 4-week risk score is not a calibrated probability.
-- `limits[3]`: On the Rio Grande the 4-week system (cost 1912) is close to a tie with the best simple rule, Worsening (cost 1971).
-- `limits[4]`: On the other four rivers the Rio Grande-trained 4-week system beats persistence on the Mississippi, Missouri and Colorado, but it does not beat the best simple rule on any of them.
-- `limits[5]`: The 6-month outlook (cost 2324) is close to a tie with the 'D1 or worse now' rule (cost 2382). It fails on the Mississippi, Missouri and Ohio.
-- `limits[6]`: The 12-month outlook is off by 14.0 weeks on average, against an average of 22.1 weeks. It is a planning range, not a precise forecast.
-- `limits[7]`: The 31 Rio Grande counties move together, so the real sample is about 18 years, not thousands of rows.
-- `limits[8]`: Design choices were made after exploratory runs on the same test years.
+- `limits[0]`: The cost rule (a miss costs 3 false alarms) is our assumption. Results at other costs are in cost_sensitivity.
+- `limits[1]`: The 4-week risk score is not a calibrated probability.
+- `limits[2]`: On the Rio Grande the 4-week system (cost 1912) is close to a tie with the best simple rule, Worsening (cost 1971).
+- `limits[3]`: Onset is the hard part. For counties not yet in severe drought, the system caught 36% of the weeks that led to it, with precision 46%. Its cost was 1735, against 1794 for the best simple rule (Worsening) and 2226 for never warning.
+- `limits[4]`: The 6-month outlook costs 2324, against 2382 for the 'D1 or worse now' rule. That is close to a tie.
+- `limits[5]`: The 12-month outlook is off by 14.0 weeks on average, against an average of 22.1 weeks. It is a planning range, not a precise forecast.
+- `limits[6]`: Transfer of the Rio Grande-trained 4-week system: it did not beat the best simple rule on: Mississippi, Missouri, Colorado, Ohio. It did not beat persistence on: Ohio.
+- `limits[7]`: Transfer of the Rio Grande-trained 6-month outlook: it did not beat the best simple rule on: Mississippi, Missouri, Colorado, Ohio.
+- `limits[8]`: Transfer of the Rio Grande-trained 12-month outlook: it did not beat the best baseline on: Mississippi, Missouri, Colorado, Ohio.
+- `limits[9]`: The 31 Rio Grande counties move together, so the real sample is about 18 years, not thousands of rows.
+- `limits[10]`: Design choices were made after exploratory runs on the same test years.
+- `limits[11]`: Counties are chosen by a 50 km rule from the river's main line. A different width gives a different set.
+- `limits[12]`: The Drought Monitor map is drawn by people each week, so the target includes their judgment.
+- `limits[13]`: A warning is not a payment decision. The grazing-period rule of the aid program is not modeled.
+- `limits[14]`: Nothing here measures crop yields or dollars saved.
+- `limits[15]`: River flow and snowpack were tested as extra inputs and are not part of the system. See ablations. The El Paso gauge had no daily flow data and was dropped. The Del Norte gauge ends in 2024.
+- `limits[16]`: Weather inputs (rain, temperature, soil moisture) were not tested.
+- `limits[17]`: A random forest cannot predict a drought longer or deeper than any it saw in training.
 
 ## Other keys
 

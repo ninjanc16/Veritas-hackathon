@@ -1,4 +1,4 @@
-STATUS: PROVISIONAL - DO NOT USE IN THE FINAL VIDEO OR WRITE-UP
+STATUS: FINAL
 
 # Explain sheet
 Everyone on the team reads this before recording the video.

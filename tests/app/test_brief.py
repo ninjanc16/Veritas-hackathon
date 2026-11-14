@@ -3,7 +3,7 @@ import copy
 
 import pandas as pd
 
-from app.brief import build_brief
+from app.brief import build_brief, md_escape
 from app.contract import load_demo
 
 
@@ -40,3 +40,20 @@ def test_transfer_river_gets_a_warning_line():
     row = latest[latest["river"] == "Ohio"].iloc[0]
     text = build_brief(row, pred[pred["fips"] == row["fips"]], metrics, "DEMO")
     assert "not on this river" in text
+
+
+def test_md_escape_stops_links_html_and_color_tags():
+    out = md_escape("X](http://evil) <b>hi</b> :red[x] $a$ `c` normal (text)")
+    assert "\\]" in out and "\\<" in out and "\\[" in out and "\\$" in out and "\\`" in out
+    assert out.endswith("normal (text)")               # ordinary prose is left alone
+    assert md_escape("Willacy") == "Willacy"           # real county names are unchanged
+
+
+def test_hostile_county_name_cannot_make_a_link_in_the_brief():
+    row, history, metrics = _inputs()
+    row["county"] = "Evil](http://bad.example) <img src=x>"
+    text = build_brief(row, history, metrics, "DEMO")
+    # The dangerous characters are escaped with a backslash, so they show as plain text.
+    assert "\\]" in text and "\\<img" in text
+    assert "](" not in text.replace("\\]", "")       # no un-escaped "](" = no real link
+    assert "<img" not in text.replace("\\<", "")     # no un-escaped HTML tag

@@ -1,4 +1,4 @@
-STATUS: PROVISIONAL - DO NOT USE IN THE FINAL VIDEO OR WRITE-UP
+STATUS: FINAL
 
 # Demo story: four moments
 Each moment was picked by a fixed rule from the handoff files (not hand-picked).

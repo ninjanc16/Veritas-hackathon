@@ -12,6 +12,7 @@ How it works, in plain English:
                   "How good is it" (the honest scorecard).
 Run it with:  streamlit run app/streamlit_app.py
 """
+import html
 import sys
 from pathlib import Path
 
@@ -22,7 +23,7 @@ import pandas as pd                      # noqa: E402
 import plotly.graph_objects as go        # noqa: E402
 import streamlit as st                   # noqa: E402
 
-from app.brief import CLASS_WORDS, build_brief, streak_sentence   # noqa: E402
+from app.brief import CLASS_WORDS, build_brief, md_escape, streak_sentence   # noqa: E402
 from app.contract import load            # noqa: E402
 from app.tallies import (errors_table, reconcile, river_grid, tally,   # noqa: E402
                          weeks_error)
@@ -106,7 +107,7 @@ is_transfer = river != focus
 st.sidebar.markdown("#### Data checks")
 mismatches = reconcile(pred, metrics)
 if mismatches:
-    st.sidebar.warning("App counts do not match metrics.json:\n\n" + "\n".join(f"- {m}" for m in mismatches)
+    st.sidebar.warning("App counts do not match metrics.json:\n\n" + "\n".join(f"- {md_escape(m)}" for m in mismatches)
                        + "\n\nTell the Pipeline owner. Do not edit the files.")
 else:
     st.sidebar.success("App counts match metrics.json")
@@ -124,7 +125,7 @@ def transfer_note():
 def tab_this_week():
     transfer_note()
     row = latest[latest["fips"] == fips].iloc[0]
-    st.subheader(f"{county_label} - week of {row['date']:%B %d, %Y}")
+    st.subheader(f"{md_escape(county_label)} - week of {row['date']:%B %d, %Y}")
 
     # Three cards: the 4-week alert, the 6-month outlook, the 12-month outlook.
     c1, c2, c3 = st.columns(3)
@@ -157,7 +158,8 @@ def tab_this_week():
     fig = go.Figure()
     for tier in TIER_COLOR:
         sub = river_latest[river_latest["tier"] == tier]
-        hover = [f"{r.county}, {r.state}<br>4-week: {r.tier}<br>6-month: {round(r.p_season * 100)}%"
+        # html.escape: a county name from the data can never inject HTML into the hover box.
+        hover = [f"{html.escape(r.county)}, {html.escape(r.state)}<br>4-week: {r.tier}<br>6-month: {round(r.p_season * 100)}%"
                  f"<br>12-month: about {round(r.weeks_model)} weeks" for r in sub.itertuples()]
         fig.add_trace(go.Scatter(x=sub["lon"], y=sub["lat"], mode="markers", name=tier,
                                  text=hover, hoverinfo="text",
@@ -262,7 +264,8 @@ def tab_replay():
 def show_failures():
     """List the failure examples written by the pipeline (used on two tabs)."""
     for f in metrics["failure_examples"]:
-        st.write(f"- **{f['product']}**, {f['date']}, {f['county']}, {f['state']}: {f['what_happened']}")
+        st.write(f"- **{md_escape(f['product'])}**, {md_escape(f['date'])}, {md_escape(f['county'])}, "
+                 f"{md_escape(f['state'])}: {md_escape(f['what_happened'])}")
 
 
 def kv_table(d):
@@ -298,7 +301,7 @@ def tab_how_good():
     verdict = "PASSED" if h["honesty_check_pass"] else "FAILED"
     st.write(f"Our system cost **{h['system_cost']}** against **{h['persistence_cost']}** for "
              f"'the future equals today' ({h['pct_cheaper_than_persistence']}% cheaper). "
-             f"The cheapest simple rule was **{h['cheapest_baseline_on_test']}** at "
+             f"The cheapest simple rule was **{md_escape(h['cheapest_baseline_on_test'])}** at "
              f"**{h['cheapest_baseline_cost']}**.")
     st.write(f"Honesty check (beats every simple rule on years it never saw): **{verdict}**")
     st.markdown("**Hard part: counties not yet in severe drought (onset)**")
@@ -312,14 +315,14 @@ def tab_how_good():
     # 2) The 6-month outlook.
     sf = m["season"]["focus"]
     st.header("6-month outlook")
-    st.caption(m["season"]["target"])
+    st.caption(md_escape(m["season"]["target"]))
     st.dataframe(kv_table(sf), hide_index=True)
     st.write(f"Beats every baseline: **{yes_no(sf['beats_every_baseline'])}**")
 
     # 3) The 12-month outlook.
     yf = m["year"]["focus"]
     st.header("12-month outlook")
-    st.caption(m["year"]["target"] + ". Errors are in weeks; lower is better.")
+    st.caption(md_escape(m["year"]["target"]) + ". Errors are in weeks; lower is better.")
     st.dataframe(kv_table(yf), hide_index=True)
     st.write(f"Beats every baseline: **{yes_no(yf['beats_every_baseline'])}**")
     bars = {"Our system": yf["mae_system"], "Same as now": yf["mae_same_as_now"],
@@ -354,7 +357,7 @@ def tab_how_good():
         height=300, xaxis_title="Importance", margin=dict(l=10, r=10, t=10, b=10)),
         width="stretch")
     for sentence in m["limits"]:
-        st.write(f"- {sentence}")
+        st.write(f"- {md_escape(sentence)}")
 
 
 # ---------------------------------------------------------------------------

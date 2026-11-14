@@ -5,7 +5,19 @@ It is plain template text: no internet, no AI model. Same inputs always give the
 It only reads today's forecast row plus the county's PAST drought class - never the truth
 columns and never any row after the chosen week.
 """
+import re
+
 import pandas as pd
+
+# Characters that could turn plain text from a data file into a link, an image, HTML, a
+# color tag (:red[...]) or math. We put a backslash in front so they show as plain characters.
+_MARKDOWN_SPECIAL = re.compile(r"([\\\[\]<>$`])")
+
+
+def md_escape(text):
+    """Make text from a data file safe to show as Markdown (it can't become a link, tag or HTML)."""
+    return _MARKDOWN_SPECIAL.sub(r"\\\1", str(text))
+
 
 # Drought Monitor classes in words (0..5).
 CLASS_WORDS = {0: "None", 1: "D0 Abnormally dry", 2: "D1 Moderate", 3: "D2 Severe",
@@ -49,8 +61,9 @@ def build_brief(latest_row, history, metrics, status):
     r = latest_row
     week = pd.Timestamp(r["date"])
     mae = metrics["year"]["focus"]["mae_system"]
-    lines = [f"# Farm brief: {r['county']}, {r['state']}",
-             f"**Status: {status}**  |  River: {r['river']}  |  Week of {week:%B %d, %Y}", ""]
+    county, state, river = md_escape(r["county"]), md_escape(r["state"]), md_escape(r["river"])
+    lines = [f"# Farm brief: {county}, {state}",
+             f"**Status: {status}**  |  River: {river}  |  Week of {week:%B %d, %Y}", ""]
 
     # The three products, in plain sentences.
     lines += ["## What the forecast says",
@@ -86,9 +99,9 @@ def build_brief(latest_row, history, metrics, status):
     lines.append("## Limits")
     first_limit = metrics["limits"][0] if metrics["limits"] else ""
     if first_limit:
-        lines.append(f"- {first_limit}")
+        lines.append(f"- {md_escape(first_limit)}")
     if r["river"] != metrics["focus_river"]:
-        lines.append(f"- The model was trained on the {metrics['focus_river']}, not on this river. "
+        lines.append(f"- The model was trained on the {md_escape(metrics['focus_river'])}, not on this river. "
                      "Treat this as a test, not a product.")
     lines += ["- This is a forecast tool, not a payment decision. Not financial or legal advice."]
     return "\n".join(lines) + "\n"

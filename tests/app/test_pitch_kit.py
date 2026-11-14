@@ -54,6 +54,11 @@ def test_kit_has_all_the_pieces():
     assert (OUT_DIR / "story.md").read_text().count("\n## ") == 4             # 4 moments
     for name in ("four_week_policies", "twelve_month_error", "other_rivers", "this_week_map"):
         assert (OUT_DIR / "charts" / f"{name}.html").exists()
+    # Charts load the chart library from the same folder, never from the internet.
+    assert (OUT_DIR / "charts" / "plotly.min.js").exists()
+    for chart in (OUT_DIR / "charts").glob("*.html"):
+        text = chart.read_text(encoding="utf-8")
+        assert 'src="plotly.min.js"' in text and "cdn.plot.ly" not in text, chart
     for name in ("numbers", "writeup", "explain", "story"):
         assert (OUT_DIR / f"{name}.md").read_text().splitlines()[0].startswith("STATUS:")
 

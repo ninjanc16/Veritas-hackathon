@@ -1,4 +1,4 @@
-STATUS: PROVISIONAL - DO NOT USE IN THE FINAL VIDEO OR WRITE-UP
+STATUS: FINAL
 
 # Rio Grande Farm Drought Outlook
 
@@ -89,15 +89,24 @@ Cost = 3 x missed droughts + false alarms. That cost rule is our assumption, not
 **A failure example.** 2023-04-04, Hidalgo, Texas (4-week alert): False alarm: the system warned with a risk score of 1.00, but the county did not reach severe drought in the next 4 weeks.
 
 **What the results do not show:**
-- Provisional: river flow not tested yet.
-- The cost rule (a miss costs 3 false alarms) is our assumption.
+- The cost rule (a miss costs 3 false alarms) is our assumption. Results at other costs are in cost_sensitivity.
 - The 4-week risk score is not a calibrated probability.
 - On the Rio Grande the 4-week system (cost 1912) is close to a tie with the best simple rule, Worsening (cost 1971).
-- On the other four rivers the Rio Grande-trained 4-week system beats persistence on the Mississippi, Missouri and Colorado, but it does not beat the best simple rule on any of them.
-- The 6-month outlook (cost 2324) is close to a tie with the 'D1 or worse now' rule (cost 2382). It fails on the Mississippi, Missouri and Ohio.
+- Onset is the hard part. For counties not yet in severe drought, the system caught 36% of the weeks that led to it, with precision 46%. Its cost was 1735, against 1794 for the best simple rule (Worsening) and 2226 for never warning.
+- The 6-month outlook costs 2324, against 2382 for the 'D1 or worse now' rule. That is close to a tie.
 - The 12-month outlook is off by 14.0 weeks on average, against an average of 22.1 weeks. It is a planning range, not a precise forecast.
+- Transfer of the Rio Grande-trained 4-week system: it did not beat the best simple rule on: Mississippi, Missouri, Colorado, Ohio. It did not beat persistence on: Ohio.
+- Transfer of the Rio Grande-trained 6-month outlook: it did not beat the best simple rule on: Mississippi, Missouri, Colorado, Ohio.
+- Transfer of the Rio Grande-trained 12-month outlook: it did not beat the best baseline on: Mississippi, Missouri, Colorado, Ohio.
 - The 31 Rio Grande counties move together, so the real sample is about 18 years, not thousands of rows.
 - Design choices were made after exploratory runs on the same test years.
+- Counties are chosen by a 50 km rule from the river's main line. A different width gives a different set.
+- The Drought Monitor map is drawn by people each week, so the target includes their judgment.
+- A warning is not a payment decision. The grazing-period rule of the aid program is not modeled.
+- Nothing here measures crop yields or dollars saved.
+- River flow and snowpack were tested as extra inputs and are not part of the system. See ablations. The El Paso gauge had no daily flow data and was dropped. The Del Norte gauge ends in 2024.
+- Weather inputs (rain, temperature, soil moisture) were not tested.
+- A random forest cannot predict a drought longer or deeper than any it saw in training.
 
 ## What we'd do next
 Snowpack and river flow as inputs, the real grazing-period rule, a rancher's own cost numbers, and
