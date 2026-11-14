@@ -16,11 +16,13 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 
+from farmdrought.canals import run_canals
 from farmdrought.alert import make_forest, run_alert, split_masks
 from farmdrought.config import (ALERT_WEEKS, COUNTY_RESERVOIR, D2_CLASS, FEED_COST_PER_HEAD_MONTH, FOCUS_RIVER, LATEST, METRICS, MISS_COST, OUTLOOK, OUTLOOK_TEST,
                                 PREDICTIONS, PROCESSED, REPORTS, SEASON_THRESHOLD, SEASON_WEEKS, TEST_START,
                                 TRAIN, VAL, YEAR_WEEKS)
 from farmdrought.features import FEATURES_H
+from farmdrought.leaks import run_leaks
 from farmdrought.flow import FEATURES_F, add_flow_features
 from farmdrought.losses import run_losses
 from farmdrought.mapfields import MAP_COLUMNS, add_map_fields, range_coverage
@@ -269,8 +271,8 @@ def build_metrics(alert, season, year, predictions, scored, panel):
     }
 
 
-def pivot_metrics(scored, season, panel, metrics_limits):
-    """The three pivot keys (trigger, reservoir, losses), plus their limit sentences added to the
+def pivot_metrics(scored, season, panel, metrics_limits, latest):
+    """The five pivot keys (trigger, reservoir, losses, canals, canal_priority), plus their limit sentences added to the
     existing list of limits (metrics_limits)."""
     trigger = run_trigger(scored)
     rg = panel[panel["river"] == FOCUS_RIVER]
@@ -305,8 +307,16 @@ def pivot_metrics(scored, season, panel, metrics_limits):
         "County drought is not the same as water supply. Water in the canals also depends on reservoir releases "
         "and on Mexico's deliveries under the 1944 water treaty, which are not modeled.",
         "The loss figures are insured crop losses only, not all drought losses, and are not adjusted for inflation.",
+        "The canal map shows where canals and ditches are. It does not say which are irrigation canals, which are "
+        "lined, how much any canal leaks or which district owns it.",
+        "The canal priority levels are an estimate of where leaks are likely, not measured leaks. They combine "
+        "the 6-month forecast with a published seepage rate for the soil under each canal. They assume bare-earth "
+        "canals, because we do not know which canals are lined. No canal was inspected or measured by us.",
     ]
-    return {"limits": metrics_limits + limits, "trigger": trigger, "reservoir": reservoir, "losses": losses}
+    return {"limits": metrics_limits + limits, "trigger": trigger, "reservoir": reservoir, "losses": losses,
+            "canals": run_canals(counties),
+            # the chain: AI forecast (when) + canal map (where) + soil under the canal (how leaky)
+            "canal_priority": run_leaks(latest, counties)}
 
 
 def main():
@@ -375,7 +385,7 @@ def main():
             "same days the outlook is issued. A real-time forecast might have to use the value from a month earlier.",
         ]
     # ---- Pivot keys (canal action), at the very end ----
-    metrics.update(pivot_metrics(scored, season, panel, metrics["limits"]))
+    metrics.update(pivot_metrics(scored, season, panel, metrics["limits"], latest))
     with open(METRICS, "w") as f:
         # default=... turns numpy numbers into plain numbers that JSON accepts
         json.dump(metrics, f, indent=2, default=lambda value: value.item())

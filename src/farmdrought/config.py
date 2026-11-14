@@ -120,3 +120,36 @@ COST_RATIOS = [0.02, 0.05, 0.10, 0.18, 0.25, 0.50]
 # 8c. Measured drought losses (USDA Risk Management Agency, Cause of Loss files)
 LOSS_YEARS = (2000, 2025)
 LOSSES_CSV = RAW / "rma" / "colsom_rio_grande.csv"  # the 31 Rio Grande counties only
+
+# 8d. Canal and ditch lines mapped by the U.S. Geological Survey (National Hydrography Dataset)
+CANALS_DIR = RAW / "canals"
+CANALS_CSV = CANALS_DIR / "canals_rio_grande.csv"          # one row per mapped canal segment
+# The same segments as map lines. It sits with the handoff files because the App draws it.
+CANALS_GEOJSON = PROCESSED / "canals.geojson"
+CANAL_SOIL_CSV = CANALS_DIR / "canal_soil.csv"             # soil texture under each canal segment
+
+# 8e. Canal seepage rate by soil type, in gallons per square foot of wetted canal per day.
+# Source: Fipps (Texas A&M), 1998, "Potential Water Savings in Irrigation Districts ... Lower
+# Rio Grande Valley", Table 7, which quotes the Texas Board of Water Engineers (1946).
+# https://gfipps.tamu.edu/files/2019/12/RGV-Potential-Water-Savings.pdf
+# These are rates for UNLINED (bare earth) canals. Soil types not in the table get no rate.
+SEEPAGE_GAL_SQFT_DAY = {
+    "Clay": 1.5,
+    "Silty clay loam": 2.24,
+    "Clay loam": 2.99,
+    "Silt loam": 4.49,
+    "Loam": 7.48,
+    "Fine sandy loam": 9.35,
+    "Sandy loam": 11.22,
+    # Sandy soils are not in Table 7. Table 6 of the same report gives "sand: 9.34 to 19.45".
+    # We use the LOW end, 9.34, for every sand and loamy sand, so we do not overstate it.
+    "Sand": 9.34, "Fine sand": 9.34, "Coarse sand": 9.34, "Very fine sand": 9.34,
+    "Loamy sand": 9.34, "Loamy fine sand": 9.34, "Loamy coarse sand": 9.34, "Loamy very fine sand": 9.34,
+    # Table 8 of the same report: ONE earth canal in sandy clay loam was measured, at 1.69.
+    "Sandy clay loam": 1.69,
+}
+# Soil types with no figure anywhere in the report (silty clay, silt, sandy clay, very fine
+# sandy loam, coarse sandy loam) are left out on purpose. Those canals are "Unknown soil".
+# Our rule: a soil counts as "leaky" from loam upward (7.48 or more). In the source's own
+# summary table (Table 6), clay soils top out at 2.99 and loam starts at 4.49 to 7.48.
+LEAKY_SOIL_RATE = 7.48
