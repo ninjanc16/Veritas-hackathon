@@ -5,8 +5,9 @@ Everything is scored with one cost rule:
 A lower cost is better. Missing a drought counts 3 times as much as a false alarm.
 """
 import numpy as np
+from sklearn.metrics import roc_auc_score
 
-from farmdrought.config import D2_CLASS, MISS_COST
+from farmdrought.config import D2_CLASS, MISS_COST, SEASON_THRESHOLD
 
 
 def tally(y, alarm, miss_cost=MISS_COST):
@@ -67,3 +68,86 @@ def events(rows, alarm_column):
         "warned_within_4_weeks": n_warned,
         "median_lead_weeks": float(np.median(leads)) if leads else 0.0,
     }
+
+
+# ================================ 6-month outlook ================================
+
+def season_costs(g, p_column="p_season"):
+    """Cost of the model and of every simple rule, on one group of rows."""
+    y = g["y_season"]
+    return {
+        "system": tally(y, g[p_column] >= SEASON_THRESHOLD)["cost"],
+        "Persistence": tally(y, g["alarm_season_persistence"])["cost"],
+        "D1 now": tally(y, g["alarm_season_d1"])["cost"],
+        "Usual": tally(y, g["p_season_usual"] >= SEASON_THRESHOLD)["cost"],
+        "Always warn": tally(y, np.ones(len(g), dtype=bool))["cost"],
+        "Never warn": tally(y, np.zeros(len(g), dtype=bool))["cost"],
+    }
+
+
+def season_block(g, p_column="p_season"):
+    """Results of the 6-month outlook on the Rio Grande rows."""
+    y, p = g["y_season"], g[p_column]
+    costs = season_costs(g, p_column)
+    system = tally(y, p >= SEASON_THRESHOLD)
+    # Brier score = average squared gap between the probability and what happened (lower
+    # is better). Count the test years where the model's Brier score beats "usual".
+    years = g.groupby(g["date"].dt.year)
+    wins = sum(((yr[p_column] - yr["y_season"]) ** 2).mean() < ((yr["p_season_usual"] - yr["y_season"]) ** 2).mean()
+               for _, yr in years)
+    return {
+        "rows": len(g), "base_rate": round(float(y.mean()), 3),
+        "precision": system["precision"], "recall": system["recall"],
+        "auc": round(roc_auc_score(y, p), 3),
+        "system_cost": costs["system"], "persistence_cost": costs["Persistence"],
+        "d1_rule_cost": costs["D1 now"], "usual_cost": costs["Usual"],
+        "always_warn_cost": costs["Always warn"], "never_warn_cost": costs["Never warn"],
+        "pct_cheaper_than_persistence": round(100 * (1 - costs["system"] / costs["Persistence"]), 1),
+        "beats_every_baseline": bool(costs["system"] < min(v for k, v in costs.items() if k != "system")),
+        "years_better_than_usual": f"{wins}/{years.ngroups}",
+    }
+
+
+def season_river(river, g):
+    """6-month transfer test: the Rio Grande model on one river."""
+    costs = season_costs(g)
+    rules = {k: v for k, v in costs.items() if k != "system"}
+    best = min(rules, key=rules.get)
+    return {
+        "river": river, "system_cost": costs["system"], "persistence_cost": costs["Persistence"],
+        "best_rule": best, "best_rule_cost": rules[best],
+        "pct_cheaper_than_best_rule": round(100 * (1 - costs["system"] / max(rules[best], 1)), 1),
+        "own_river_cost": season_costs(g, "p_season_own")["system"],
+    }
+
+
+# ================================ 12-month outlook ================================
+
+def mae(g, column):
+    """Mean absolute error: on average, how many weeks off is this estimate?"""
+    return round(float((g[column] - g["y_weeks"]).abs().mean()), 2)
+
+
+YEAR_BASELINES = {"same as now": "weeks_same_as_now", "last year": "weeks_last_year", "usual": "weeks_usual"}
+
+
+def year_block(g, column="weeks_model"):
+    """Results of the 12-month outlook on the Rio Grande rows."""
+    years = g.groupby(g["date"].dt.year)
+    better = lambda base: sum(mae(yr, column) < mae(yr, base) for _, yr in years)
+    return {
+        "rows": len(g), "mean_weeks": round(float(g["y_weeks"].mean()), 1),
+        "mae_system": mae(g, column), "mae_same_as_now": mae(g, "weeks_same_as_now"),
+        "mae_last_year": mae(g, "weeks_last_year"), "mae_usual": mae(g, "weeks_usual"),
+        "beats_every_baseline": bool(mae(g, column) < min(mae(g, c) for c in YEAR_BASELINES.values())),
+        "years_better_than_last_year": f"{better('weeks_last_year')}/{years.ngroups}",
+        "years_better_than_usual": f"{better('weeks_usual')}/{years.ngroups}",
+    }
+
+
+def year_river(river, g):
+    """12-month transfer test: the Rio Grande model on one river."""
+    errors = {name: mae(g, column) for name, column in YEAR_BASELINES.items()}
+    best = min(errors, key=errors.get)
+    return {"river": river, "mae_system": mae(g, "weeks_model"), "best_baseline": best,
+            "mae_best_baseline": errors[best], "mae_own_river": mae(g, "weeks_own")}

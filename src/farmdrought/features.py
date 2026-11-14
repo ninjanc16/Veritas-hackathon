@@ -80,3 +80,67 @@ def history_features(classes, all_classes, neighbors, dates):
         "nb_minus_self": nb_mean - c,           # are the neighbors drier than this county?
         "sin": np.sin(season), "cos": np.cos(season),
     }
+
+
+# ======================= Extra inputs for the 6- and 12-month outlooks =======================
+
+# Set L ("long memory"): how drought-prone has this county been over the last few years?
+FEATURES_L = ["share52", "share104", "share156", "share_all", "river_mean"]
+# Set E (ENSO): the state of El Nino / La Nina in the Pacific, which shifts rain patterns
+FEATURES_E = ["oni", "oni_chg3", "oni_mean12", "oni_min12", "oni_max12"]
+
+
+def long_memory_features(classes, river):
+    """Build set L. Returns {input name: array of shape (counties, weeks)}.
+
+    classes : drought class for the river counties
+    river   : the river each of those counties belongs to
+    """
+    in_d2 = (classes >= D2_CLASS).astype(float)
+    n_weeks = classes.shape[1]
+    # Share of the last 1, 2 and 3 years spent at D2 or worse
+    feats = {f"share{k}": rolling(in_d2, k, "mean") for k in (52, 104, 156)}
+    # Share of ALL weeks so far at D2 or worse (D2 weeks so far / weeks so far)
+    feats["share_all"] = in_d2.cumsum(axis=1) / np.arange(1, n_weeks + 1)
+    # Average class right now across all counties on the same river
+    river_mean = np.zeros(classes.shape)
+    for name in np.unique(river):
+        river_mean[river == name] = classes[river == name].mean(axis=0)
+    feats["river_mean"] = river_mean
+    return feats
+
+
+def load_oni(path):
+    """Read NOAA's El Nino index. Returns a Series: month a season ENDED -> index value.
+
+    Each line of the file is a year followed by up to 12 values, one per 3-month season:
+    DJF (Dec-Jan-Feb, ends in February), JFM (ends in March), ... NDJ (ends next January).
+    """
+    values = {}
+    with open(path) as f:
+        for line in f:
+            if line.startswith("#"):
+                continue  # the first line is a comment
+            parts = line.split()
+            year = int(parts[0])
+            for i, value in enumerate(parts[1:]):
+                # Season number i ends in month i+2. The last one (NDJ) ends in January next year.
+                end = pd.Period(year=year, month=i + 2, freq="M") if i < 11 else pd.Period(year=year + 1, month=1, freq="M")
+                values[end] = float(value)
+    return pd.Series(values).sort_index()
+
+
+def enso_features(dates, oni):
+    """Build set E. Returns {input name: one value per week}. It is the same for every county.
+
+    LEAKAGE RULE: a forecast issued in some month may only use seasons that ENDED
+    before that month began.
+    """
+    rows = []
+    for date in dates:
+        known = oni[oni.index < pd.Period(date, "M")]  # seasons that ended before this month
+        last12 = known.iloc[-12:]
+        rows.append((known.iloc[-1],                    # latest value
+                     known.iloc[-1] - known.iloc[-4],   # change over 3 seasons
+                     last12.mean(), last12.min(), last12.max()))
+    return dict(zip(FEATURES_E, np.array(rows).T))

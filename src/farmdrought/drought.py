@@ -10,9 +10,10 @@ import json
 import numpy as np
 import pandas as pd
 
-from farmdrought.config import ALERT_WEEKS, BUFFER_KM, D2_CLASS, NEIGHBOR_KM, USDM_JSON
+from farmdrought.config import (ALERT_WEEKS, BUFFER_KM, D2_CLASS, NEIGHBOR_KM, ONI_TXT, SEASON_RUN,
+                                SEASON_WEEKS, USDM_JSON, YEAR_WEEKS)
 from farmdrought.counties import km, load_county_centers, load_river_points, nearest_river
-from farmdrought.features import FEATURES_H, history_features
+from farmdrought.features import FEATURES_H, enso_features, history_features, load_oni, long_memory_features
 
 
 def load_usdm(path=USDM_JSON):
@@ -53,6 +54,38 @@ def label_alert(classes, horizon=ALERT_WEEKS):
     return y
 
 
+def label_season(classes, horizon=SEASON_WEEKS, run=SEASON_RUN):
+    """Truth for the 6-month outlook: 1 if the next `horizon` weeks contain `run` or more
+    weeks IN A ROW at D2 or worse. That is the trigger for a USDA aid payment.
+
+    Only weeks inside the window (t+1 .. t+horizon) count. If a drought started before
+    the window, only the part inside the window counts toward the run.
+    """
+    in_d2 = classes >= D2_CLASS
+    n_counties, n_weeks = classes.shape
+    y = np.full((n_counties, n_weeks), np.nan)
+    for t in range(n_weeks - horizon):
+        # Walk through the window week by week, tracking the current run of D2 weeks
+        # and the longest run seen so far. Both start at zero at the start of the window.
+        current = np.zeros(n_counties)
+        longest = np.zeros(n_counties)
+        for week in range(t + 1, t + 1 + horizon):
+            current = np.where(in_d2[:, week], current + 1, 0)
+            longest = np.maximum(longest, current)
+        y[:, t] = longest >= run
+    return y
+
+
+def label_weeks(classes, horizon=YEAR_WEEKS):
+    """Truth for the 12-month outlook: how many of the next `horizon` weeks are at D2 or worse."""
+    in_d2 = classes >= D2_CLASS
+    n_counties, n_weeks = classes.shape
+    y = np.full((n_counties, n_weeks), np.nan)
+    for t in range(n_weeks - horizon):
+        y[:, t] = in_d2[:, t + 1 : t + 1 + horizon].sum(axis=1)
+    return y
+
+
 def d2_streak(classes):
     """Weeks in a row at D2 or worse, counting the current week. 0 if not in D2 now."""
     in_d2 = classes >= D2_CLASS
@@ -66,8 +99,9 @@ def d2_streak(classes):
 def build_panel():
     """Build the county-week table for the 436 river counties.
 
-    Columns: date, fips, county, state, river, lat, lon, d2_streak, the 24 inputs
-    (which include cls, the class now), and y (the 4-week truth, NaN if not known yet).
+    Columns: date, fips, county, state, river, lat, lon, d2_streak, the inputs (sets H, L
+    and E), and the three truths: y (4-week), y_season (6-month) and y_weeks (12-month).
+    A truth is NaN when its future is not known yet.
     Rows from each county's first year are dropped, because the inputs look back 52 weeks.
     """
     usdm = load_usdm()
@@ -95,7 +129,10 @@ def build_panel():
     classes = all_classes[chosen]
     columns = history_features(classes, all_classes, neighbors, usdm["dates"])
     columns["d2_streak"] = d2_streak(classes)
+    columns.update(long_memory_features(classes, river[chosen]))  # set L, for the outlooks
     columns["y"] = label_alert(classes)
+    columns["y_season"] = label_season(classes)
+    columns["y_weeks"] = label_weeks(classes)
 
     # 5. Flatten to one row per county per week. ravel() lists county 1's weeks, then
     #    county 2's, and so on. So county details repeat and the dates tile.
@@ -107,6 +144,9 @@ def build_panel():
     panel["lat"] = np.repeat(lat[chosen], n_weeks)
     panel["lon"] = np.repeat(lon[chosen], n_weeks)
     panel["date"] = np.tile(usdm["dates"], len(chosen))
+    # Set E (El Nino index) is the same for every county, so its weekly values tile too
+    for name, values in enso_features(usdm["dates"], load_oni(ONI_TXT)).items():
+        panel[name] = np.tile(values, len(chosen))
 
     # 6. Drop rows where an input is missing (the first 52 weeks of the record).
     #    Rows with a missing y are KEPT: they are the newest weeks, used for "latest".
