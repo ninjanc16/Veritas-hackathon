@@ -138,3 +138,27 @@ def test_canal_tab_works_without_and_with_the_new_columns(monkeypatch):
     assert "reservoir version is not available yet" in text
     assert "not available yet" in text
     st.cache_data.clear()                # don't leave the fake data cached for other tests
+
+
+def test_how_good_tab_shows_trigger_losses_and_reservoirs(monkeypatch):
+    """The fake files carry the new blocks, so the three new sections fill in; without them they say so."""
+    import app.contract as contract
+    monkeypatch.setattr(contract, "load", lambda: (*contract.load_demo(), "demo", []))
+    st.cache_data.clear()
+    at = _run_with_link(view="How good is it")
+    assert not at.exception
+    headers = [h.value for h in at.header]
+    for h in ("Does the forecast work as a pre-season trigger?", "Measured drought losses", "Reservoirs"):
+        assert h in headers
+    assert any("does about as well as a simple drought rule" in e.value for e in at.markdown)
+
+    def stripped():
+        pred, outlook, latest, metrics = contract.load_demo()
+        metrics = {k: v for k, v in metrics.items() if k not in contract.OPTIONAL_METRICS_KEYS}
+        return pred, outlook, latest, metrics, "demo", []
+    monkeypatch.setattr(contract, "load", stripped)
+    st.cache_data.clear()
+    at = _run_with_link(view="How good is it")
+    assert not at.exception
+    assert sum(1 for e in at.markdown if e.value == "Not available yet.") == 3
+    st.cache_data.clear()

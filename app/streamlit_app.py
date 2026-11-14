@@ -321,6 +321,11 @@ def show_failures():
                  f"{md_escape(f['state'])}: {md_escape(f['what_happened'])}")
 
 
+def yes_no(flag):
+    """True/False as plain words."""
+    return "yes" if flag else "no"
+
+
 def kv_table(d):
     """Turn the single values of a dict into a two-column table."""
     rows = [(k.replace("_", " "), str(v)) for k, v in d.items() if not isinstance(v, (dict, list))]
@@ -338,7 +343,6 @@ def colored(df, good):
 def tab_how_good():
     transfer_note()
     m = metrics
-    yes_no = lambda flag: "yes" if flag else "no"  # noqa: E731
 
     # 1) The 4-week alert.
     st.header(f"4-week alert on the {focus}")
@@ -419,6 +423,74 @@ def tab_how_good():
     st.plotly_chart(theme.style_fig(fi_fig, 320), width="stretch")
     for sentence in m["limits"]:
         st.write(f"- {md_escape(sentence)}")
+
+    # 7) The canal-pivot results. Each block is optional: if the pipeline did not write it, say so.
+    show_trigger(m.get("trigger"))
+    show_losses(m.get("losses"))
+    show_reservoirs(m.get("reservoir"))
+
+
+# Names of the lines in trigger.value_sweep -> plain words for the chart legend.
+SWEEP_NAMES = {"forecast": "Our forecast", "forecast_reservoir": "Our forecast with reservoirs",
+               "d1_rule": "D1 or worse now", "persistence": "D2 or worse now",
+               "seal_every_year": "Seal every year"}
+
+
+def show_trigger(trig):
+    """Does the forecast work as a pre-season trigger? Everything comes from metrics.json."""
+    st.header("Does the forecast work as a pre-season trigger?")
+    if not isinstance(trig, dict):
+        st.write("Not available yet.")
+        return
+    months = ", ".join(str(x) for x in trig["issue_months"])
+    st.caption(f"Scored on {trig['rows']} Rio Grande rows issued in months {months} of the test years, "
+               f"with {trig['drought_seasons']} drought seasons. A rule fires when its chance is at least "
+               f"{round(trig['threshold'] * 100)}%.")
+    st.dataframe(pd.DataFrame(trig["rules"]), hide_index=True, width="stretch")
+    if trig["value_sweep"]:
+        sweep = pd.DataFrame(trig["value_sweep"])
+        fig = go.Figure()
+        for col, name in SWEEP_NAMES.items():
+            if col in sweep.columns:
+                fig.add_trace(go.Scatter(x=sweep["cost_ratio"], y=sweep[col], mode="lines+markers", name=name))
+        fig.update_layout(xaxis_title="Cost of acting, as a share of the loss avoided",
+                          yaxis_title="Value per row (higher is better)")
+        st.plotly_chart(theme.style_fig(fig, 340), width="stretch")
+    st.write("Our forecast beats the simple 'D1 or worse now' rule: "
+             f"**{yes_no(trig['forecast_beats_d1_rule'])}**. With reservoir storage added: "
+             f"**{yes_no(trig['reservoir_forecast_beats_d1_rule'])}**.")
+    if not trig["forecast_beats_d1_rule"]:
+        st.write("For this decision our model does about as well as a simple drought rule.")
+
+
+def show_losses(loss):
+    """Measured drought losses from the insurance files. If the lists are empty, only the note shows."""
+    st.header("Measured drought losses")
+    if not isinstance(loss, dict):
+        st.write("Not available yet.")
+        return
+    if loss["by_year"] or loss["by_county"]:
+        st.metric(f"Insured drought losses, {loss['years'][0]} to {loss['years'][1]}", f"${loss['total_usd']:,.0f}")
+        if loss["by_year"]:
+            by_year = pd.DataFrame(loss["by_year"])
+            fig = go.Figure(go.Bar(x=by_year["year"], y=by_year["usd"], marker_color=theme.CHART_COLORS[0]))
+            fig.update_layout(xaxis_title="Year", yaxis_title="Insured loss (US dollars)")
+            st.plotly_chart(theme.style_fig(fig, 300), width="stretch")
+        if loss["by_county"]:
+            st.dataframe(pd.DataFrame(loss["by_county"]), hide_index=True, width="stretch")
+        st.caption(md_escape(f"Source: {loss['source']}."))
+    st.caption(md_escape(loss["note"]))
+
+
+def show_reservoirs(res):
+    """Which reservoirs the pipeline matched to counties."""
+    st.header("Reservoirs")
+    if not isinstance(res, dict):
+        st.write("Not available yet.")
+        return
+    if res["systems"]:
+        st.dataframe(pd.DataFrame(res["systems"]), hide_index=True, width="stretch")
+    st.caption(md_escape(f"{res['counties_without_reservoir']} counties have no matched reservoir. {res['note']}"))
 
 
 # ---------------------------------------------------------------------------
