@@ -7,7 +7,7 @@ Every value below is copied from reports/metrics.json. Nothing is computed here.
 ## Setup
 
 - `contract_version`: 2
-- `generated_at`: 2026-11-14T07:21:26-08:00
+- `generated_at`: 2026-11-14T08:02:28-08:00
 - `is_final`: True
 - `focus_river`: Rio Grande
 - `training_scope`: Rio Grande counties only
@@ -425,11 +425,102 @@ Every value below is copied from reports/metrics.json. Nothing is computed here.
 - `limits[11]`: Counties are chosen by a 50 km rule from the river's main line. A different width gives a different set.
 - `limits[12]`: The Drought Monitor map is drawn by people each week, so the target includes their judgment.
 - `limits[13]`: A warning is not a payment decision. The grazing-period rule of the aid program is not modeled.
-- `limits[14]`: Nothing here measures crop yields or dollars saved.
-- `limits[15]`: River flow and snowpack were tested as extra inputs and are not part of the system. See ablations. The El Paso gauge had no daily flow data and was dropped. The Del Norte gauge ends in 2024.
-- `limits[16]`: Weather inputs (rain, temperature, soil moisture) were not tested.
-- `limits[17]`: A random forest cannot predict a drought longer or deeper than any it saw in training.
+- `limits[14]`: The 6-month target (8 weeks in a row at D2) matches the aid rule for years up to 2025. For 2026 USDA lowered the trigger to 4 weeks in a row (FSA Notice LFP-8).
+- `limits[15]`: The damage figure on the map is an estimate, not a tested forecast. It assumes every week of severe drought is a week of bought feed, priced at USDA's 2026 monthly feed cost for an adult beef cow. It was not checked against real losses, and it inherits the 12-month outlook's error.
+- `limits[16]`: Nothing here measures crop yields.
+- `limits[17]`: River flow and snowpack were tested as extra inputs and are not part of the system. See ablations. The El Paso gauge had no daily flow data and was dropped. The Del Norte gauge ends in 2024.
+- `limits[18]`: Weather inputs (rain, temperature, soil moisture) were not tested.
+- `limits[19]`: A random forest cannot predict a drought longer or deeper than any it saw in training.
+- `limits[20]`: Seed check: retrained with 10 random seeds, the system beat the best simple rule in 8/10 runs for the 4-week alert, 3/10 for the 6-month outlook and 10/10 for the 12-month outlook.
+- `limits[21]`: Buffer check: with a 100 km county rule (53 counties), the 4-week system cost 3269 against 3243 for the best simple rule (Worsening).
+- `limits[22]`: An outside review suggested two simple rules that were not in our baseline list. They were scored after the final run. 4-week rule 'D2 now, or D1 and worse than 4 or 8 weeks ago': cost 1840 on the test years, against 1912 for the system. 12-month rule 'average of 'same as now' and 'same as the last 52 weeks'': average error 13.21 weeks, against 14.0 for the system.
+- `limits[23]`: The 6-month outlook uses an El Nino value that NOAA publishes a few days into the month, around the same days the outlook is issued. A real-time forecast might have to use the value from a month earlier.
 
 ## Other keys
 
 - `alert_threshold`: 0.36
+- `map_fields.columns.risk_level`: Overall level for the map: the worse of the 4-week tier and the 6-month tier
+- `map_fields.columns.weeks_low`: Low end of the 12-month estimate: weeks_model minus the average error measured on that river
+- `map_fields.columns.weeks_high`: High end of the 12-month estimate: weeks_model plus that average error, at most 52
+- `map_fields.columns.typical_drought_weeks`: Median length of the county's past severe-drought spells, in weeks (0 if none)
+- `map_fields.columns.longest_drought_weeks`: The county's longest severe-drought spell on record, in weeks
+- `map_fields.columns.damage_months`: Months of bought feed if every expected severe-drought week needs bought feed
+- `map_fields.columns.damage_usd_per_100_head`: damage_months x monthly feed cost per head x 100 cattle, in dollars
+- `map_fields.feed_cost_per_head_month`: 35.66
+- `map_fields.feed_cost_source`: USDA Farm Service Agency, Notice LFP-7, 2026 LFP Payment Rates, adult beef cattle
+- `map_fields.length_range_coverage_focus`: 0.557
+- `map_fields.tested`: risk_level and the length range come from tested forecasts. The damage columns are untested estimates.
+- `seed_check.runs[0].seed`: 0
+- `seed_check.runs[0].alert_cost`: 1912
+- `seed_check.runs[0].season_cost`: 2324
+- `seed_check.runs[0].year_mae`: 14.0
+- `seed_check.runs[1].seed`: 1
+- `seed_check.runs[1].alert_cost`: 1940
+- `seed_check.runs[1].season_cost`: 2453
+- `seed_check.runs[1].year_mae`: 14.14
+- `seed_check.runs[2].seed`: 2
+- `seed_check.runs[2].alert_cost`: 1899
+- `seed_check.runs[2].season_cost`: 2407
+- `seed_check.runs[2].year_mae`: 13.95
+- `seed_check.runs[3].seed`: 3
+- `seed_check.runs[3].alert_cost`: 1888
+- `seed_check.runs[3].season_cost`: 2429
+- `seed_check.runs[3].year_mae`: 14.02
+- `seed_check.runs[4].seed`: 4
+- `seed_check.runs[4].alert_cost`: 1883
+- `seed_check.runs[4].season_cost`: 2446
+- `seed_check.runs[4].year_mae`: 13.94
+- `seed_check.runs[5].seed`: 5
+- `seed_check.runs[5].alert_cost`: 2005
+- `seed_check.runs[5].season_cost`: 2432
+- `seed_check.runs[5].year_mae`: 13.93
+- `seed_check.runs[6].seed`: 6
+- `seed_check.runs[6].alert_cost`: 2063
+- `seed_check.runs[6].season_cost`: 2391
+- `seed_check.runs[6].year_mae`: 14.03
+- `seed_check.runs[7].seed`: 7
+- `seed_check.runs[7].alert_cost`: 1915
+- `seed_check.runs[7].season_cost`: 2380
+- `seed_check.runs[7].year_mae`: 14.11
+- `seed_check.runs[8].seed`: 8
+- `seed_check.runs[8].alert_cost`: 1922
+- `seed_check.runs[8].season_cost`: 2421
+- `seed_check.runs[8].year_mae`: 14.05
+- `seed_check.runs[9].seed`: 9
+- `seed_check.runs[9].alert_cost`: 1931
+- `seed_check.runs[9].season_cost`: 2378
+- `seed_check.runs[9].year_mae`: 13.96
+- `seed_check.summary.alert_cost.lowest`: 1883
+- `seed_check.summary.alert_cost.highest`: 2063
+- `seed_check.summary.alert_cost.best_baseline`: 1971
+- `seed_check.summary.alert_cost.seeds_beating_best_baseline`: 8/10
+- `seed_check.summary.season_cost.lowest`: 2324
+- `seed_check.summary.season_cost.highest`: 2453
+- `seed_check.summary.season_cost.best_baseline`: 2382
+- `seed_check.summary.season_cost.seeds_beating_best_baseline`: 3/10
+- `seed_check.summary.year_mae.lowest`: 13.93
+- `seed_check.summary.year_mae.highest`: 14.14
+- `seed_check.summary.year_mae.best_baseline`: 14.52
+- `seed_check.summary.year_mae.seeds_beating_best_baseline`: 10/10
+- `buffer_check.buffer_km`: 100
+- `buffer_check.n_focus_counties`: 53
+- `buffer_check.alert.system_cost`: 3269
+- `buffer_check.alert.best_baseline`: Worsening
+- `buffer_check.alert.best_baseline_cost`: 3243
+- `buffer_check.alert.beats_every_baseline`: False
+- `buffer_check.season.system_cost`: 4081
+- `buffer_check.season.d1_rule_cost`: 4168
+- `buffer_check.season.persistence_cost`: 5423
+- `buffer_check.season.beats_every_baseline`: True
+- `buffer_check.year.mae_system`: 13.99
+- `buffer_check.year.mae_same_as_now`: 14.39
+- `buffer_check.year.mae_last_year`: 14.94
+- `buffer_check.year.beats_every_baseline`: True
+- `extra_rules_check.alert_rule`: D2 now, or D1 and worse than 4 or 8 weeks ago
+- `extra_rules_check.alert_rule_cost_validation`: 622
+- `extra_rules_check.system_cost_validation`: 636
+- `extra_rules_check.alert_rule_cost_test`: 1840
+- `extra_rules_check.system_cost_test`: 1912
+- `extra_rules_check.year_rule`: average of 'same as now' and 'same as the last 52 weeks'
+- `extra_rules_check.year_rule_mae`: 13.21
+- `extra_rules_check.system_mae`: 14.0

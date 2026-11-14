@@ -17,10 +17,12 @@ import pandas as pd
 
 # Make "import app.contract" work when this file is run as a script.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from app.contract import (DEMO_DIR, LATEST_COLUMNS, OUTLOOK_COLUMNS, PRED_COLUMNS,  # noqa: E402
-                          validate_all)
+from app.contract import (DEMO_DIR, LATEST_COLUMNS, MAP_COLUMNS, OUTLOOK_COLUMNS,  # noqa: E402
+                          PRED_COLUMNS, validate_all)
 
 SEED = 42                      # same seed = same fake data every time
+FAKE_MAE = 8                   # fake "typical error" in weeks, used for the fake 12-month range
+FAKE_FEED_COST = 35.66         # same placeholder price per head per month as the real handoff states
 MISS_COST = 3                  # a missed drought costs 3x a false alarm (from the contract)
 ALARM_LEVEL = 0.25             # warn when risk >= 25% (follows from the 3x cost rule)
 rng = np.random.default_rng(SEED)
@@ -79,6 +81,20 @@ def has_run_ahead(d2, k, run):
             best = max(best, cur)
         out[t] = int(best >= run)
     return out
+
+
+def spell_lengths(d2):
+    """Lengths of every run of consecutive severe-drought weeks, e.g. [3, 8, 2]."""
+    runs, cur = [], 0
+    for w in d2:
+        if w:
+            cur += 1
+        elif cur:
+            runs.append(cur)
+            cur = 0
+    if cur:
+        runs.append(cur)
+    return runs
 
 
 def past_weeks(d2, k):
@@ -211,7 +227,19 @@ def build_latest(full, outlook):
     last["weeks_usual"] = last["fips"].map(usual)
     last["weeks_model"] = np.clip(last["weeks_usual"] + 6 * (last["cls"] - 2), 0, 52)
     last = last.sort_values("fips", kind="stable").reset_index(drop=True)
-    return last[[c for c, _ in LATEST_COLUMNS]]
+
+    # --- the optional map columns (same names and meaning as the real handoff) ---
+    order = {"Low": 0, "Watch": 1, "Warning": 2}
+    last["risk_level"] = [a if order[a] >= order[b] else b for a, b in zip(last["tier"], last["season_tier"])]
+    last["weeks_low"] = np.clip(last["weeks_model"] - FAKE_MAE, 0, 52)
+    last["weeks_high"] = np.clip(last["weeks_model"] + FAKE_MAE, 0, 52)
+    spells = {f: spell_lengths(g["cls"].to_numpy() >= 3) for f, g in full.groupby("fips")}
+    last["typical_drought_weeks"] = [float(np.median(spells[f])) if spells[f] else 0.0 for f in last["fips"]]
+    last["longest_drought_weeks"] = [float(max(spells[f])) if spells[f] else 0.0 for f in last["fips"]]
+    last["damage_months"] = last["weeks_model"] / 4.345
+    last["damage_usd_per_100_head"] = last["damage_months"] * FAKE_FEED_COST * 100
+    columns = [c for c, _ in LATEST_COLUMNS] + MAP_COLUMNS
+    return last[columns]
 
 
 # ---------------------------------------------------------------------------
@@ -357,6 +385,11 @@ def build_metrics(pred, outlook, latest):
                         result="DEMO: no change in cost.")],
         feature_importance=[dict(feature="nb_mean", importance=0.4), dict(feature="cls", importance=0.3)],
         limits=["DEMO DATA - these are not real results"],
+        map_fields=dict(
+            columns={c: "DEMO: fake map column" for c in MAP_COLUMNS},
+            feed_cost_per_head_month=FAKE_FEED_COST,
+            feed_cost_source="DEMO placeholder, not a real source",
+            tested="DEMO DATA - these are not real estimates."),
     )
 
 

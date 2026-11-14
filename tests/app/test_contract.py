@@ -99,3 +99,32 @@ def test_python_dates_pass_but_text_dates_fail(demo):
     # Dates stored as text are NOT dates, so they must still fail.
     pred["date"] = pred["date"].astype(str)
     assert validate_predictions(pred) != []
+
+
+def test_map_columns_are_checked_when_present(demo):
+    _, _, latest, _ = demo
+    assert "risk_level" in latest.columns                      # the demo files carry them too
+    # some but not all of the map columns -> a problem
+    assert validate_latest(latest.drop(columns=["damage_months"])) != []
+    # a range that is upside down -> a problem
+    broken = latest.copy()
+    broken.loc[0, "weeks_low"], broken.loc[0, "weeks_high"] = 40.0, 10.0
+    assert validate_latest(broken) != []
+    # an unknown level name -> a problem
+    broken = latest.copy()
+    broken["risk_level"] = broken["risk_level"].astype(object)
+    broken.loc[0, "risk_level"] = "Panic"
+    assert validate_latest(broken) != []
+
+
+def test_map_columns_need_the_metrics_explanation(demo):
+    pred, outlook, latest, metrics = demo
+    del metrics["map_fields"]
+    assert any("map_fields" in p for p in validate_all(pred, outlook, latest, metrics))
+
+
+def test_files_without_map_columns_still_pass(demo):
+    # Older handoffs have no map columns: that must stay valid (the map falls back to the tiers).
+    from app.contract import MAP_COLUMNS
+    pred, outlook, latest, metrics = demo
+    assert validate_all(pred, outlook, latest.drop(columns=MAP_COLUMNS), metrics) == []

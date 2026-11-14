@@ -29,7 +29,8 @@ from plotly.subplots import make_subplots
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 logging.getLogger("streamlit").setLevel(logging.ERROR)   # theme.py imports Streamlit; keep this script quiet
 from app import theme                                           # noqa: E402
-from app.contract import REPO_ROOT, load                       # noqa: E402
+from app.contract import REPO_ROOT, has_map_fields, load      # noqa: E402
+from app.mapdata import load_river_line                         # noqa: E402
 
 OUT_DIR = REPO_ROOT / "app" / "pitch_kit"
 APP_URL = "[TEAM: paste the live app link here]"
@@ -442,7 +443,8 @@ def build_charts(latest, metrics, status):
 
     # 4) This week's map of the focus river: a real zoomable map (needs internet to draw the tiles).
     now = latest[latest["river"] == m["focus_river"]]
-    fig = theme.risk_map(now, selected_fips=None)
+    fig = theme.risk_map(now, selected_fips=None, river_lines=load_river_line(m["focus_river"]),
+                         river_name=m["focus_river"], level_col="risk_level" if has_map_fields(now) else "tier")
     fig.update_layout(title_text=f"This week: {m['focus_river']} counties by 4-week tier",
                       margin=dict(l=0, r=0, t=50, b=0))
     save_chart(fig, "this_week_map.html", status)

@@ -1,6 +1,6 @@
 {
   "contract_version": 2,
-  "generated_at": "2026-11-14T14:59:01+00:00",
+  "generated_at": "2026-11-14T16:07:18+00:00",
   "is_final": false,
   "focus_river": "Rio Grande",
   "training_scope": "Rio Grande counties only (DEMO)",
@@ -397,5 +397,19 @@
   ],
   "limits": [
     "DEMO DATA - these are not real results"
-  ]
+  ],
+  "map_fields": {
+    "columns": {
+      "risk_level": "DEMO: fake map column",
+      "weeks_low": "DEMO: fake map column",
+      "weeks_high": "DEMO: fake map column",
+      "typical_drought_weeks": "DEMO: fake map column",
+      "longest_drought_weeks": "DEMO: fake map column",
+      "damage_months": "DEMO: fake map column",
+      "damage_usd_per_100_head": "DEMO: fake map column"
+    },
+    "feed_cost_per_head_month": 35.66,
+    "feed_cost_source": "DEMO placeholder, not a real source",
+    "tested": "DEMO DATA - these are not real estimates."
+  }
 }

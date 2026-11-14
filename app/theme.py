@@ -214,28 +214,54 @@ def style_fig(fig, height=None):
     return fig
 
 
-def risk_map(df, selected_fips, height=520, width_px=980):
+def risk_map(df, selected_fips, river_lines=None, river_name="River", level_col="tier",
+             height=520, width_px=980):
     """
-    A real, zoomable map of the counties in `df` (one river), colored by 4-week tier.
-    Needs: fips, county, state, lat, lon, tier, p_season, weeks_model.
-    - Hover shows the county's three forecasts. Click a county to select it (customdata = its code).
-    - The map tiles (streets, rivers, terrain) are fetched by the viewer's browser from a free
-      public tile server (no account or key). If the tiles can't load, the dots still show.
+    A real, zoomable map of the counties in `df` (one river).
+      - the river itself is drawn as a blue line (river_lines = list of [(lat, lon), ...] pieces)
+      - each county is a dot, colored by `level_col` ("risk_level" = the worse of the 4-week and
+        6-month levels, or "tier" = the 4-week level if the pipeline's map columns are missing)
+      - hovering shows the county's forecasts; clicking selects it (customdata = its county code)
+    The map tiles (streets, terrain) come from a free public tile server, fetched by the viewer's
+    browser (no account or key). If the tiles can't load, the river and dots still show.
     """
     p = palette()
     fig = go.Figure()
 
-    # A soft halo behind the selected county, drawn first so it sits under the dots.
+    # The river: one blue line. None between the pieces lifts the pen so they are not joined.
+    if river_lines:
+        lats, lons = [], []
+        for piece in river_lines:
+            lats += [pt[0] for pt in piece] + [None]
+            lons += [pt[1] for pt in piece] + [None]
+        fig.add_trace(go.Scattermap(lat=lats, lon=lons, mode="lines", name=river_name, hoverinfo="skip",
+                                    line=dict(width=3, color=p["river"])))
+
+    # A soft halo behind the selected county, drawn before the dots so it sits under them.
     sel = df[df["fips"] == selected_fips]
     fig.add_trace(go.Scattermap(lat=sel["lat"], lon=sel["lon"], mode="markers", hoverinfo="skip",
                                 name="Selected county", marker=dict(size=34, color=p["forest"], opacity=0.35)))
 
-    for tier, color in TIER_COLOR.items():
-        sub = df[df["tier"] == tier]
-        hover = [f"{html.escape(r.county)}, {html.escape(r.state)}<br>4-week: {r.tier}"
-                 f"<br>6-month: {round(r.p_season * 100)}%<br>12-month: about {round(r.weeks_model)} weeks"
-                 for r in sub.itertuples()]
-        fig.add_trace(go.Scattermap(lat=sub["lat"], lon=sub["lon"], mode="markers", name=tier,
+    has_range = "weeks_low" in df.columns and "weeks_high" in df.columns
+    has_spells = "typical_drought_weeks" in df.columns and "longest_drought_weeks" in df.columns
+    for level, color in TIER_COLOR.items():
+        sub = df[df[level_col] == level]
+        hover = []
+        for r in sub.itertuples():
+            lines = [f"<b>{html.escape(r.county)}, {html.escape(r.state)}</b>"]
+            if level_col != "tier":
+                lines.append(f"Overall level: {html.escape(str(getattr(r, level_col)))}")
+            lines.append(f"4-week: {html.escape(r.tier)}")
+            lines.append(f"6-month: {round(r.p_season * 100)}% chance")
+            weeks = f"12-month: about {round(r.weeks_model)} weeks"
+            if has_range:
+                weeks += f" (range {round(r.weeks_low)} to {round(r.weeks_high)})"
+            lines.append(weeks)
+            if has_spells:
+                lines.append(f"Past spells: typical {round(r.typical_drought_weeks)}, "
+                             f"longest {round(r.longest_drought_weeks)} weeks")
+            hover.append("<br>".join(lines))
+        fig.add_trace(go.Scattermap(lat=sub["lat"], lon=sub["lon"], mode="markers", name=level,
                                     text=hover, hoverinfo="text", customdata=sub[["fips"]],
                                     marker=dict(size=15, color=color)))
 
@@ -247,5 +273,6 @@ def risk_map(df, selected_fips, height=520, width_px=980):
                math.log2(width_px * 360 / (512 * lon_span * 1.5)), 9)
     fig.update_layout(map=dict(style=p["map_style"], zoom=zoom,
                                center=dict(lat=float(df["lat"].mean()), lon=float(df["lon"].mean()))),
-                      margin=dict(l=0, r=0, t=0, b=0))
+                      margin=dict(l=0, r=0, t=0, b=0),
+                      legend_title_text="Overall level" if level_col != "tier" else "4-week level")
     return style_fig(fig, height)

@@ -103,10 +103,16 @@ Cost = 3 x missed droughts + false alarms. That cost rule is our assumption, not
 - Counties are chosen by a 50 km rule from the river's main line. A different width gives a different set.
 - The Drought Monitor map is drawn by people each week, so the target includes their judgment.
 - A warning is not a payment decision. The grazing-period rule of the aid program is not modeled.
-- Nothing here measures crop yields or dollars saved.
+- The 6-month target (8 weeks in a row at D2) matches the aid rule for years up to 2025. For 2026 USDA lowered the trigger to 4 weeks in a row (FSA Notice LFP-8).
+- The damage figure on the map is an estimate, not a tested forecast. It assumes every week of severe drought is a week of bought feed, priced at USDA's 2026 monthly feed cost for an adult beef cow. It was not checked against real losses, and it inherits the 12-month outlook's error.
+- Nothing here measures crop yields.
 - River flow and snowpack were tested as extra inputs and are not part of the system. See ablations. The El Paso gauge had no daily flow data and was dropped. The Del Norte gauge ends in 2024.
 - Weather inputs (rain, temperature, soil moisture) were not tested.
 - A random forest cannot predict a drought longer or deeper than any it saw in training.
+- Seed check: retrained with 10 random seeds, the system beat the best simple rule in 8/10 runs for the 4-week alert, 3/10 for the 6-month outlook and 10/10 for the 12-month outlook.
+- Buffer check: with a 100 km county rule (53 counties), the 4-week system cost 3269 against 3243 for the best simple rule (Worsening).
+- An outside review suggested two simple rules that were not in our baseline list. They were scored after the final run. 4-week rule 'D2 now, or D1 and worse than 4 or 8 weeks ago': cost 1840 on the test years, against 1912 for the system. 12-month rule 'average of 'same as now' and 'same as the last 52 weeks'': average error 13.21 weeks, against 14.0 for the system.
+- The 6-month outlook uses an El Nino value that NOAA publishes a few days into the month, around the same days the outlook is issued. A real-time forecast might have to use the value from a month earlier.
 
 ## What we'd do next
 Snowpack and river flow as inputs, the real grazing-period rule, a rancher's own cost numbers, and

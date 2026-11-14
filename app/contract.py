@@ -60,6 +60,13 @@ LATEST_COLUMNS = [
     ("weeks_model", "float"), ("weeks_usual", "float"),
 ]
 
+# Extra columns the pipeline added to latest.parquet for the map (all optional, all together).
+# If they are there, the app uses them; if not (older files), the map falls back to the tiers.
+MAP_COLUMNS = ["risk_level", "weeks_low", "weeks_high", "typical_drought_weeks",
+               "longest_drought_weeks", "damage_months", "damage_usd_per_100_head"]
+# What metrics.json["map_fields"] must say when those columns are present (the app prints it).
+MAP_FIELDS_KEYS = ["feed_cost_per_head_month", "feed_cost_source", "tested"]
+
 # ---------------------------------------------------------------------------
 # metrics.json: every key the contract requires. A dotted name like
 # "season.focus" means "the key 'focus' inside the key 'season'".
@@ -197,6 +204,33 @@ def validate_outlook(df):
     return problems
 
 
+def has_map_fields(df):
+    """True when latest.parquet carries all the optional map columns."""
+    return all(c in df.columns for c in MAP_COLUMNS)
+
+
+def _check_map_columns(df, name):
+    """The optional map columns: all or nothing, and sensible values."""
+    present = [c for c in MAP_COLUMNS if c in df.columns]
+    if not present:
+        return []
+    if len(present) < len(MAP_COLUMNS):
+        return [f"{name}: map columns are incomplete, missing {[c for c in MAP_COLUMNS if c not in present]}"]
+    problems = []
+    for col in MAP_COLUMNS:
+        if df[col].isna().any():
+            problems.append(f"{name}: column '{col}' has missing values")
+    problems += _check_in(df, "risk_level", TIERS, name)
+    for col in ("weeks_low", "weeks_high"):
+        problems += _check_range(df, col, 0, 52, name)
+    if (df["weeks_low"] > df["weeks_high"]).any():
+        problems.append(f"{name}: 'weeks_low' is above 'weeks_high' for some counties")
+    for col in ("typical_drought_weeks", "longest_drought_weeks", "damage_months", "damage_usd_per_100_head"):
+        if (df[col] < 0).any():
+            problems.append(f"{name}: column '{col}' has negative values")
+    return problems
+
+
 def validate_latest(df):
     name = "latest"
     problems = _check_frame(df, LATEST_COLUMNS, name)
@@ -210,6 +244,7 @@ def validate_latest(df):
     problems += _check_range(df, "cls", 0, 5, name)
     for col in ("p_model", "p_season"):
         problems += _check_range(df, col, 0, 1, name)
+    problems += _check_map_columns(df, name)
     return problems
 
 
@@ -273,8 +308,16 @@ def load_demo():
 
 def validate_all(pred, outlook, latest, metrics):
     """Run all four validators and return one combined list of problems."""
-    return (validate_predictions(pred) + validate_outlook(outlook)
-            + validate_latest(latest) + validate_metrics(metrics, n_rows=len(pred)))
+    problems = (validate_predictions(pred) + validate_outlook(outlook)
+                + validate_latest(latest) + validate_metrics(metrics, n_rows=len(pred)))
+    # If the map columns are there, metrics.json must explain them (the app prints that text).
+    if has_map_fields(latest):
+        block = metrics.get("map_fields")
+        if not isinstance(block, dict):
+            problems.append("metrics: missing key 'map_fields' (needed because latest has the map columns)")
+        else:
+            problems += [f"metrics: missing key 'map_fields.{k}'" for k in MAP_FIELDS_KEYS if k not in block]
+    return problems
 
 
 def load():

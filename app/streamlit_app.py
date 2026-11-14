@@ -25,7 +25,8 @@ import streamlit as st                   # noqa: E402
 
 from app import theme                    # noqa: E402
 from app.brief import CLASS_WORDS, build_brief, md_escape, streak_sentence   # noqa: E402
-from app.contract import load            # noqa: E402
+from app.contract import has_map_fields, load   # noqa: E402
+from app.mapdata import load_river_line   # noqa: E402
 from app.tallies import (errors_table, reconcile, river_grid, tally,   # noqa: E402
                          weeks_error)
 
@@ -53,7 +54,15 @@ def get_data():
     return load()
 
 
+@st.cache_data
+def get_river_line(river):
+    """The river's line for the map (from the app's own small file)."""
+    return load_river_line(river)
+
+
 pred, outlook, latest, metrics, source, problems = get_data()
+# The pipeline's extra map columns (overall level, ranges, drought history, feed cost) - if present.
+map_fields = has_map_fields(latest)
 
 # ---------------------------------------------------------------------------
 # Top of the page: the hero banner, then banners that tell the viewer how much to trust the data
@@ -160,9 +169,29 @@ def tab_this_week():
              rows=[f"Level: {row['season_tier']}"]),
         dict(label="Next 12 months", value=f"about {round(row['weeks_model'])} weeks", accent=theme.CHART_COLORS[0],
              caption="of severe drought",
-             rows=[f"Usual for this county: {round(row['weeks_usual'])} weeks",
-                   f"Typical error: about {metrics['year']['focus']['mae_system']} weeks"]),
+             rows=([f"Likely range: {round(row['weeks_low'])} to {round(row['weeks_high'])} weeks"] if map_fields else [])
+                  + [f"Usual for this county: {round(row['weeks_usual'])} weeks",
+                     f"Typical error: about {metrics['year']['focus']['mae_system']} weeks"]),
     ])
+
+    # Past drought spells and an illustrative feed-cost estimate (the pipeline's map fields).
+    # The feed-cost numbers are UNTESTED estimates, and we say so on the card and under it.
+    if map_fields:
+        mf = metrics["map_fields"]
+        typical = round(row["typical_drought_weeks"])
+        theme.card_grid([
+            dict(label="Past severe-drought spells", value=f"{round(row['longest_drought_weeks'])} weeks",
+                 accent=TIER_COLOR["Watch"], caption="longest spell on record for this county",
+                 rows=[f"Typical spell: {typical} weeks" if typical else "No severe-drought spell on record"]),
+            dict(label="Feed cost estimate (untested)", value=f"${round(row['damage_usd_per_100_head']):,}",
+                 accent=TIER_COLOR["Warning"], caption="per 100 cattle, illustrative only",
+                 rows=[f"About {row['damage_months']:.1f} months of bought feed",
+                       f"Assumes ${mf['feed_cost_per_head_month']} per head per month"]),
+        ])
+        # The pipeline's own sentence, with its column name swapped for plain words.
+        tested = mf["tested"].replace("risk_level", "the overall level")
+        st.caption(md_escape(f"{tested} Feed price: {mf['feed_cost_source']}. This is not a prediction "
+                             "of losses, not a payment, and not financial advice."))
 
     # The link to the USDA program, in careful words (we never predict a payment).
     note = streak_sentence(int(row["d2_streak"]))    # wording shared with the Farm brief
@@ -172,8 +201,12 @@ def tab_this_week():
 
     # A real map: scroll to zoom, drag to move, hover for the forecasts, click a county to select it.
     st.markdown("#### Where the risk is")
-    st.caption("Scroll to zoom, drag to move, click a county to select it.")
-    st.plotly_chart(theme.risk_map(river_latest, fips), key="risk_map", on_select=pick_county_from_map,
+    st.caption("Scroll to zoom, drag to move, click a county to select it. "
+               + ("Dot color = the worse of the 4-week and 6-month levels." if map_fields else ""))
+    level_col = "risk_level" if map_fields else "tier"      # overall level when the pipeline gives it
+    st.plotly_chart(theme.risk_map(river_latest, fips, river_lines=get_river_line(river), river_name=river,
+                                   level_col=level_col),
+                    key="risk_map", on_select=pick_county_from_map,
                     selection_mode="points", config={"scrollZoom": True}, width="stretch")
 
     # Two small tables under the map: the counties on Warning, then the ones on Watch.
@@ -518,7 +551,8 @@ with tabs[5]:
     tab_how_good()
 
 theme.footer("Drought data: U.S. Drought Monitor (NDMC, USDA, NOAA), county archive by the Montana "
-             "Climate Office. ENSO index: NOAA Climate Prediction Center.")
+             "Climate Office. ENSO index: NOAA Climate Prediction Center. River lines: Natural Earth. "
+             "Map: OpenStreetMap contributors, CARTO.")
 
 # Write the current choices back to the web address, so "copy link" shares exactly this view.
 st.query_params["river"] = river
