@@ -26,7 +26,7 @@ from farmdrought.outlook import (FEATURES_SEASON, FEATURES_YEAR, extra_inputs_te
                                  make_regressor, run_outlook)
 from farmdrought.snow import FEATURES_S, add_snow_features
 
-IS_FINAL = False  # stays False until the numbers are locked (Phase P4)
+IS_FINAL = True  # the numbers are locked: reports/decision.md was committed before this run
 
 # Column order of each file, exactly as in the contract
 PREDICTION_COLUMNS = ["date", "fips", "county", "state", "river", "lat", "lon", "y", "cls", "d2_streak",
