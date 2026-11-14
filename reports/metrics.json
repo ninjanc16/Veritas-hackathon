@@ -1,0 +1,538 @@
+{
+  "contract_version": 2,
+  "generated_at": "2026-11-14T07:13:12-08:00",
+  "is_final": false,
+  "focus_river": "Rio Grande",
+  "training_scope": "Rio Grande counties only",
+  "n_rows": 177452,
+  "n_focus_rows": 12617,
+  "n_counties": 436,
+  "n_focus_counties": 31,
+  "horizon_weeks": 4,
+  "train_years": [
+    2000,
+    2014
+  ],
+  "val_years": [
+    2015,
+    2018
+  ],
+  "test_years": [
+    2019,
+    2026
+  ],
+  "latest_week": "2026-11-10",
+  "miss_cost": 3,
+  "policies": [
+    {
+      "name": "Our system",
+      "column": "alarm_system",
+      "cost": 1912,
+      "alarms": 7269,
+      "caught": 6773,
+      "missed": 472,
+      "false_alarms": 496,
+      "precision": 0.932,
+      "recall": 0.935,
+      "auc": 0.975
+    },
+    {
+      "name": "Persistence",
+      "column": "alarm_persistence",
+      "cost": 2403,
+      "alarms": 6680,
+      "caught": 6503,
+      "missed": 742,
+      "false_alarms": 177,
+      "precision": 0.974,
+      "recall": 0.898,
+      "auc": null
+    },
+    {
+      "name": "D1 now",
+      "column": "alarm_d1_now",
+      "cost": 2333,
+      "alarms": 9118,
+      "caught": 7130,
+      "missed": 115,
+      "false_alarms": 1988,
+      "precision": 0.782,
+      "recall": 0.984,
+      "auc": null
+    },
+    {
+      "name": "Worsening",
+      "column": "alarm_worsening",
+      "cost": 1971,
+      "alarms": 7236,
+      "caught": 6750,
+      "missed": 495,
+      "false_alarms": 486,
+      "precision": 0.933,
+      "recall": 0.932,
+      "auc": null
+    },
+    {
+      "name": "Calendar",
+      "column": "alarm_calendar",
+      "cost": 21735,
+      "alarms": 0,
+      "caught": 0,
+      "missed": 7245,
+      "false_alarms": 0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "auc": null
+    }
+  ],
+  "headline": {
+    "system_cost": 1912,
+    "persistence_cost": 2403,
+    "pct_cheaper_than_persistence": 20.4,
+    "cheapest_baseline_on_test": "Worsening",
+    "cheapest_baseline_cost": 1971,
+    "honesty_check_pass": true
+  },
+  "onset": {
+    "rows": 5937,
+    "positives": 742,
+    "system_cost": 1735,
+    "best_rule": "Worsening",
+    "best_rule_cost": 1794,
+    "never_warn_cost": 2226,
+    "precision": 0.458,
+    "recall": 0.364,
+    "auc": 0.832
+  },
+  "events": {
+    "n": 175,
+    "warned_within_4_weeks": 100,
+    "median_lead_weeks": 3.0
+  },
+  "cost_sensitivity": [
+    {
+      "miss_cost": 2,
+      "system_cost": 1537,
+      "best_baseline_cost": 1476
+    },
+    {
+      "miss_cost": 3,
+      "system_cost": 1912,
+      "best_baseline_cost": 1971
+    },
+    {
+      "miss_cost": 5,
+      "system_cost": 2603,
+      "best_baseline_cost": 2563
+    },
+    {
+      "miss_cost": 10,
+      "system_cost": 3097,
+      "best_baseline_cost": 3138
+    }
+  ],
+  "year_by_year": [
+    {
+      "year": 2019,
+      "positives": 512,
+      "system_cost": 248,
+      "persistence_cost": 341
+    },
+    {
+      "year": 2020,
+      "positives": 1069,
+      "system_cost": 284,
+      "persistence_cost": 427
+    },
+    {
+      "year": 2021,
+      "positives": 1098,
+      "system_cost": 223,
+      "persistence_cost": 267
+    },
+    {
+      "year": 2022,
+      "positives": 999,
+      "system_cost": 138,
+      "persistence_cost": 165
+    },
+    {
+      "year": 2023,
+      "positives": 752,
+      "system_cost": 356,
+      "persistence_cost": 410
+    },
+    {
+      "year": 2024,
+      "positives": 667,
+      "system_cost": 165,
+      "persistence_cost": 147
+    },
+    {
+      "year": 2025,
+      "positives": 1125,
+      "system_cost": 242,
+      "persistence_cost": 335
+    },
+    {
+      "year": 2026,
+      "positives": 1023,
+      "system_cost": 256,
+      "persistence_cost": 311
+    }
+  ],
+  "per_river": [
+    {
+      "river": "Rio Grande",
+      "counties": 31,
+      "system_cost": 1912,
+      "persistence_cost": 2403,
+      "best_rule": "Worsening",
+      "best_rule_cost": 1971,
+      "pct_cheaper_than_best_rule": 3.0,
+      "own_river_cost": 1912,
+      "all_rivers_cost": 1760,
+      "precision": 0.932,
+      "recall": 0.935,
+      "auc": 0.975
+    },
+    {
+      "river": "Mississippi",
+      "counties": 164,
+      "system_cost": 9232,
+      "persistence_cost": 10382,
+      "best_rule": "Worsening",
+      "best_rule_cost": 8677,
+      "pct_cheaper_than_best_rule": -6.4,
+      "own_river_cost": 8190,
+      "all_rivers_cost": 8087,
+      "precision": 0.811,
+      "recall": 0.779,
+      "auc": 0.955
+    },
+    {
+      "river": "Missouri",
+      "counties": 103,
+      "system_cost": 5455,
+      "persistence_cost": 6100,
+      "best_rule": "Worsening",
+      "best_rule_cost": 5358,
+      "pct_cheaper_than_best_rule": -1.8,
+      "own_river_cost": 5848,
+      "all_rivers_cost": 5093,
+      "precision": 0.877,
+      "recall": 0.875,
+      "auc": 0.972
+    },
+    {
+      "river": "Colorado",
+      "counties": 13,
+      "system_cost": 572,
+      "persistence_cost": 664,
+      "best_rule": "Worsening",
+      "best_rule_cost": 512,
+      "pct_cheaper_than_best_rule": -11.7,
+      "own_river_cost": 562,
+      "all_rivers_cost": 525,
+      "precision": 0.957,
+      "recall": 0.946,
+      "auc": 0.983
+    },
+    {
+      "river": "Ohio",
+      "counties": 125,
+      "system_cost": 4592,
+      "persistence_cost": 4470,
+      "best_rule": "Persistence",
+      "best_rule_cost": 4470,
+      "pct_cheaper_than_best_rule": -2.7,
+      "own_river_cost": 4625,
+      "all_rivers_cost": 4615,
+      "precision": 0.582,
+      "recall": 0.598,
+      "auc": 0.935
+    }
+  ],
+  "season": {
+    "horizon_weeks": 26,
+    "target": "8 or more consecutive weeks at D2 or worse inside the next 26 weeks",
+    "test_years": [
+      2008,
+      2025
+    ],
+    "threshold": 0.25,
+    "focus": {
+      "rows": 6665,
+      "base_rate": 0.489,
+      "precision": 0.733,
+      "recall": 0.868,
+      "auc": 0.868,
+      "system_cost": 2324,
+      "persistence_cost": 3133,
+      "d1_rule_cost": 2382,
+      "usual_cost": 3871,
+      "always_warn_cost": 3403,
+      "never_warn_cost": 9786,
+      "pct_cheaper_than_persistence": 25.8,
+      "beats_every_baseline": true,
+      "years_better_than_usual": "16/18"
+    },
+    "per_river": [
+      {
+        "river": "Rio Grande",
+        "system_cost": 2324,
+        "persistence_cost": 3133,
+        "best_rule": "D1 now",
+        "best_rule_cost": 2382,
+        "pct_cheaper_than_best_rule": 2.4,
+        "own_river_cost": 2324
+      },
+      {
+        "river": "Mississippi",
+        "system_cost": 13807,
+        "persistence_cost": 9208,
+        "best_rule": "Persistence",
+        "best_rule_cost": 9208,
+        "pct_cheaper_than_best_rule": -49.9,
+        "own_river_cost": 10086
+      },
+      {
+        "river": "Missouri",
+        "system_cost": 8142,
+        "persistence_cost": 6220,
+        "best_rule": "Persistence",
+        "best_rule_cost": 6220,
+        "pct_cheaper_than_best_rule": -30.9,
+        "own_river_cost": 6162
+      },
+      {
+        "river": "Colorado",
+        "system_cost": 1059,
+        "persistence_cost": 1215,
+        "best_rule": "D1 now",
+        "best_rule_cost": 1048,
+        "pct_cheaper_than_best_rule": -1.0,
+        "own_river_cost": 1072
+      },
+      {
+        "river": "Ohio",
+        "system_cost": 5258,
+        "persistence_cost": 2488,
+        "best_rule": "Persistence",
+        "best_rule_cost": 2488,
+        "pct_cheaper_than_best_rule": -111.3,
+        "own_river_cost": 2658
+      }
+    ]
+  },
+  "year": {
+    "horizon_weeks": 52,
+    "target": "number of weeks at D2 or worse in the next 52 weeks",
+    "test_years": [
+      2008,
+      2025
+    ],
+    "focus": {
+      "rows": 6665,
+      "mean_weeks": 22.1,
+      "mae_system": 14.0,
+      "mae_same_as_now": 14.52,
+      "mae_last_year": 15.18,
+      "mae_usual": 17.39,
+      "beats_every_baseline": true,
+      "years_better_than_last_year": "11/18",
+      "years_better_than_usual": "14/18"
+    },
+    "per_river": [
+      {
+        "river": "Rio Grande",
+        "mae_system": 14.0,
+        "best_baseline": "same as now",
+        "mae_best_baseline": 14.52,
+        "mae_own_river": 14.0
+      },
+      {
+        "river": "Mississippi",
+        "mae_system": 12.31,
+        "best_baseline": "usual",
+        "mae_best_baseline": 6.49,
+        "mae_own_river": 5.83
+      },
+      {
+        "river": "Missouri",
+        "mae_system": 12.83,
+        "best_baseline": "same as now",
+        "mae_best_baseline": 8.63,
+        "mae_own_river": 7.64
+      },
+      {
+        "river": "Colorado",
+        "mae_system": 13.55,
+        "best_baseline": "same as now",
+        "mae_best_baseline": 13.21,
+        "mae_own_river": 12.79
+      },
+      {
+        "river": "Ohio",
+        "mae_system": 11.78,
+        "best_baseline": "usual",
+        "mae_best_baseline": 2.63,
+        "mae_own_river": 2.71
+      }
+    ]
+  },
+  "failure_examples": [
+    {
+      "product": "4-week alert",
+      "date": "2023-04-04",
+      "county": "Hidalgo",
+      "state": "Texas",
+      "what_happened": "False alarm: the system warned with a risk score of 1.00, but the county did not reach severe drought in the next 4 weeks."
+    },
+    {
+      "product": "4-week alert",
+      "date": "2024-12-31",
+      "county": "Rio Grande",
+      "state": "Colorado",
+      "what_happened": "Miss: the risk score was only 0.00, so there was no warning, but the county reached severe drought within 4 weeks."
+    }
+  ],
+  "shuffled_auc_mean": 0.44,
+  "ablations": [
+    {
+      "name": "4-week forest trained on all five rivers",
+      "product": "4-week alert",
+      "result": "Cost 1760 on the Rio Grande, against 1912 for the Rio Grande-trained system."
+    },
+    {
+      "name": "Logistic regression in place of the forest",
+      "product": "4-week alert",
+      "result": "Cost 2535 on the Rio Grande, against 1912 for the forest."
+    },
+    {
+      "name": "6-month forest without the El Nino inputs",
+      "product": "6-month outlook",
+      "result": "Cost 2489 on the Rio Grande, against 2324 with them."
+    },
+    {
+      "name": "6-month forest trained on all five rivers",
+      "product": "6-month outlook",
+      "result": "Cost 2708 on the Rio Grande, against 2324 for the Rio Grande-trained system."
+    },
+    {
+      "name": "12-month forest trained on all five rivers",
+      "product": "12-month outlook",
+      "result": "Average error 13.38 weeks on the Rio Grande, against 14.0 for the Rio Grande-trained system."
+    }
+  ],
+  "feature_importance": [
+    {
+      "feature": "cls",
+      "importance": 0.172
+    },
+    {
+      "feature": "since_d2",
+      "importance": 0.1564
+    },
+    {
+      "feature": "l1",
+      "importance": 0.1293
+    },
+    {
+      "feature": "nb_d2",
+      "importance": 0.1133
+    },
+    {
+      "feature": "mean12",
+      "importance": 0.0749
+    },
+    {
+      "feature": "nb_mean",
+      "importance": 0.0677
+    },
+    {
+      "feature": "l2",
+      "importance": 0.0606
+    },
+    {
+      "feature": "max12",
+      "importance": 0.0574
+    },
+    {
+      "feature": "l4",
+      "importance": 0.0533
+    },
+    {
+      "feature": "mean26",
+      "importance": 0.027
+    },
+    {
+      "feature": "nb_max",
+      "importance": 0.024
+    },
+    {
+      "feature": "l8",
+      "importance": 0.0174
+    },
+    {
+      "feature": "nb_chg4",
+      "importance": 0.0096
+    },
+    {
+      "feature": "max26",
+      "importance": 0.0064
+    },
+    {
+      "feature": "chg8",
+      "importance": 0.0059
+    },
+    {
+      "feature": "nb_minus_self",
+      "importance": 0.0052
+    },
+    {
+      "feature": "sin",
+      "importance": 0.0044
+    },
+    {
+      "feature": "max52",
+      "importance": 0.0038
+    },
+    {
+      "feature": "chg4",
+      "importance": 0.0037
+    },
+    {
+      "feature": "run",
+      "importance": 0.0033
+    },
+    {
+      "feature": "l26",
+      "importance": 0.0015
+    },
+    {
+      "feature": "cos",
+      "importance": 0.0012
+    },
+    {
+      "feature": "l52",
+      "importance": 0.0012
+    },
+    {
+      "feature": "l12",
+      "importance": 0.0004
+    }
+  ],
+  "limits": [
+    "Provisional: river flow not tested yet.",
+    "The cost rule (a miss costs 3 false alarms) is our assumption.",
+    "The 4-week risk score is not a calibrated probability.",
+    "On the Rio Grande the 4-week system (cost 1912) is close to a tie with the best simple rule, Worsening (cost 1971).",
+    "On the other four rivers the Rio Grande-trained 4-week system beats persistence on the Mississippi, Missouri and Colorado, but it does not beat the best simple rule on any of them.",
+    "The 6-month outlook (cost 2324) is close to a tie with the 'D1 or worse now' rule (cost 2382). It fails on the Mississippi, Missouri and Ohio.",
+    "The 12-month outlook is off by 14.0 weeks on average, against an average of 22.1 weeks. It is a planning range, not a precise forecast.",
+    "The 31 Rio Grande counties move together, so the real sample is about 18 years, not thousands of rows.",
+    "Design choices were made after exploratory runs on the same test years."
+  ],
+  "alert_threshold": 0.36
+}
