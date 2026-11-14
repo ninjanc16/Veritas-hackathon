@@ -82,6 +82,9 @@ OPTIONAL_METRICS_KEYS = {
                 "forecast_beats_d1_rule", "reservoir_forecast_beats_d1_rule"],
     "reservoir": ["systems", "counties_without_reservoir", "note"],
     "losses": ["source", "years", "causes_included", "total_usd", "by_year", "by_county", "note"],
+    # Canal map (the lines themselves are in data/processed/canals.geojson, read by app/mapdata.py).
+    "canals": ["source", "total_km", "segments", "by_county", "note"],
+    "canal_priority": ["levels", "by_level", "by_soil", "by_county", "named", "note"],
 }
 
 # ---------------------------------------------------------------------------

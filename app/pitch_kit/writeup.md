@@ -118,6 +118,8 @@ Cost = 3 x missed droughts + false alarms. That cost rule is our assumption, not
 - Only 14 of the 31 Rio Grande counties are matched to a reservoir, and that matching is our assumption.
 - County drought is not the same as water supply. Water in the canals also depends on reservoir releases and on Mexico's deliveries under the 1944 water treaty, which are not modeled.
 - The loss figures are insured crop losses only, not all drought losses, and are not adjusted for inflation.
+- The canal map shows where canals and ditches are. It does not say which are irrigation canals, which are lined, how much any canal leaks or which district owns it.
+- The canal priority levels are an estimate of where leaks are likely, not measured leaks. They combine the 6-month forecast with a published seepage rate for the soil under each canal. They assume bare-earth canals, because we do not know which canals are lined. No canal was inspected or measured by us.
 
 ## What we'd do next
 Snowpack and river flow as inputs, the real grazing-period rule, a rancher's own cost numbers, and

@@ -276,3 +276,43 @@ def risk_map(df, selected_fips, river_lines=None, river_name="River", level_col=
                       margin=dict(l=0, r=0, t=0, b=0),
                       legend_title_text="Overall level" if level_col != "tier" else "4-week level")
     return style_fig(fig, height)
+
+
+# Canal levels (from the pipeline) -> line colors. Same sage / ochre / clay as the tiers,
+# plus grey for "no published seepage rate" and slate blue for drains.
+CANAL_COLOR = {"Inspect first": "#b5472f", "Watch": "#d4a031", "Low": "#7a9e7e",
+               "Unknown soil": "#9a9a92", "Drain": "#5b7f95"}
+
+
+def canal_map(segments, height=560, width_px=980):
+    """
+    Zoomable map of one county's canals. `segments` = the list from mapdata.load_canals()[fips].
+    One line trace per level (so the legend can switch levels on and off). Named canals show their
+    name, soil and seepage rate on hover; unnamed ones are plain lines.
+    """
+    p = palette()
+    fig = go.Figure()
+    # Draw in reverse so the important level ("Inspect first") is painted last, on top of the rest.
+    for level, color in reversed(list(CANAL_COLOR.items())):
+        lats, lons, hover = [], [], []
+        for seg in (s for s in segments if s["level"] == level):
+            tip = (f"<b>{html.escape(seg['name'])}</b><br>{html.escape(seg['soil'] or 'soil unknown')}"
+                   f"<br>{html.escape(level)}" if seg["name"] else "")
+            for lat, lon in seg["line"]:
+                lats.append(lat); lons.append(lon); hover.append(tip)
+            lats.append(None); lons.append(None); hover.append("")      # lift the pen between segments
+        if lats:
+            fig.add_trace(go.Scattermap(lat=lats, lon=lons, mode="lines", name=level, text=hover,
+                                        hoverinfo="text", line=dict(width=5 if level == "Inspect first" else 2,
+                                                                    color=color)))
+    pts = [pt for seg in segments for pt in seg["line"]]
+    lat_min, lat_max = min(a for a, _ in pts), max(a for a, _ in pts)
+    lon_min, lon_max = min(b for _, b in pts), max(b for _, b in pts)
+    lat_c, lon_c = (lat_min + lat_max) / 2, (lon_min + lon_max) / 2
+    lat_span = max(lat_max - lat_min, 0.05)
+    lon_span = max((lon_max - lon_min) * math.cos(math.radians(lat_c)), 0.05)
+    zoom = min(math.log2(height * 360 / (512 * lat_span * 1.2)),
+               math.log2(width_px * 360 / (512 * lon_span * 1.2)), 12)
+    fig.update_layout(map=dict(style=p["map_style"], zoom=zoom, center=dict(lat=lat_c, lon=lon_c)),
+                      margin=dict(l=0, r=0, t=0, b=0), legend_title_text="Canal level", legend_traceorder="reversed")
+    return style_fig(fig, height)

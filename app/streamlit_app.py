@@ -27,7 +27,7 @@ from app import theme                    # noqa: E402
 from app import canal                    # noqa: E402
 from app.brief import CLASS_WORDS, build_brief, md_escape, streak_sentence   # noqa: E402
 from app.contract import has_map_fields, load, load_reference   # noqa: E402
-from app.mapdata import load_river_line   # noqa: E402
+from app.mapdata import load_canals, load_river_line   # noqa: E402
 from app.tallies import (errors_table, reconcile, river_grid, tally,   # noqa: E402
                          weeks_error)
 
@@ -59,6 +59,12 @@ def get_data():
 def get_river_line(river):
     """The river's line for the map (from the app's own small file)."""
     return load_river_line(river)
+
+
+@st.cache_resource
+def get_canals():
+    """The pipeline's canal lines, grouped by county. Big file (about 8 MB), so read once and keep."""
+    return load_canals()
 
 
 @st.cache_data
@@ -614,6 +620,38 @@ def tab_other_rivers():
     show_failures()
 
 
+def show_canal_map(fips):
+    """Canal lines for the chosen county, colored by the pipeline's level. Needs the pipeline's file."""
+    st.markdown("#### Where leaks are likely")
+    prio = metrics.get("canal_priority")
+    canals = get_canals() if isinstance(prio, dict) else {}
+    if not canals:
+        st.write("Canal map: not available yet.")
+        return
+    segs = canals.get(fips, [])
+    if segs:
+        st.plotly_chart(theme.canal_map(segs), width="stretch", key="canal_map")
+        km = {lvl: sum(x["length_km"] or 0 for x in segs if x["level"] == lvl) for lvl in theme.CANAL_COLOR}
+        st.caption(md_escape("In this county: " + ", ".join(f"{lvl} {v:,.0f} km" for lvl, v in km.items() if v)
+                             + ". Click a level in the legend to hide or show it."))
+    else:
+        st.info("No canal lines for this county in the pipeline's file.")
+    st.caption(md_escape("How the levels are set: " + prio["rule"]) if "rule" in prio else "")
+    # Named canals to inspect first: this county's, or the top few across all counties.
+    named = pd.DataFrame(prio["named"])
+    if not named.empty:
+        mine = named[named["county"] == names[fips].split(",")[0]]
+        shown = mine if not mine.empty else named
+        st.markdown("**Named canals with the most 'Inspect first' length**"
+                    + ("" if not mine.empty else " (all counties, none named here)"))
+        st.dataframe(shown.head(10).rename(columns={
+            "name": "Canal", "county": "County", "state": "State", "inspect_first_km": "Inspect-first km",
+            "seepage_rate": "Seepage (gal/sq ft/day)", "p_season": "6-month chance"}),
+            hide_index=True, width="stretch")
+    st.caption(md_escape(prio["note"]))
+    st.caption(canal.ESTIMATE_LABEL)
+
+
 def tab_canal():
     """
     The "Canal action" tab. The forecast above is the AI part. Everything on THIS tab is plain
@@ -668,6 +706,9 @@ def tab_canal():
         st.caption(canal.ESTIMATE_LABEL)
     else:
         st.info("No public district table for this county. Use the calculator below.")
+
+    # 3b) Where leaks are likely: the pipeline's canal lines, colored by level.
+    show_canal_map(fips)
 
     # 4) Calculator.
     st.markdown("#### Canal calculator")

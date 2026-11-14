@@ -162,3 +162,28 @@ def test_how_good_tab_shows_trigger_losses_and_reservoirs(monkeypatch):
     assert not at.exception
     assert sum(1 for e in at.markdown if e.value == "Not available yet.") == 3
     st.cache_data.clear()
+
+
+def test_canal_map_shows_for_a_valley_county_and_a_county_without_canals():
+    from app.mapdata import CANALS_FILE
+    _, _, latest, metrics, *_ = load()
+    if "canal_priority" not in metrics or not CANALS_FILE.exists():
+        return
+    at = _run_with_link(fips="48215", view="Canal action")
+    assert not at.exception
+    assert "Where leaks are likely" in _all_text(at)
+    assert not any("Canal map: not available yet" in str(e.value) for e in at.markdown)
+    # Every Rio Grande county opens without a crash, with or without canal lines.
+    for fips in latest[latest["river"] == "Rio Grande"]["fips"]:
+        at = _run_with_link(fips=fips, view="Canal action")
+        assert not at.exception, fips
+
+
+def test_canal_map_says_not_available_without_the_pipeline_keys(monkeypatch):
+    import app.contract as contract
+    monkeypatch.setattr(contract, "load", lambda: (*contract.load_demo(), "demo", []))
+    st.cache_data.clear()
+    at = _run_with_link(view="Canal action")
+    assert not at.exception
+    assert any("Canal map: not available yet" in str(e.value) for e in at.markdown)
+    st.cache_data.clear()

@@ -7,7 +7,7 @@ Every value below is copied from reports/metrics.json. Nothing is computed here.
 ## Setup
 
 - `contract_version`: 2
-- `generated_at`: 2026-11-14T11:53:38-08:00
+- `generated_at`: 2026-11-14T12:43:55-08:00
 - `is_final`: True
 - `focus_river`: Rio Grande
 - `training_scope`: Rio Grande counties only
@@ -440,6 +440,8 @@ Every value below is copied from reports/metrics.json. Nothing is computed here.
 - `limits[26]`: Only 14 of the 31 Rio Grande counties are matched to a reservoir, and that matching is our assumption.
 - `limits[27]`: County drought is not the same as water supply. Water in the canals also depends on reservoir releases and on Mexico's deliveries under the 1944 water treaty, which are not modeled.
 - `limits[28]`: The loss figures are insured crop losses only, not all drought losses, and are not adjusted for inflation.
+- `limits[29]`: The canal map shows where canals and ditches are. It does not say which are irrigation canals, which are lined, how much any canal leaks or which district owns it.
+- `limits[30]`: The canal priority levels are an estimate of where leaks are likely, not measured leaks. They combine the 6-month forecast with a published seepage rate for the soil under each canal. They assume bare-earth canals, because we do not know which canals are lined. No canal was inspected or measured by us.
 
 ## Pre-season trigger
 
@@ -897,3 +899,639 @@ Every value below is copied from reports/metrics.json. Nothing is computed here.
 - `extra_rules_check.year_rule`: average of 'same as now' and 'same as the last 52 weeks'
 - `extra_rules_check.year_rule_mae`: 13.21
 - `extra_rules_check.system_mae`: 14.0
+- `canals.source`: U.S. Geological Survey, National Hydrography Dataset (high resolution), feature type 336 Canal/Ditch
+- `canals.total_km`: 14991.4
+- `canals.segments`: 12171
+- `canals.by_county[0].fips`: 48061
+- `canals.by_county[0].county`: Cameron
+- `canals.by_county[0].state`: Texas
+- `canals.by_county[0].canal_km`: 2749.6
+- `canals.by_county[0].named_km`: 82.7
+- `canals.by_county[1].fips`: 48215
+- `canals.by_county[1].county`: Hidalgo
+- `canals.by_county[1].state`: Texas
+- `canals.by_county[1].canal_km`: 2382.9
+- `canals.by_county[1].named_km`: 16.2
+- `canals.by_county[2].fips`: 08109
+- `canals.by_county[2].county`: Saguache
+- `canals.by_county[2].state`: Colorado
+- `canals.by_county[2].canal_km`: 1011.4
+- `canals.by_county[2].named_km`: 331.6
+- `canals.by_county[3].fips`: 35013
+- `canals.by_county[3].county`: Doña Ana
+- `canals.by_county[3].state`: New Mexico
+- `canals.by_county[3].canal_km`: 924.0
+- `canals.by_county[3].named_km`: 454.8
+- `canals.by_county[4].fips`: 08021
+- `canals.by_county[4].county`: Conejos
+- `canals.by_county[4].state`: Colorado
+- `canals.by_county[4].canal_km`: 919.7
+- `canals.by_county[4].named_km`: 557.4
+- `canals.by_county[5].fips`: 48489
+- `canals.by_county[5].county`: Willacy
+- `canals.by_county[5].state`: Texas
+- `canals.by_county[5].canal_km`: 904.2
+- `canals.by_county[5].named_km`: 31.9
+- `canals.by_county[6].fips`: 08105
+- `canals.by_county[6].county`: Rio Grande
+- `canals.by_county[6].state`: Colorado
+- `canals.by_county[6].canal_km`: 791.3
+- `canals.by_county[6].named_km`: 287.1
+- `canals.by_county[7].fips`: 08003
+- `canals.by_county[7].county`: Alamosa
+- `canals.by_county[7].state`: Colorado
+- `canals.by_county[7].canal_km`: 723.7
+- `canals.by_county[7].named_km`: 417.4
+- `canals.by_county[8].fips`: 48141
+- `canals.by_county[8].county`: El Paso
+- `canals.by_county[8].state`: Texas
+- `canals.by_county[8].canal_km`: 621.2
+- `canals.by_county[8].named_km`: 299.6
+- `canals.by_county[9].fips`: 35061
+- `canals.by_county[9].county`: Valencia
+- `canals.by_county[9].state`: New Mexico
+- `canals.by_county[9].canal_km`: 597.6
+- `canals.by_county[9].named_km`: 295.0
+- `canals.by_county[10].fips`: 08023
+- `canals.by_county[10].county`: Costilla
+- `canals.by_county[10].state`: Colorado
+- `canals.by_county[10].canal_km`: 517.9
+- `canals.by_county[10].named_km`: 227.3
+- `canals.by_county[11].fips`: 35053
+- `canals.by_county[11].county`: Socorro
+- `canals.by_county[11].state`: New Mexico
+- `canals.by_county[11].canal_km`: 516.1
+- `canals.by_county[11].named_km`: 115.9
+- `canals.by_county[12].fips`: 35001
+- `canals.by_county[12].county`: Bernalillo
+- `canals.by_county[12].state`: New Mexico
+- `canals.by_county[12].canal_km`: 463.6
+- `canals.by_county[12].named_km`: 124.1
+- `canals.by_county[13].fips`: 35043
+- `canals.by_county[13].county`: Sandoval
+- `canals.by_county[13].state`: New Mexico
+- `canals.by_county[13].canal_km`: 450.7
+- `canals.by_county[13].named_km`: 125.5
+- `canals.by_county[14].fips`: 35055
+- `canals.by_county[14].county`: Taos
+- `canals.by_county[14].state`: New Mexico
+- `canals.by_county[14].canal_km`: 398.9
+- `canals.by_county[14].named_km`: 199.6
+- `canals.by_county[15].fips`: 48323
+- `canals.by_county[15].county`: Maverick
+- `canals.by_county[15].state`: Texas
+- `canals.by_county[15].canal_km`: 339.7
+- `canals.by_county[15].named_km`: 17.4
+- `canals.by_county[16].fips`: 48229
+- `canals.by_county[16].county`: Hudspeth
+- `canals.by_county[16].state`: Texas
+- `canals.by_county[16].canal_km`: 301.4
+- `canals.by_county[16].named_km`: 97.4
+- `canals.by_county[17].fips`: 35049
+- `canals.by_county[17].county`: Santa Fe
+- `canals.by_county[17].state`: New Mexico
+- `canals.by_county[17].canal_km`: 85.7
+- `canals.by_county[17].named_km`: 22.9
+- `canals.by_county[18].fips`: 35051
+- `canals.by_county[18].county`: Sierra
+- `canals.by_county[18].state`: New Mexico
+- `canals.by_county[18].canal_km`: 67.6
+- `canals.by_county[18].named_km`: 25.2
+- `canals.by_county[19].fips`: 48377
+- `canals.by_county[19].county`: Presidio
+- `canals.by_county[19].state`: Texas
+- `canals.by_county[19].canal_km`: 46.7
+- `canals.by_county[19].named_km`: 0.0
+- `canals.by_county[20].fips`: 08053
+- `canals.by_county[20].county`: Hinsdale
+- `canals.by_county[20].state`: Colorado
+- `canals.by_county[20].canal_km`: 45.0
+- `canals.by_county[20].named_km`: 17.1
+- `canals.by_county[21].fips`: 48479
+- `canals.by_county[21].county`: Webb
+- `canals.by_county[21].state`: Texas
+- `canals.by_county[21].canal_km`: 41.1
+- `canals.by_county[21].named_km`: 0.0
+- `canals.by_county[22].fips`: 48465
+- `canals.by_county[22].county`: Val Verde
+- `canals.by_county[22].state`: Texas
+- `canals.by_county[22].canal_km`: 32.8
+- `canals.by_county[22].named_km`: 0.0
+- `canals.by_county[23].fips`: 08079
+- `canals.by_county[23].county`: Mineral
+- `canals.by_county[23].state`: Colorado
+- `canals.by_county[23].canal_km`: 26.3
+- `canals.by_county[23].named_km`: 7.6
+- `canals.by_county[24].fips`: 48505
+- `canals.by_county[24].county`: Zapata
+- `canals.by_county[24].state`: Texas
+- `canals.by_county[24].canal_km`: 11.5
+- `canals.by_county[24].named_km`: 0.0
+- `canals.by_county[25].fips`: 48427
+- `canals.by_county[25].county`: Starr
+- `canals.by_county[25].state`: Texas
+- `canals.by_county[25].canal_km`: 10.3
+- `canals.by_county[25].named_km`: 0.0
+- `canals.by_county[26].fips`: 48271
+- `canals.by_county[26].county`: Kinney
+- `canals.by_county[26].state`: Texas
+- `canals.by_county[26].canal_km`: 7.0
+- `canals.by_county[26].named_km`: 0.0
+- `canals.by_county[27].fips`: 08111
+- `canals.by_county[27].county`: San Juan
+- `canals.by_county[27].state`: Colorado
+- `canals.by_county[27].canal_km`: 2.5
+- `canals.by_county[27].named_km`: 0.0
+- `canals.by_county[28].fips`: 48127
+- `canals.by_county[28].county`: Dimmit
+- `canals.by_county[28].state`: Texas
+- `canals.by_county[28].canal_km`: 1.0
+- `canals.by_county[28].named_km`: 0.0
+- `canals.by_county[29].fips`: 35028
+- `canals.by_county[29].county`: Los Alamos
+- `canals.by_county[29].state`: New Mexico
+- `canals.by_county[29].canal_km`: 0.0
+- `canals.by_county[29].named_km`: 0.0
+- `canals.by_county[30].fips`: 48043
+- `canals.by_county[30].county`: Brewster
+- `canals.by_county[30].state`: Texas
+- `canals.by_county[30].canal_km`: 0.0
+- `canals.by_county[30].named_km`: 0.0
+- `canals.named[0].name`: Prairie Ditch
+- `canals.named[0].km`: 40.4
+- `canals.named[1].name`: San Luis Valley Irrigation Drain
+- `canals.named[1].km`: 32.4
+- `canals.named[2].name`: Gibson Ditch
+- `canals.named[2].km`: 29.4
+- `canals.named[3].name`: Mesa Ditch
+- `canals.named[3].km`: 29.3
+- `canals.named[4].name`: Three Saints Lateral
+- `canals.named[4].km`: 29.0
+- `canals.named[5].name`: Tome Drain
+- `canals.named[5].km`: 28.8
+- `canals.named[6].name`: North Central Lateral
+- `canals.named[6].km`: 28.6
+- `canals.named[7].name`: Farmers Union Canal
+- `canals.named[7].km`: 28.0
+- `canals.named[8].name`: Rio Grande Canal
+- `canals.named[8].km`: 27.9
+- `canals.named[9].name`: Central Lateral
+- `canals.named[9].km`: 27.6
+- `canals.named[10].name`: Hooper Lateral
+- `canals.named[10].km`: 26.5
+- `canals.named[11].name`: South Lateral
+- `canals.named[11].km`: 25.6
+- `canals.named[12].name`: Rio Grande Drain
+- `canals.named[12].km`: 24.6
+- `canals.named[13].name`: Lateral Fortyseven
+- `canals.named[13].km`: 24.3
+- `canals.named[14].name`: Pilot Channel
+- `canals.named[14].km`: 23.8
+- `canals.map_file`: data/processed/canals.geojson
+- `canals.checked_against`: OpenStreetMap canal, ditch and drain lines, for two counties: Cameron 2,640 km against 2,750 km here, Alamosa 767 km against 724 km here. OpenStreetMap partly copies the same USGS data, so this is a sanity check, not independent proof.
+- `canals.note`: Mapped canal and ditch lines whose middle point lies inside the county. The map does not separate irrigation canals from drainage ditches, and does not say whether a canal is lined, how much it leaks or which district owns it. Most segments have no name. This shows where canals are, not which ones to seal.
+- `canal_priority.soil_source`: USDA NRCS Soil Survey (SSURGO), through the Soil Data Access service
+- `canal_priority.seepage_rate_source`: Fipps (Texas A&M), 1998: Table 7 (quoting the Texas Board of Water Engineers, 1946), the low end of Table 6 for sands, and one measured canal in Table 8 for sandy clay loam
+- `canal_priority.seepage_gal_sqft_day.Clay`: 1.5
+- `canal_priority.seepage_gal_sqft_day.Silty clay loam`: 2.24
+- `canal_priority.seepage_gal_sqft_day.Clay loam`: 2.99
+- `canal_priority.seepage_gal_sqft_day.Silt loam`: 4.49
+- `canal_priority.seepage_gal_sqft_day.Loam`: 7.48
+- `canal_priority.seepage_gal_sqft_day.Fine sandy loam`: 9.35
+- `canal_priority.seepage_gal_sqft_day.Sandy loam`: 11.22
+- `canal_priority.seepage_gal_sqft_day.Sand`: 9.34
+- `canal_priority.seepage_gal_sqft_day.Fine sand`: 9.34
+- `canal_priority.seepage_gal_sqft_day.Coarse sand`: 9.34
+- `canal_priority.seepage_gal_sqft_day.Very fine sand`: 9.34
+- `canal_priority.seepage_gal_sqft_day.Loamy sand`: 9.34
+- `canal_priority.seepage_gal_sqft_day.Loamy fine sand`: 9.34
+- `canal_priority.seepage_gal_sqft_day.Loamy coarse sand`: 9.34
+- `canal_priority.seepage_gal_sqft_day.Loamy very fine sand`: 9.34
+- `canal_priority.seepage_gal_sqft_day.Sandy clay loam`: 1.69
+- `canal_priority.leaky_soil_rate`: 7.48
+- `canal_priority.forecast_threshold`: 0.25
+- `canal_priority.levels[0]`: Inspect first
+- `canal_priority.levels[1]`: Watch
+- `canal_priority.levels[2]`: Low
+- `canal_priority.levels[3]`: Unknown soil
+- `canal_priority.levels[4]`: Drain
+- `canal_priority.rule`: Inspect first = the 6-month forecast warns for the county AND the soil under the canal is leaky (loam or sandier). Watch = one of the two. Low = neither. Unknown soil = the soil type has no published seepage rate. Drain = the name says it is a drain, wasteway or floodway.
+- `canal_priority.by_level[0].level`: Inspect first
+- `canal_priority.by_level[0].km`: 1420.7
+- `canal_priority.by_level[0].segments`: 941
+- `canal_priority.by_level[1].level`: Watch
+- `canal_priority.by_level[1].km`: 7670.5
+- `canal_priority.by_level[1].segments`: 6160
+- `canal_priority.by_level[2].level`: Low
+- `canal_priority.by_level[2].km`: 4038.4
+- `canal_priority.by_level[2].segments`: 3561
+- `canal_priority.by_level[3].level`: Unknown soil
+- `canal_priority.by_level[3].km`: 1075.7
+- `canal_priority.by_level[3].segments`: 1202
+- `canal_priority.by_level[4].level`: Drain
+- `canal_priority.by_level[4].km`: 786.0
+- `canal_priority.by_level[4].segments`: 307
+- `canal_priority.by_soil[0].soil`: Clay
+- `canal_priority.by_soil[0].km`: 2229.1
+- `canal_priority.by_soil[0].seepage_rate`: 1.5
+- `canal_priority.by_soil[1].soil`: Sand
+- `canal_priority.by_soil[1].km`: 2186.7
+- `canal_priority.by_soil[1].seepage_rate`: 9.34
+- `canal_priority.by_soil[2].soil`: Clay loam
+- `canal_priority.by_soil[2].km`: 2178.3
+- `canal_priority.by_soil[2].seepage_rate`: 2.99
+- `canal_priority.by_soil[3].soil`: Sandy clay loam
+- `canal_priority.by_soil[3].km`: 1645.3
+- `canal_priority.by_soil[3].seepage_rate`: 1.69
+- `canal_priority.by_soil[4].soil`: Silt loam
+- `canal_priority.by_soil[4].km`: 1380.7
+- `canal_priority.by_soil[4].seepage_rate`: 4.49
+- `canal_priority.by_soil[5].soil`: Loam
+- `canal_priority.by_soil[5].km`: 772.6
+- `canal_priority.by_soil[5].seepage_rate`: 7.48
+- `canal_priority.by_soil[6].soil`: Loamy sand
+- `canal_priority.by_soil[6].km`: 741.1
+- `canal_priority.by_soil[6].seepage_rate`: 9.34
+- `canal_priority.by_soil[7].soil`: Sandy loam
+- `canal_priority.by_soil[7].km`: 693.1
+- `canal_priority.by_soil[7].seepage_rate`: 11.22
+- `canal_priority.by_soil[8].soil`: Silty clay loam
+- `canal_priority.by_soil[8].km`: 628.0
+- `canal_priority.by_soil[8].seepage_rate`: 2.24
+- `canal_priority.by_soil[9].soil`: Loamy fine sand
+- `canal_priority.by_soil[9].km`: 393.0
+- `canal_priority.by_soil[9].seepage_rate`: 9.34
+- `canal_priority.by_soil[10].soil`: (no soil data)
+- `canal_priority.by_soil[10].km`: 385.7
+- `canal_priority.by_soil[10].seepage_rate`: n/a
+- `canal_priority.by_soil[11].soil`: Silty clay
+- `canal_priority.by_soil[11].km`: 382.1
+- `canal_priority.by_soil[11].seepage_rate`: n/a
+- `canal_priority.by_soil[12].soil`: Fine sand
+- `canal_priority.by_soil[12].km`: 379.3
+- `canal_priority.by_soil[12].seepage_rate`: 9.34
+- `canal_priority.by_soil[13].soil`: Loamy coarse sand
+- `canal_priority.by_soil[13].km`: 229.9
+- `canal_priority.by_soil[13].seepage_rate`: 9.34
+- `canal_priority.by_soil[14].soil`: Fine sandy loam
+- `canal_priority.by_soil[14].km`: 215.0
+- `canal_priority.by_soil[14].seepage_rate`: 9.35
+- `canal_priority.by_soil[15].soil`: Very fine sandy loam
+- `canal_priority.by_soil[15].km`: 173.0
+- `canal_priority.by_soil[15].seepage_rate`: n/a
+- `canal_priority.by_soil[16].soil`: Silt
+- `canal_priority.by_soil[16].km`: 120.3
+- `canal_priority.by_soil[16].seepage_rate`: n/a
+- `canal_priority.by_soil[17].soil`: Loamy very fine sand
+- `canal_priority.by_soil[17].km`: 94.8
+- `canal_priority.by_soil[17].seepage_rate`: 9.34
+- `canal_priority.by_soil[18].soil`: Coarse sand
+- `canal_priority.by_soil[18].km`: 71.7
+- `canal_priority.by_soil[18].seepage_rate`: 9.34
+- `canal_priority.by_soil[19].soil`: Very fine sand
+- `canal_priority.by_soil[19].km`: 41.3
+- `canal_priority.by_soil[19].seepage_rate`: 9.34
+- `canal_priority.by_soil[20].soil`: Sandy clay
+- `canal_priority.by_soil[20].km`: 38.2
+- `canal_priority.by_soil[20].seepage_rate`: n/a
+- `canal_priority.by_soil[21].soil`: Coarse sandy loam
+- `canal_priority.by_soil[21].km`: 12.3
+- `canal_priority.by_soil[21].seepage_rate`: n/a
+- `canal_priority.by_county[0].fips`: 08109
+- `canal_priority.by_county[0].county`: Saguache
+- `canal_priority.by_county[0].state`: Colorado
+- `canal_priority.by_county[0].p_season`: 0.513
+- `canal_priority.by_county[0].inspect_first_km`: 843.3
+- `canal_priority.by_county[0].leaky_soil_km`: 852.2
+- `canal_priority.by_county[0].canal_km`: 1011.4
+- `canal_priority.by_county[1].fips`: 08023
+- `canal_priority.by_county[1].county`: Costilla
+- `canal_priority.by_county[1].state`: Colorado
+- `canal_priority.by_county[1].p_season`: 0.262
+- `canal_priority.by_county[1].inspect_first_km`: 421.0
+- `canal_priority.by_county[1].leaky_soil_km`: 421.0
+- `canal_priority.by_county[1].canal_km`: 517.9
+- `canal_priority.by_county[2].fips`: 35049
+- `canal_priority.by_county[2].county`: Santa Fe
+- `canal_priority.by_county[2].state`: New Mexico
+- `canal_priority.by_county[2].p_season`: 0.277
+- `canal_priority.by_county[2].inspect_first_km`: 74.9
+- `canal_priority.by_county[2].leaky_soil_km`: 74.9
+- `canal_priority.by_county[2].canal_km`: 85.7
+- `canal_priority.by_county[3].fips`: 48229
+- `canal_priority.by_county[3].county`: Hudspeth
+- `canal_priority.by_county[3].state`: Texas
+- `canal_priority.by_county[3].p_season`: 0.274
+- `canal_priority.by_county[3].inspect_first_km`: 27.4
+- `canal_priority.by_county[3].leaky_soil_km`: 27.4
+- `canal_priority.by_county[3].canal_km`: 301.4
+- `canal_priority.by_county[4].fips`: 48215
+- `canal_priority.by_county[4].county`: Hidalgo
+- `canal_priority.by_county[4].state`: Texas
+- `canal_priority.by_county[4].p_season`: 0.307
+- `canal_priority.by_county[4].inspect_first_km`: 21.2
+- `canal_priority.by_county[4].leaky_soil_km`: 21.2
+- `canal_priority.by_county[4].canal_km`: 2382.9
+- `canal_priority.by_county[5].fips`: 48489
+- `canal_priority.by_county[5].county`: Willacy
+- `canal_priority.by_county[5].state`: Texas
+- `canal_priority.by_county[5].p_season`: 0.336
+- `canal_priority.by_county[5].inspect_first_km`: 17.4
+- `canal_priority.by_county[5].leaky_soil_km`: 17.4
+- `canal_priority.by_county[5].canal_km`: 904.2
+- `canal_priority.by_county[6].fips`: 48323
+- `canal_priority.by_county[6].county`: Maverick
+- `canal_priority.by_county[6].state`: Texas
+- `canal_priority.by_county[6].p_season`: 0.304
+- `canal_priority.by_county[6].inspect_first_km`: 13.9
+- `canal_priority.by_county[6].leaky_soil_km`: 13.9
+- `canal_priority.by_county[6].canal_km`: 339.7
+- `canal_priority.by_county[7].fips`: 48479
+- `canal_priority.by_county[7].county`: Webb
+- `canal_priority.by_county[7].state`: Texas
+- `canal_priority.by_county[7].p_season`: 0.599
+- `canal_priority.by_county[7].inspect_first_km`: 1.6
+- `canal_priority.by_county[7].leaky_soil_km`: 1.6
+- `canal_priority.by_county[7].canal_km`: 41.1
+- `canal_priority.by_county[8].fips`: 08003
+- `canal_priority.by_county[8].county`: Alamosa
+- `canal_priority.by_county[8].state`: Colorado
+- `canal_priority.by_county[8].p_season`: 0.228
+- `canal_priority.by_county[8].inspect_first_km`: 0.0
+- `canal_priority.by_county[8].leaky_soil_km`: 603.0
+- `canal_priority.by_county[8].canal_km`: 723.7
+- `canal_priority.by_county[9].fips`: 08021
+- `canal_priority.by_county[9].county`: Conejos
+- `canal_priority.by_county[9].state`: Colorado
+- `canal_priority.by_county[9].p_season`: 0.158
+- `canal_priority.by_county[9].inspect_first_km`: 0.0
+- `canal_priority.by_county[9].leaky_soil_km`: 774.4
+- `canal_priority.by_county[9].canal_km`: 919.7
+- `canal_priority.by_county[10].fips`: 08053
+- `canal_priority.by_county[10].county`: Hinsdale
+- `canal_priority.by_county[10].state`: Colorado
+- `canal_priority.by_county[10].p_season`: 0.193
+- `canal_priority.by_county[10].inspect_first_km`: 0.0
+- `canal_priority.by_county[10].leaky_soil_km`: 18.6
+- `canal_priority.by_county[10].canal_km`: 45.0
+- `canal_priority.by_county[11].fips`: 08079
+- `canal_priority.by_county[11].county`: Mineral
+- `canal_priority.by_county[11].state`: Colorado
+- `canal_priority.by_county[11].p_season`: 0.191
+- `canal_priority.by_county[11].inspect_first_km`: 0.0
+- `canal_priority.by_county[11].leaky_soil_km`: 22.0
+- `canal_priority.by_county[11].canal_km`: 26.3
+- `canal_priority.by_county[12].fips`: 08105
+- `canal_priority.by_county[12].county`: Rio Grande
+- `canal_priority.by_county[12].state`: Colorado
+- `canal_priority.by_county[12].p_season`: 0.209
+- `canal_priority.by_county[12].inspect_first_km`: 0.0
+- `canal_priority.by_county[12].leaky_soil_km`: 709.0
+- `canal_priority.by_county[12].canal_km`: 791.3
+- `canal_priority.by_county[13].fips`: 08111
+- `canal_priority.by_county[13].county`: San Juan
+- `canal_priority.by_county[13].state`: Colorado
+- `canal_priority.by_county[13].p_season`: 0.143
+- `canal_priority.by_county[13].inspect_first_km`: 0.0
+- `canal_priority.by_county[13].leaky_soil_km`: 0.0
+- `canal_priority.by_county[13].canal_km`: 2.5
+- `canal_priority.by_county[14].fips`: 35001
+- `canal_priority.by_county[14].county`: Bernalillo
+- `canal_priority.by_county[14].state`: New Mexico
+- `canal_priority.by_county[14].p_season`: 0.189
+- `canal_priority.by_county[14].inspect_first_km`: 0.0
+- `canal_priority.by_county[14].leaky_soil_km`: 372.4
+- `canal_priority.by_county[14].canal_km`: 463.6
+- `canal_priority.by_county[15].fips`: 35013
+- `canal_priority.by_county[15].county`: Doña Ana
+- `canal_priority.by_county[15].state`: New Mexico
+- `canal_priority.by_county[15].p_season`: 0.082
+- `canal_priority.by_county[15].inspect_first_km`: 0.0
+- `canal_priority.by_county[15].leaky_soil_km`: 402.2
+- `canal_priority.by_county[15].canal_km`: 924.0
+- `canal_priority.by_county[16].fips`: 35028
+- `canal_priority.by_county[16].county`: Los Alamos
+- `canal_priority.by_county[16].state`: New Mexico
+- `canal_priority.by_county[16].p_season`: 0.162
+- `canal_priority.by_county[16].inspect_first_km`: 0.0
+- `canal_priority.by_county[16].leaky_soil_km`: 0.0
+- `canal_priority.by_county[16].canal_km`: 0.0
+- `canal_priority.by_county[17].fips`: 35043
+- `canal_priority.by_county[17].county`: Sandoval
+- `canal_priority.by_county[17].state`: New Mexico
+- `canal_priority.by_county[17].p_season`: 0.202
+- `canal_priority.by_county[17].inspect_first_km`: 0.0
+- `canal_priority.by_county[17].leaky_soil_km`: 318.1
+- `canal_priority.by_county[17].canal_km`: 450.7
+- `canal_priority.by_county[18].fips`: 35051
+- `canal_priority.by_county[18].county`: Sierra
+- `canal_priority.by_county[18].state`: New Mexico
+- `canal_priority.by_county[18].p_season`: 0.102
+- `canal_priority.by_county[18].inspect_first_km`: 0.0
+- `canal_priority.by_county[18].leaky_soil_km`: 34.1
+- `canal_priority.by_county[18].canal_km`: 67.6
+- `canal_priority.by_county[19].fips`: 35053
+- `canal_priority.by_county[19].county`: Socorro
+- `canal_priority.by_county[19].state`: New Mexico
+- `canal_priority.by_county[19].p_season`: 0.217
+- `canal_priority.by_county[19].inspect_first_km`: 0.0
+- `canal_priority.by_county[19].leaky_soil_km`: 247.1
+- `canal_priority.by_county[19].canal_km`: 516.1
+- `canal_priority.by_county[20].fips`: 35055
+- `canal_priority.by_county[20].county`: Taos
+- `canal_priority.by_county[20].state`: New Mexico
+- `canal_priority.by_county[20].p_season`: 0.248
+- `canal_priority.by_county[20].inspect_first_km`: 0.0
+- `canal_priority.by_county[20].leaky_soil_km`: 138.3
+- `canal_priority.by_county[20].canal_km`: 398.9
+- `canal_priority.by_county[21].fips`: 35061
+- `canal_priority.by_county[21].county`: Valencia
+- `canal_priority.by_county[21].state`: New Mexico
+- `canal_priority.by_county[21].p_season`: 0.197
+- `canal_priority.by_county[21].inspect_first_km`: 0.0
+- `canal_priority.by_county[21].leaky_soil_km`: 536.3
+- `canal_priority.by_county[21].canal_km`: 597.6
+- `canal_priority.by_county[22].fips`: 48043
+- `canal_priority.by_county[22].county`: Brewster
+- `canal_priority.by_county[22].state`: Texas
+- `canal_priority.by_county[22].p_season`: 0.18
+- `canal_priority.by_county[22].inspect_first_km`: 0.0
+- `canal_priority.by_county[22].leaky_soil_km`: 0.0
+- `canal_priority.by_county[22].canal_km`: 0.0
+- `canal_priority.by_county[23].fips`: 48061
+- `canal_priority.by_county[23].county`: Cameron
+- `canal_priority.by_county[23].state`: Texas
+- `canal_priority.by_county[23].p_season`: 0.243
+- `canal_priority.by_county[23].inspect_first_km`: 0.0
+- `canal_priority.by_county[23].leaky_soil_km`: 5.3
+- `canal_priority.by_county[23].canal_km`: 2749.6
+- `canal_priority.by_county[24].fips`: 48127
+- `canal_priority.by_county[24].county`: Dimmit
+- `canal_priority.by_county[24].state`: Texas
+- `canal_priority.by_county[24].p_season`: 0.51
+- `canal_priority.by_county[24].inspect_first_km`: 0.0
+- `canal_priority.by_county[24].leaky_soil_km`: 0.0
+- `canal_priority.by_county[24].canal_km`: 1.0
+- `canal_priority.by_county[25].fips`: 48141
+- `canal_priority.by_county[25].county`: El Paso
+- `canal_priority.by_county[25].state`: Texas
+- `canal_priority.by_county[25].p_season`: 0.031
+- `canal_priority.by_county[25].inspect_first_km`: 0.0
+- `canal_priority.by_county[25].leaky_soil_km`: 188.2
+- `canal_priority.by_county[25].canal_km`: 621.2
+- `canal_priority.by_county[26].fips`: 48271
+- `canal_priority.by_county[26].county`: Kinney
+- `canal_priority.by_county[26].state`: Texas
+- `canal_priority.by_county[26].p_season`: 0.265
+- `canal_priority.by_county[26].inspect_first_km`: 0.0
+- `canal_priority.by_county[26].leaky_soil_km`: 0.0
+- `canal_priority.by_county[26].canal_km`: 7.0
+- `canal_priority.by_county[27].fips`: 48377
+- `canal_priority.by_county[27].county`: Presidio
+- `canal_priority.by_county[27].state`: Texas
+- `canal_priority.by_county[27].p_season`: 0.181
+- `canal_priority.by_county[27].inspect_first_km`: 0.0
+- `canal_priority.by_county[27].leaky_soil_km`: 14.6
+- `canal_priority.by_county[27].canal_km`: 46.7
+- `canal_priority.by_county[28].fips`: 48427
+- `canal_priority.by_county[28].county`: Starr
+- `canal_priority.by_county[28].state`: Texas
+- `canal_priority.by_county[28].p_season`: 0.333
+- `canal_priority.by_county[28].inspect_first_km`: 0.0
+- `canal_priority.by_county[28].leaky_soil_km`: 0.0
+- `canal_priority.by_county[28].canal_km`: 10.3
+- `canal_priority.by_county[29].fips`: 48465
+- `canal_priority.by_county[29].county`: Val Verde
+- `canal_priority.by_county[29].state`: Texas
+- `canal_priority.by_county[29].p_season`: 0.25
+- `canal_priority.by_county[29].inspect_first_km`: 0.0
+- `canal_priority.by_county[29].leaky_soil_km`: 5.1
+- `canal_priority.by_county[29].canal_km`: 32.8
+- `canal_priority.by_county[30].fips`: 48505
+- `canal_priority.by_county[30].county`: Zapata
+- `canal_priority.by_county[30].state`: Texas
+- `canal_priority.by_county[30].p_season`: 0.399
+- `canal_priority.by_county[30].inspect_first_km`: 0.0
+- `canal_priority.by_county[30].leaky_soil_km`: 0.0
+- `canal_priority.by_county[30].canal_km`: 11.5
+- `canal_priority.named[0].name`: North Central Lateral
+- `canal_priority.named[0].county`: Saguache
+- `canal_priority.named[0].state`: Colorado
+- `canal_priority.named[0].inspect_first_km`: 28.6
+- `canal_priority.named[0].seepage_rate`: 9.34
+- `canal_priority.named[0].p_season`: 0.513
+- `canal_priority.named[1].name`: Farmers Union Canal
+- `canal_priority.named[1].county`: Saguache
+- `canal_priority.named[1].state`: Colorado
+- `canal_priority.named[1].inspect_first_km`: 28.0
+- `canal_priority.named[1].seepage_rate`: 9.34
+- `canal_priority.named[1].p_season`: 0.513
+- `canal_priority.named[2].name`: Gibson Ditch
+- `canal_priority.named[2].county`: Saguache
+- `canal_priority.named[2].state`: Colorado
+- `canal_priority.named[2].inspect_first_km`: 27.4
+- `canal_priority.named[2].seepage_rate`: 9.34
+- `canal_priority.named[2].p_season`: 0.513
+- `canal_priority.named[3].name`: Lateral Fortyseven
+- `canal_priority.named[3].county`: Saguache
+- `canal_priority.named[3].state`: Colorado
+- `canal_priority.named[3].inspect_first_km`: 24.3
+- `canal_priority.named[3].seepage_rate`: 9.34
+- `canal_priority.named[3].p_season`: 0.513
+- `canal_priority.named[4].name`: Rio Grande Canal
+- `canal_priority.named[4].county`: Saguache
+- `canal_priority.named[4].state`: Colorado
+- `canal_priority.named[4].inspect_first_km`: 23.5
+- `canal_priority.named[4].seepage_rate`: 9.65
+- `canal_priority.named[4].p_season`: 0.513
+- `canal_priority.named[5].name`: North Lateral
+- `canal_priority.named[5].county`: Saguache
+- `canal_priority.named[5].state`: Colorado
+- `canal_priority.named[5].inspect_first_km`: 20.7
+- `canal_priority.named[5].seepage_rate`: 9.34
+- `canal_priority.named[5].p_season`: 0.513
+- `canal_priority.named[6].name`: Mesa Ditch
+- `canal_priority.named[6].county`: Costilla
+- `canal_priority.named[6].state`: Colorado
+- `canal_priority.named[6].inspect_first_km`: 20.3
+- `canal_priority.named[6].seepage_rate`: 8.46
+- `canal_priority.named[6].p_season`: 0.262
+- `canal_priority.named[7].name`: Trinchera Canal
+- `canal_priority.named[7].county`: Costilla
+- `canal_priority.named[7].state`: Colorado
+- `canal_priority.named[7].inspect_first_km`: 18.1
+- `canal_priority.named[7].seepage_rate`: 9.04
+- `canal_priority.named[7].p_season`: 0.262
+- `canal_priority.named[8].name`: Indian Creek Ditch
+- `canal_priority.named[8].county`: Costilla
+- `canal_priority.named[8].state`: Colorado
+- `canal_priority.named[8].inspect_first_km`: 17.0
+- `canal_priority.named[8].seepage_rate`: 8.98
+- `canal_priority.named[8].p_season`: 0.262
+- `canal_priority.named[9].name`: Highline Canal
+- `canal_priority.named[9].county`: Costilla
+- `canal_priority.named[9].state`: Colorado
+- `canal_priority.named[9].inspect_first_km`: 16.9
+- `canal_priority.named[9].seepage_rate`: 8.88
+- `canal_priority.named[9].p_season`: 0.262
+- `canal_priority.named[10].name`: Sanchez Canal
+- `canal_priority.named[10].county`: Costilla
+- `canal_priority.named[10].state`: Colorado
+- `canal_priority.named[10].inspect_first_km`: 11.8
+- `canal_priority.named[10].seepage_rate`: 9.16
+- `canal_priority.named[10].p_season`: 0.262
+- `canal_priority.named[11].name`: North Main Canal
+- `canal_priority.named[11].county`: Saguache
+- `canal_priority.named[11].state`: Colorado
+- `canal_priority.named[11].inspect_first_km`: 11.3
+- `canal_priority.named[11].seepage_rate`: 9.34
+- `canal_priority.named[11].p_season`: 0.513
+- `canal_priority.named[12].name`: Eastdale Culebra Canal
+- `canal_priority.named[12].county`: Costilla
+- `canal_priority.named[12].state`: Colorado
+- `canal_priority.named[12].inspect_first_km`: 10.8
+- `canal_priority.named[12].seepage_rate`: 9.34
+- `canal_priority.named[12].p_season`: 0.262
+- `canal_priority.named[13].name`: Arch Irrigation Ditch
+- `canal_priority.named[13].county`: Saguache
+- `canal_priority.named[13].state`: Colorado
+- `canal_priority.named[13].inspect_first_km`: 10.2
+- `canal_priority.named[13].seepage_rate`: 8.42
+- `canal_priority.named[13].p_season`: 0.513
+- `canal_priority.named[14].name`: Cerritos Canal
+- `canal_priority.named[14].county`: Costilla
+- `canal_priority.named[14].state`: Colorado
+- `canal_priority.named[14].inspect_first_km`: 9.3
+- `canal_priority.named[14].seepage_rate`: 10.68
+- `canal_priority.named[14].p_season`: 0.262
+- `canal_priority.named[15].name`: Reservoir Ditch
+- `canal_priority.named[15].county`: Costilla
+- `canal_priority.named[15].state`: Colorado
+- `canal_priority.named[15].inspect_first_km`: 9.0
+- `canal_priority.named[15].seepage_rate`: 9.34
+- `canal_priority.named[15].p_season`: 0.262
+- `canal_priority.named[16].name`: South Crestone Ditch
+- `canal_priority.named[16].county`: Saguache
+- `canal_priority.named[16].state`: Colorado
+- `canal_priority.named[16].inspect_first_km`: 8.4
+- `canal_priority.named[16].seepage_rate`: 9.34
+- `canal_priority.named[16].p_season`: 0.513
+- `canal_priority.named[17].name`: Eastdale Branch Cerro Canal
+- `canal_priority.named[17].county`: Costilla
+- `canal_priority.named[17].state`: Colorado
+- `canal_priority.named[17].inspect_first_km`: 8.3
+- `canal_priority.named[17].seepage_rate`: 8.41
+- `canal_priority.named[17].p_season`: 0.262
+- `canal_priority.named[18].name`: Sangre De Cristo-Trinchera Diversion Canal
+- `canal_priority.named[18].county`: Costilla
+- `canal_priority.named[18].state`: Colorado
+- `canal_priority.named[18].inspect_first_km`: 8.2
+- `canal_priority.named[18].seepage_rate`: 11.22
+- `canal_priority.named[18].p_season`: 0.262
+- `canal_priority.named[19].name`: Sangre de Cristo Ditch Number 3
+- `canal_priority.named[19].county`: Costilla
+- `canal_priority.named[19].state`: Colorado
+- `canal_priority.named[19].inspect_first_km`: 8.2
+- `canal_priority.named[19].seepage_rate`: 8.41
+- `canal_priority.named[19].p_season`: 0.262
+- `canal_priority.note`: An estimate of where leaks are LIKELY, not measured leaks. It assumes bare-earth canals: we do not know which canals are lined. Real seepage also depends on construction, silt and the water table. The levels change every week with the forecast. Use it to choose canals to inspect, not to claim water savings.

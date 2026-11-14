@@ -56,3 +56,41 @@ def test_map_colors_by_overall_level_when_asked():
     shown = sum(len(t.lat) for t in fig.data if t.name in ("Low", "Watch", "Warning"))
     assert shown == len(rg)                                  # every county appears exactly once
     assert "Overall level" in "".join(fig.data[-1].text) or "Overall level" in "".join(fig.data[-2].text)
+
+
+# --- canal lines (the pipeline's canals.geojson) --------------------------------------------
+def test_load_canals_groups_by_county_and_flips_to_lat_lon(tmp_path):
+    from app.mapdata import load_canals
+    path = tmp_path / "canals.geojson"
+    path.write_text('{"type": "FeatureCollection", "features": [{"type": "Feature", '
+                    '"geometry": {"type": "LineString", "coordinates": [[-98.0, 26.0], [-98.1, 26.1]]}, '
+                    '"properties": {"fips": "48215", "name": "Test Canal", "length_km": 2.5, "soil": "Loam", '
+                    '"seepage_rate": 7.48, "p_season": 0.3, "level": "Inspect first", "score": 0.5}}]}')
+    got = load_canals(path)
+    assert list(got) == ["48215"]
+    seg = got["48215"][0]
+    assert seg["line"][0] == (26.0, -98.0) and seg["level"] == "Inspect first" and seg["name"] == "Test Canal"
+
+
+def test_load_canals_missing_or_broken_file_gives_empty(tmp_path):
+    from app.mapdata import load_canals
+    assert load_canals(tmp_path / "nope.geojson") == {}
+    bad = tmp_path / "bad.geojson"
+    bad.write_text("not json")
+    assert load_canals(bad) == {}
+
+
+def test_real_canal_file_matches_metrics():
+    """When the real file is there, its segment count and levels match what metrics.json says."""
+    import json
+    from app.contract import REAL_METRICS
+    from app.mapdata import CANALS_FILE, load_canals
+    from app.theme import CANAL_COLOR
+    if not (CANALS_FILE.exists() and REAL_METRICS.exists()):
+        return
+    metrics = json.loads(REAL_METRICS.read_text(encoding="utf-8"))
+    if "canals" not in metrics:
+        return
+    segs = [s for group in load_canals().values() for s in group]
+    assert len(segs) == metrics["canals"]["segments"]
+    assert {s["level"] for s in segs} <= set(CANAL_COLOR)
