@@ -22,21 +22,21 @@ from farmdrought.drought import build_panel
 from farmdrought.evaluate import season_block, season_river, tally, year_block, year_river
 from farmdrought.features import FEATURES_E, FEATURES_H, FEATURES_L
 
-# Inputs for each outlook, fixed before the build (architecture doc, P5)
+# Inputs for each outlook. They come from the plan and were not re-chosen by this code.
 FEATURES_SEASON = FEATURES_H + FEATURES_L + FEATURES_E  # 6-month: history + long memory + ENSO
 FEATURES_YEAR = FEATURES_H + FEATURES_L                 # 12-month: history + long memory
 
 
-def make_classifier():
+def make_classifier(seed=0):
     """6-month forest (yes/no). No class weighting, so its output is a rough probability."""
     return RandomForestClassifier(n_estimators=80, max_depth=10, min_samples_leaf=20,
-                                  max_features="sqrt", random_state=0, n_jobs=-1)
+                                  max_features="sqrt", random_state=seed, n_jobs=-1)
 
 
-def make_regressor():
+def make_regressor(seed=0):
     """12-month forest. It predicts a number of weeks instead of yes/no."""
     return RandomForestRegressor(n_estimators=80, max_depth=10, min_samples_leaf=20,
-                                 max_features="sqrt", random_state=0, n_jobs=-1)
+                                 max_features="sqrt", random_state=seed, n_jobs=-1)
 
 
 def issue_rows(panel):

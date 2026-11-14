@@ -24,6 +24,7 @@ from farmdrought.features import FEATURES_H
 from farmdrought.flow import FEATURES_F, add_flow_features
 from farmdrought.outlook import (FEATURES_SEASON, FEATURES_YEAR, extra_inputs_test, issue_rows, make_classifier,
                                  make_regressor, run_outlook)
+from farmdrought.robustness import ROBUSTNESS
 from farmdrought.snow import FEATURES_S, add_snow_features
 
 IS_FINAL = True  # the numbers are locked: reports/decision.md was committed before this run
@@ -267,6 +268,30 @@ def main():
     predictions.to_parquet(PREDICTIONS, index=False)
     outlook.to_parquet(OUTLOOK, index=False)
     latest.to_parquet(LATEST, index=False)
+    # Add the robustness checks (seeds and county buffer) if they have been run.
+    # They are extra keys at the end, which contract rule 2 allows.
+    if ROBUSTNESS.exists():
+        with open(ROBUSTNESS) as f:
+            checks = json.load(f)
+        metrics.update(checks)
+        seeds, wide, extra = checks["seed_check"]["summary"], checks["buffer_check"], checks["extra_rules_check"]
+        metrics["limits"] += [
+            f"Seed check: retrained with {len(checks['seed_check']['runs'])} random seeds, the system beat the best simple rule in "
+            f"{seeds['alert_cost']['seeds_beating_best_baseline']} runs for the 4-week alert, "
+            f"{seeds['season_cost']['seeds_beating_best_baseline']} for the 6-month outlook and "
+            f"{seeds['year_mae']['seeds_beating_best_baseline']} for the 12-month outlook.",
+            f"Buffer check: with a {wide['buffer_km']} km county rule ({wide['n_focus_counties']} counties), the 4-week "
+            f"system cost {wide['alert']['system_cost']} against {wide['alert']['best_baseline_cost']} for the best "
+            f"simple rule ({wide['alert']['best_baseline']}).",
+            "An outside review suggested two simple rules that were not in our baseline list. They were scored "
+            "after the final run. "
+            f"4-week rule '{extra['alert_rule']}': cost {extra['alert_rule_cost_test']} on the test years, against "
+            f"{extra['system_cost_test']} for the system. "
+            f"12-month rule '{extra['year_rule']}': average error {extra['year_rule_mae']} weeks, against "
+            f"{extra['system_mae']} for the system.",
+            "The 6-month outlook uses an El Nino value that NOAA publishes a few days into the month, around the "
+            "same days the outlook is issued. A real-time forecast might have to use the value from a month earlier.",
+        ]
     with open(METRICS, "w") as f:
         # default=... turns numpy numbers into plain numbers that JSON accepts
         json.dump(metrics, f, indent=2, default=lambda value: value.item())
