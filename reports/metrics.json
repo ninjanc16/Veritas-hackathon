@@ -1,6 +1,6 @@
 {
   "contract_version": 2,
-  "generated_at": "2026-11-14T11:53:38-08:00",
+  "generated_at": "2026-11-14T12:43:55-08:00",
   "is_final": true,
   "focus_river": "Rio Grande",
   "training_scope": "Rio Grande counties only",
@@ -596,7 +596,9 @@
     "Reservoir storage did not help. The 6-month outlook costs 2452 with reservoir inputs, against 2324 without them. As a pre-season trigger the reservoir forecast caught 771 drought seasons with 261 false alarms.",
     "Only 14 of the 31 Rio Grande counties are matched to a reservoir, and that matching is our assumption.",
     "County drought is not the same as water supply. Water in the canals also depends on reservoir releases and on Mexico's deliveries under the 1944 water treaty, which are not modeled.",
-    "The loss figures are insured crop losses only, not all drought losses, and are not adjusted for inflation."
+    "The loss figures are insured crop losses only, not all drought losses, and are not adjusted for inflation.",
+    "The canal map shows where canals and ditches are. It does not say which are irrigation canals, which are lined, how much any canal leaks or which district owns it.",
+    "The canal priority levels are an estimate of where leaks are likely, not measured leaks. They combine the 6-month forecast with a published seepage rate for the soil under each canal. They assume bare-earth canals, because we do not know which canals are lined. No canal was inspected or measured by us."
   ],
   "alert_threshold": 0.36,
   "map_fields": {
@@ -1290,5 +1292,909 @@
         "usd": 4366448
       }
     ]
+  },
+  "canals": {
+    "source": "U.S. Geological Survey, National Hydrography Dataset (high resolution), feature type 336 Canal/Ditch",
+    "total_km": 14991.4,
+    "segments": 12171,
+    "by_county": [
+      {
+        "fips": "48061",
+        "county": "Cameron",
+        "state": "Texas",
+        "canal_km": 2749.6,
+        "named_km": 82.7
+      },
+      {
+        "fips": "48215",
+        "county": "Hidalgo",
+        "state": "Texas",
+        "canal_km": 2382.9,
+        "named_km": 16.2
+      },
+      {
+        "fips": "08109",
+        "county": "Saguache",
+        "state": "Colorado",
+        "canal_km": 1011.4,
+        "named_km": 331.6
+      },
+      {
+        "fips": "35013",
+        "county": "Do\u00f1a Ana",
+        "state": "New Mexico",
+        "canal_km": 924.0,
+        "named_km": 454.8
+      },
+      {
+        "fips": "08021",
+        "county": "Conejos",
+        "state": "Colorado",
+        "canal_km": 919.7,
+        "named_km": 557.4
+      },
+      {
+        "fips": "48489",
+        "county": "Willacy",
+        "state": "Texas",
+        "canal_km": 904.2,
+        "named_km": 31.9
+      },
+      {
+        "fips": "08105",
+        "county": "Rio Grande",
+        "state": "Colorado",
+        "canal_km": 791.3,
+        "named_km": 287.1
+      },
+      {
+        "fips": "08003",
+        "county": "Alamosa",
+        "state": "Colorado",
+        "canal_km": 723.7,
+        "named_km": 417.4
+      },
+      {
+        "fips": "48141",
+        "county": "El Paso",
+        "state": "Texas",
+        "canal_km": 621.2,
+        "named_km": 299.6
+      },
+      {
+        "fips": "35061",
+        "county": "Valencia",
+        "state": "New Mexico",
+        "canal_km": 597.6,
+        "named_km": 295.0
+      },
+      {
+        "fips": "08023",
+        "county": "Costilla",
+        "state": "Colorado",
+        "canal_km": 517.9,
+        "named_km": 227.3
+      },
+      {
+        "fips": "35053",
+        "county": "Socorro",
+        "state": "New Mexico",
+        "canal_km": 516.1,
+        "named_km": 115.9
+      },
+      {
+        "fips": "35001",
+        "county": "Bernalillo",
+        "state": "New Mexico",
+        "canal_km": 463.6,
+        "named_km": 124.1
+      },
+      {
+        "fips": "35043",
+        "county": "Sandoval",
+        "state": "New Mexico",
+        "canal_km": 450.7,
+        "named_km": 125.5
+      },
+      {
+        "fips": "35055",
+        "county": "Taos",
+        "state": "New Mexico",
+        "canal_km": 398.9,
+        "named_km": 199.6
+      },
+      {
+        "fips": "48323",
+        "county": "Maverick",
+        "state": "Texas",
+        "canal_km": 339.7,
+        "named_km": 17.4
+      },
+      {
+        "fips": "48229",
+        "county": "Hudspeth",
+        "state": "Texas",
+        "canal_km": 301.4,
+        "named_km": 97.4
+      },
+      {
+        "fips": "35049",
+        "county": "Santa Fe",
+        "state": "New Mexico",
+        "canal_km": 85.7,
+        "named_km": 22.9
+      },
+      {
+        "fips": "35051",
+        "county": "Sierra",
+        "state": "New Mexico",
+        "canal_km": 67.6,
+        "named_km": 25.2
+      },
+      {
+        "fips": "48377",
+        "county": "Presidio",
+        "state": "Texas",
+        "canal_km": 46.7,
+        "named_km": 0.0
+      },
+      {
+        "fips": "08053",
+        "county": "Hinsdale",
+        "state": "Colorado",
+        "canal_km": 45.0,
+        "named_km": 17.1
+      },
+      {
+        "fips": "48479",
+        "county": "Webb",
+        "state": "Texas",
+        "canal_km": 41.1,
+        "named_km": 0.0
+      },
+      {
+        "fips": "48465",
+        "county": "Val Verde",
+        "state": "Texas",
+        "canal_km": 32.8,
+        "named_km": 0.0
+      },
+      {
+        "fips": "08079",
+        "county": "Mineral",
+        "state": "Colorado",
+        "canal_km": 26.3,
+        "named_km": 7.6
+      },
+      {
+        "fips": "48505",
+        "county": "Zapata",
+        "state": "Texas",
+        "canal_km": 11.5,
+        "named_km": 0.0
+      },
+      {
+        "fips": "48427",
+        "county": "Starr",
+        "state": "Texas",
+        "canal_km": 10.3,
+        "named_km": 0.0
+      },
+      {
+        "fips": "48271",
+        "county": "Kinney",
+        "state": "Texas",
+        "canal_km": 7.0,
+        "named_km": 0.0
+      },
+      {
+        "fips": "08111",
+        "county": "San Juan",
+        "state": "Colorado",
+        "canal_km": 2.5,
+        "named_km": 0.0
+      },
+      {
+        "fips": "48127",
+        "county": "Dimmit",
+        "state": "Texas",
+        "canal_km": 1.0,
+        "named_km": 0.0
+      },
+      {
+        "fips": "35028",
+        "county": "Los Alamos",
+        "state": "New Mexico",
+        "canal_km": 0.0,
+        "named_km": 0.0
+      },
+      {
+        "fips": "48043",
+        "county": "Brewster",
+        "state": "Texas",
+        "canal_km": 0.0,
+        "named_km": 0.0
+      }
+    ],
+    "named": [
+      {
+        "name": "Prairie Ditch",
+        "km": 40.4
+      },
+      {
+        "name": "San Luis Valley Irrigation Drain",
+        "km": 32.4
+      },
+      {
+        "name": "Gibson Ditch",
+        "km": 29.4
+      },
+      {
+        "name": "Mesa Ditch",
+        "km": 29.3
+      },
+      {
+        "name": "Three Saints Lateral",
+        "km": 29.0
+      },
+      {
+        "name": "Tome Drain",
+        "km": 28.8
+      },
+      {
+        "name": "North Central Lateral",
+        "km": 28.6
+      },
+      {
+        "name": "Farmers Union Canal",
+        "km": 28.0
+      },
+      {
+        "name": "Rio Grande Canal",
+        "km": 27.9
+      },
+      {
+        "name": "Central Lateral",
+        "km": 27.6
+      },
+      {
+        "name": "Hooper Lateral",
+        "km": 26.5
+      },
+      {
+        "name": "South Lateral",
+        "km": 25.6
+      },
+      {
+        "name": "Rio Grande Drain",
+        "km": 24.6
+      },
+      {
+        "name": "Lateral Fortyseven",
+        "km": 24.3
+      },
+      {
+        "name": "Pilot Channel",
+        "km": 23.8
+      }
+    ],
+    "map_file": "data/processed/canals.geojson",
+    "checked_against": "OpenStreetMap canal, ditch and drain lines, for two counties: Cameron 2,640 km against 2,750 km here, Alamosa 767 km against 724 km here. OpenStreetMap partly copies the same USGS data, so this is a sanity check, not independent proof.",
+    "note": "Mapped canal and ditch lines whose middle point lies inside the county. The map does not separate irrigation canals from drainage ditches, and does not say whether a canal is lined, how much it leaks or which district owns it. Most segments have no name. This shows where canals are, not which ones to seal."
+  },
+  "canal_priority": {
+    "soil_source": "USDA NRCS Soil Survey (SSURGO), through the Soil Data Access service",
+    "seepage_rate_source": "Fipps (Texas A&M), 1998: Table 7 (quoting the Texas Board of Water Engineers, 1946), the low end of Table 6 for sands, and one measured canal in Table 8 for sandy clay loam",
+    "seepage_gal_sqft_day": {
+      "Clay": 1.5,
+      "Silty clay loam": 2.24,
+      "Clay loam": 2.99,
+      "Silt loam": 4.49,
+      "Loam": 7.48,
+      "Fine sandy loam": 9.35,
+      "Sandy loam": 11.22,
+      "Sand": 9.34,
+      "Fine sand": 9.34,
+      "Coarse sand": 9.34,
+      "Very fine sand": 9.34,
+      "Loamy sand": 9.34,
+      "Loamy fine sand": 9.34,
+      "Loamy coarse sand": 9.34,
+      "Loamy very fine sand": 9.34,
+      "Sandy clay loam": 1.69
+    },
+    "leaky_soil_rate": 7.48,
+    "forecast_threshold": 0.25,
+    "levels": [
+      "Inspect first",
+      "Watch",
+      "Low",
+      "Unknown soil",
+      "Drain"
+    ],
+    "rule": "Inspect first = the 6-month forecast warns for the county AND the soil under the canal is leaky (loam or sandier). Watch = one of the two. Low = neither. Unknown soil = the soil type has no published seepage rate. Drain = the name says it is a drain, wasteway or floodway.",
+    "by_level": [
+      {
+        "level": "Inspect first",
+        "km": 1420.7,
+        "segments": 941
+      },
+      {
+        "level": "Watch",
+        "km": 7670.5,
+        "segments": 6160
+      },
+      {
+        "level": "Low",
+        "km": 4038.4,
+        "segments": 3561
+      },
+      {
+        "level": "Unknown soil",
+        "km": 1075.7,
+        "segments": 1202
+      },
+      {
+        "level": "Drain",
+        "km": 786.0,
+        "segments": 307
+      }
+    ],
+    "by_soil": [
+      {
+        "soil": "Clay",
+        "km": 2229.1,
+        "seepage_rate": 1.5
+      },
+      {
+        "soil": "Sand",
+        "km": 2186.7,
+        "seepage_rate": 9.34
+      },
+      {
+        "soil": "Clay loam",
+        "km": 2178.3,
+        "seepage_rate": 2.99
+      },
+      {
+        "soil": "Sandy clay loam",
+        "km": 1645.3,
+        "seepage_rate": 1.69
+      },
+      {
+        "soil": "Silt loam",
+        "km": 1380.7,
+        "seepage_rate": 4.49
+      },
+      {
+        "soil": "Loam",
+        "km": 772.6,
+        "seepage_rate": 7.48
+      },
+      {
+        "soil": "Loamy sand",
+        "km": 741.1,
+        "seepage_rate": 9.34
+      },
+      {
+        "soil": "Sandy loam",
+        "km": 693.1,
+        "seepage_rate": 11.22
+      },
+      {
+        "soil": "Silty clay loam",
+        "km": 628.0,
+        "seepage_rate": 2.24
+      },
+      {
+        "soil": "Loamy fine sand",
+        "km": 393.0,
+        "seepage_rate": 9.34
+      },
+      {
+        "soil": "(no soil data)",
+        "km": 385.7,
+        "seepage_rate": null
+      },
+      {
+        "soil": "Silty clay",
+        "km": 382.1,
+        "seepage_rate": null
+      },
+      {
+        "soil": "Fine sand",
+        "km": 379.3,
+        "seepage_rate": 9.34
+      },
+      {
+        "soil": "Loamy coarse sand",
+        "km": 229.9,
+        "seepage_rate": 9.34
+      },
+      {
+        "soil": "Fine sandy loam",
+        "km": 215.0,
+        "seepage_rate": 9.35
+      },
+      {
+        "soil": "Very fine sandy loam",
+        "km": 173.0,
+        "seepage_rate": null
+      },
+      {
+        "soil": "Silt",
+        "km": 120.3,
+        "seepage_rate": null
+      },
+      {
+        "soil": "Loamy very fine sand",
+        "km": 94.8,
+        "seepage_rate": 9.34
+      },
+      {
+        "soil": "Coarse sand",
+        "km": 71.7,
+        "seepage_rate": 9.34
+      },
+      {
+        "soil": "Very fine sand",
+        "km": 41.3,
+        "seepage_rate": 9.34
+      },
+      {
+        "soil": "Sandy clay",
+        "km": 38.2,
+        "seepage_rate": null
+      },
+      {
+        "soil": "Coarse sandy loam",
+        "km": 12.3,
+        "seepage_rate": null
+      }
+    ],
+    "by_county": [
+      {
+        "fips": "08109",
+        "county": "Saguache",
+        "state": "Colorado",
+        "p_season": 0.513,
+        "inspect_first_km": 843.3,
+        "leaky_soil_km": 852.2,
+        "canal_km": 1011.4
+      },
+      {
+        "fips": "08023",
+        "county": "Costilla",
+        "state": "Colorado",
+        "p_season": 0.262,
+        "inspect_first_km": 421.0,
+        "leaky_soil_km": 421.0,
+        "canal_km": 517.9
+      },
+      {
+        "fips": "35049",
+        "county": "Santa Fe",
+        "state": "New Mexico",
+        "p_season": 0.277,
+        "inspect_first_km": 74.9,
+        "leaky_soil_km": 74.9,
+        "canal_km": 85.7
+      },
+      {
+        "fips": "48229",
+        "county": "Hudspeth",
+        "state": "Texas",
+        "p_season": 0.274,
+        "inspect_first_km": 27.4,
+        "leaky_soil_km": 27.4,
+        "canal_km": 301.4
+      },
+      {
+        "fips": "48215",
+        "county": "Hidalgo",
+        "state": "Texas",
+        "p_season": 0.307,
+        "inspect_first_km": 21.2,
+        "leaky_soil_km": 21.2,
+        "canal_km": 2382.9
+      },
+      {
+        "fips": "48489",
+        "county": "Willacy",
+        "state": "Texas",
+        "p_season": 0.336,
+        "inspect_first_km": 17.4,
+        "leaky_soil_km": 17.4,
+        "canal_km": 904.2
+      },
+      {
+        "fips": "48323",
+        "county": "Maverick",
+        "state": "Texas",
+        "p_season": 0.304,
+        "inspect_first_km": 13.9,
+        "leaky_soil_km": 13.9,
+        "canal_km": 339.7
+      },
+      {
+        "fips": "48479",
+        "county": "Webb",
+        "state": "Texas",
+        "p_season": 0.599,
+        "inspect_first_km": 1.6,
+        "leaky_soil_km": 1.6,
+        "canal_km": 41.1
+      },
+      {
+        "fips": "08003",
+        "county": "Alamosa",
+        "state": "Colorado",
+        "p_season": 0.228,
+        "inspect_first_km": 0.0,
+        "leaky_soil_km": 603.0,
+        "canal_km": 723.7
+      },
+      {
+        "fips": "08021",
+        "county": "Conejos",
+        "state": "Colorado",
+        "p_season": 0.158,
+        "inspect_first_km": 0.0,
+        "leaky_soil_km": 774.4,
+        "canal_km": 919.7
+      },
+      {
+        "fips": "08053",
+        "county": "Hinsdale",
+        "state": "Colorado",
+        "p_season": 0.193,
+        "inspect_first_km": 0.0,
+        "leaky_soil_km": 18.6,
+        "canal_km": 45.0
+      },
+      {
+        "fips": "08079",
+        "county": "Mineral",
+        "state": "Colorado",
+        "p_season": 0.191,
+        "inspect_first_km": 0.0,
+        "leaky_soil_km": 22.0,
+        "canal_km": 26.3
+      },
+      {
+        "fips": "08105",
+        "county": "Rio Grande",
+        "state": "Colorado",
+        "p_season": 0.209,
+        "inspect_first_km": 0.0,
+        "leaky_soil_km": 709.0,
+        "canal_km": 791.3
+      },
+      {
+        "fips": "08111",
+        "county": "San Juan",
+        "state": "Colorado",
+        "p_season": 0.143,
+        "inspect_first_km": 0.0,
+        "leaky_soil_km": 0.0,
+        "canal_km": 2.5
+      },
+      {
+        "fips": "35001",
+        "county": "Bernalillo",
+        "state": "New Mexico",
+        "p_season": 0.189,
+        "inspect_first_km": 0.0,
+        "leaky_soil_km": 372.4,
+        "canal_km": 463.6
+      },
+      {
+        "fips": "35013",
+        "county": "Do\u00f1a Ana",
+        "state": "New Mexico",
+        "p_season": 0.082,
+        "inspect_first_km": 0.0,
+        "leaky_soil_km": 402.2,
+        "canal_km": 924.0
+      },
+      {
+        "fips": "35028",
+        "county": "Los Alamos",
+        "state": "New Mexico",
+        "p_season": 0.162,
+        "inspect_first_km": 0.0,
+        "leaky_soil_km": 0.0,
+        "canal_km": 0.0
+      },
+      {
+        "fips": "35043",
+        "county": "Sandoval",
+        "state": "New Mexico",
+        "p_season": 0.202,
+        "inspect_first_km": 0.0,
+        "leaky_soil_km": 318.1,
+        "canal_km": 450.7
+      },
+      {
+        "fips": "35051",
+        "county": "Sierra",
+        "state": "New Mexico",
+        "p_season": 0.102,
+        "inspect_first_km": 0.0,
+        "leaky_soil_km": 34.1,
+        "canal_km": 67.6
+      },
+      {
+        "fips": "35053",
+        "county": "Socorro",
+        "state": "New Mexico",
+        "p_season": 0.217,
+        "inspect_first_km": 0.0,
+        "leaky_soil_km": 247.1,
+        "canal_km": 516.1
+      },
+      {
+        "fips": "35055",
+        "county": "Taos",
+        "state": "New Mexico",
+        "p_season": 0.248,
+        "inspect_first_km": 0.0,
+        "leaky_soil_km": 138.3,
+        "canal_km": 398.9
+      },
+      {
+        "fips": "35061",
+        "county": "Valencia",
+        "state": "New Mexico",
+        "p_season": 0.197,
+        "inspect_first_km": 0.0,
+        "leaky_soil_km": 536.3,
+        "canal_km": 597.6
+      },
+      {
+        "fips": "48043",
+        "county": "Brewster",
+        "state": "Texas",
+        "p_season": 0.18,
+        "inspect_first_km": 0.0,
+        "leaky_soil_km": 0.0,
+        "canal_km": 0.0
+      },
+      {
+        "fips": "48061",
+        "county": "Cameron",
+        "state": "Texas",
+        "p_season": 0.243,
+        "inspect_first_km": 0.0,
+        "leaky_soil_km": 5.3,
+        "canal_km": 2749.6
+      },
+      {
+        "fips": "48127",
+        "county": "Dimmit",
+        "state": "Texas",
+        "p_season": 0.51,
+        "inspect_first_km": 0.0,
+        "leaky_soil_km": 0.0,
+        "canal_km": 1.0
+      },
+      {
+        "fips": "48141",
+        "county": "El Paso",
+        "state": "Texas",
+        "p_season": 0.031,
+        "inspect_first_km": 0.0,
+        "leaky_soil_km": 188.2,
+        "canal_km": 621.2
+      },
+      {
+        "fips": "48271",
+        "county": "Kinney",
+        "state": "Texas",
+        "p_season": 0.265,
+        "inspect_first_km": 0.0,
+        "leaky_soil_km": 0.0,
+        "canal_km": 7.0
+      },
+      {
+        "fips": "48377",
+        "county": "Presidio",
+        "state": "Texas",
+        "p_season": 0.181,
+        "inspect_first_km": 0.0,
+        "leaky_soil_km": 14.6,
+        "canal_km": 46.7
+      },
+      {
+        "fips": "48427",
+        "county": "Starr",
+        "state": "Texas",
+        "p_season": 0.333,
+        "inspect_first_km": 0.0,
+        "leaky_soil_km": 0.0,
+        "canal_km": 10.3
+      },
+      {
+        "fips": "48465",
+        "county": "Val Verde",
+        "state": "Texas",
+        "p_season": 0.25,
+        "inspect_first_km": 0.0,
+        "leaky_soil_km": 5.1,
+        "canal_km": 32.8
+      },
+      {
+        "fips": "48505",
+        "county": "Zapata",
+        "state": "Texas",
+        "p_season": 0.399,
+        "inspect_first_km": 0.0,
+        "leaky_soil_km": 0.0,
+        "canal_km": 11.5
+      }
+    ],
+    "named": [
+      {
+        "name": "North Central Lateral",
+        "county": "Saguache",
+        "state": "Colorado",
+        "inspect_first_km": 28.6,
+        "seepage_rate": 9.34,
+        "p_season": 0.513
+      },
+      {
+        "name": "Farmers Union Canal",
+        "county": "Saguache",
+        "state": "Colorado",
+        "inspect_first_km": 28.0,
+        "seepage_rate": 9.34,
+        "p_season": 0.513
+      },
+      {
+        "name": "Gibson Ditch",
+        "county": "Saguache",
+        "state": "Colorado",
+        "inspect_first_km": 27.4,
+        "seepage_rate": 9.34,
+        "p_season": 0.513
+      },
+      {
+        "name": "Lateral Fortyseven",
+        "county": "Saguache",
+        "state": "Colorado",
+        "inspect_first_km": 24.3,
+        "seepage_rate": 9.34,
+        "p_season": 0.513
+      },
+      {
+        "name": "Rio Grande Canal",
+        "county": "Saguache",
+        "state": "Colorado",
+        "inspect_first_km": 23.5,
+        "seepage_rate": 9.65,
+        "p_season": 0.513
+      },
+      {
+        "name": "North Lateral",
+        "county": "Saguache",
+        "state": "Colorado",
+        "inspect_first_km": 20.7,
+        "seepage_rate": 9.34,
+        "p_season": 0.513
+      },
+      {
+        "name": "Mesa Ditch",
+        "county": "Costilla",
+        "state": "Colorado",
+        "inspect_first_km": 20.3,
+        "seepage_rate": 8.46,
+        "p_season": 0.262
+      },
+      {
+        "name": "Trinchera Canal",
+        "county": "Costilla",
+        "state": "Colorado",
+        "inspect_first_km": 18.1,
+        "seepage_rate": 9.04,
+        "p_season": 0.262
+      },
+      {
+        "name": "Indian Creek Ditch",
+        "county": "Costilla",
+        "state": "Colorado",
+        "inspect_first_km": 17.0,
+        "seepage_rate": 8.98,
+        "p_season": 0.262
+      },
+      {
+        "name": "Highline Canal",
+        "county": "Costilla",
+        "state": "Colorado",
+        "inspect_first_km": 16.9,
+        "seepage_rate": 8.88,
+        "p_season": 0.262
+      },
+      {
+        "name": "Sanchez Canal",
+        "county": "Costilla",
+        "state": "Colorado",
+        "inspect_first_km": 11.8,
+        "seepage_rate": 9.16,
+        "p_season": 0.262
+      },
+      {
+        "name": "North Main Canal",
+        "county": "Saguache",
+        "state": "Colorado",
+        "inspect_first_km": 11.3,
+        "seepage_rate": 9.34,
+        "p_season": 0.513
+      },
+      {
+        "name": "Eastdale Culebra Canal",
+        "county": "Costilla",
+        "state": "Colorado",
+        "inspect_first_km": 10.8,
+        "seepage_rate": 9.34,
+        "p_season": 0.262
+      },
+      {
+        "name": "Arch Irrigation Ditch",
+        "county": "Saguache",
+        "state": "Colorado",
+        "inspect_first_km": 10.2,
+        "seepage_rate": 8.42,
+        "p_season": 0.513
+      },
+      {
+        "name": "Cerritos Canal",
+        "county": "Costilla",
+        "state": "Colorado",
+        "inspect_first_km": 9.3,
+        "seepage_rate": 10.68,
+        "p_season": 0.262
+      },
+      {
+        "name": "Reservoir Ditch",
+        "county": "Costilla",
+        "state": "Colorado",
+        "inspect_first_km": 9.0,
+        "seepage_rate": 9.34,
+        "p_season": 0.262
+      },
+      {
+        "name": "South Crestone Ditch",
+        "county": "Saguache",
+        "state": "Colorado",
+        "inspect_first_km": 8.4,
+        "seepage_rate": 9.34,
+        "p_season": 0.513
+      },
+      {
+        "name": "Eastdale Branch Cerro Canal",
+        "county": "Costilla",
+        "state": "Colorado",
+        "inspect_first_km": 8.3,
+        "seepage_rate": 8.41,
+        "p_season": 0.262
+      },
+      {
+        "name": "Sangre De Cristo-Trinchera Diversion Canal",
+        "county": "Costilla",
+        "state": "Colorado",
+        "inspect_first_km": 8.2,
+        "seepage_rate": 11.22,
+        "p_season": 0.262
+      },
+      {
+        "name": "Sangre de Cristo Ditch Number 3",
+        "county": "Costilla",
+        "state": "Colorado",
+        "inspect_first_km": 8.2,
+        "seepage_rate": 8.41,
+        "p_season": 0.262
+      }
+    ],
+    "note": "An estimate of where leaks are LIKELY, not measured leaks. It assumes bare-earth canals: we do not know which canals are lined. Real seepage also depends on construction, silt and the water table. The levels change every week with the forecast. Use it to choose canals to inspect, not to claim water savings."
   }
 }

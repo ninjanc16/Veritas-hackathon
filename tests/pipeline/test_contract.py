@@ -121,7 +121,7 @@ def test_pivot_columns_and_keys(files):
     assert (latest.loc[latest["res_name"] == "none", "res_pct_full"] == -1).all()
     assert latest.loc[latest["res_name"] != "none", "res_pct_full"].between(0, 100).all()
 
-    assert list(metrics)[-3:] == ["trigger", "reservoir", "losses"]   # the new keys are at the end
+    assert list(metrics)[-5:] == ["trigger", "reservoir", "losses", "canals", "canal_priority"]   # new keys at the end
     trigger = metrics["trigger"]
     assert [r["name"] for r in trigger["rules"]] == ["Our forecast", "Our forecast with reservoirs",
                                                      "D1 or worse now", "D2 or worse now", "Seal every year"]
@@ -140,3 +140,16 @@ def test_pivot_columns_and_keys(files):
     losses = metrics["losses"]
     assert losses["total_usd"] == sum(entry["usd"] for entry in losses["by_year"])
     assert len(losses["by_county"]) == 31 and losses["causes_included"] == ["Drought"]
+
+    canals = metrics["canals"]
+    assert len(canals["by_county"]) == 31
+    assert abs(canals["total_km"] - sum(entry["canal_km"] for entry in canals["by_county"])) < 2   # rounding only
+    assert all(entry["named_km"] <= entry["canal_km"] for entry in canals["by_county"])
+
+    # Canal priority: every km of canal has exactly one level, and "inspect first" needs BOTH links
+    priority = metrics["canal_priority"]
+    assert abs(sum(entry["km"] for entry in priority["by_level"]) - canals["total_km"]) < 2
+    for entry in priority["by_county"]:
+        assert entry["inspect_first_km"] <= entry["leaky_soil_km"] <= entry["canal_km"]
+        if entry["p_season"] < priority["forecast_threshold"]:
+            assert entry["inspect_first_km"] == 0      # no forecast warning, so nothing is "inspect first"
