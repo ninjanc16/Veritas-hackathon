@@ -21,10 +21,14 @@ from farmdrought.config import (D2_CLASS, FOCUS_RIVER, OUTLOOK_TEST, RIVERS, SEA
 from farmdrought.drought import build_panel
 from farmdrought.evaluate import season_block, season_river, tally, year_block, year_river
 from farmdrought.features import FEATURES_E, FEATURES_H, FEATURES_L
+from farmdrought.reservoirs import FEATURES_R, add_reservoir_features
 
 # Inputs for each outlook. They come from the plan and were not re-chosen by this code.
 FEATURES_SEASON = FEATURES_H + FEATURES_L + FEATURES_E  # 6-month: history + long memory + ENSO
 FEATURES_YEAR = FEATURES_H + FEATURES_L                 # 12-month: history + long memory
+# Pivot: the 6-month inputs plus reservoir storage. Used by a SECOND forecast (p_season_res)
+# that sits beside the system. The system forecast p_season does not use it.
+FEATURES_SEASON_RES = FEATURES_SEASON + FEATURES_R
 
 
 def make_classifier(seed=0):
@@ -100,7 +104,7 @@ def usual(table, label, horizon):
 
 def run_outlook(panel):
     """Run both outlooks. Returns (scored rows, season results, year results)."""
-    table = issue_rows(panel)
+    table = add_reservoir_features(issue_rows(panel))  # reservoir inputs, used only by p_season_res
     focus = table["river"] == FOCUS_RIVER
     everyone = pd.Series(True, index=table.index)
     season = dict(label="y_season", horizon=SEASON_WEEKS)
@@ -112,6 +116,11 @@ def run_outlook(panel):
     table["weeks_model"] = chain(table, **year, features=FEATURES_YEAR, make_model=make_regressor,
                                  train_on=focus, predict_on=everyone)
     table["alarm_season"] = table["p_season"] >= SEASON_THRESHOLD
+
+    # ---- Pivot: the same 6-month forest, but it also sees reservoir storage ----
+    # Same settings, same training rows, same forward chaining. Only the inputs differ.
+    table["p_season_res"] = chain(table, **season, features=FEATURES_SEASON_RES, make_model=make_classifier,
+                                  train_on=focus, predict_on=everyone)
 
     # ---- Baselines ----
     table["alarm_season_persistence"] = table["cls"] >= D2_CLASS      # in D2 now
@@ -153,6 +162,7 @@ def run_outlook(panel):
         # comparison costs on the Rio Grande, used for the "ablations" lines
         "all_rivers_cost": season_block(rg, "p_season_all")["system_cost"],
         "no_enso_cost": season_block(rg, "p_season_no_enso")["system_cost"],
+        "reservoir_cost": season_block(rg, "p_season_res")["system_cost"],
     }
     year_results = {
         "focus": year_block(rg),
@@ -186,7 +196,8 @@ if __name__ == "__main__":
     _, s, y = run_outlook(build_panel())
     print("=== 6-month outlook, Rio Grande (cost: lower is better) ===")
     print(pd.Series(s["focus"]).to_string(), "\n")
-    print("Trained on all five rivers:", s["all_rivers_cost"], "| Without El Nino inputs:", s["no_enso_cost"], "\n")
+    print("Trained on all five rivers:", s["all_rivers_cost"], "| Without El Nino inputs:", s["no_enso_cost"],
+          "| With reservoir inputs:", s["reservoir_cost"], "\n")
     print(pd.DataFrame(s["per_river"]).to_string(index=False), "\n")
     print("=== 12-month outlook, Rio Grande (average error in weeks: lower is better) ===")
     print(pd.Series(y["focus"]).to_string(), "\n")
