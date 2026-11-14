@@ -19,7 +19,7 @@ from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from farmdrought.config import (D2_CLASS, FOCUS_RIVER, OUTLOOK_TEST, RIVERS, SEASON_THRESHOLD, SEASON_WEEKS,
                                 YEAR_WEEKS)
 from farmdrought.drought import build_panel
-from farmdrought.evaluate import season_block, season_river, year_block, year_river
+from farmdrought.evaluate import season_block, season_river, tally, year_block, year_river
 from farmdrought.features import FEATURES_E, FEATURES_H, FEATURES_L
 
 # Inputs for each outlook, fixed before the build (architecture doc, P5)
@@ -160,6 +160,26 @@ def run_outlook(panel):
         "all_rivers_mae": year_block(rg, "weeks_all")["mae_system"],
     }
     return scored, season_results, year_results
+
+
+def extra_inputs_test(table, extra):
+    """Ablation: would extra inputs (river flow, snowpack) have helped on the Rio Grande?
+
+    Runs both outlooks twice on the SAME rows, once without and once with the extra inputs,
+    using the same forward chaining. Rows where an extra input is missing are left out of both
+    runs, so the comparison is fair. The system itself is NOT changed by this test.
+    """
+    rg = table[(table["river"] == FOCUS_RIVER) & table[extra].notna().all(axis=1)].reset_index(drop=True)
+    everyone = pd.Series(True, index=rg.index)
+    out = {}
+    for name, added in [("without", []), ("with", extra)]:
+        p = chain(rg, "y_season", SEASON_WEEKS, FEATURES_SEASON + added, make_classifier, everyone, everyone)
+        w = chain(rg, "y_weeks", YEAR_WEEKS, FEATURES_YEAR + added, make_regressor, everyone, everyone)
+        known = p.notna() & rg["y_season"].notna() & rg["y_weeks"].notna()  # test years, full future known
+        out["rows"] = int(known.sum())
+        out[f"season_cost_{name}"] = tally(rg.loc[known, "y_season"], p[known] >= SEASON_THRESHOLD)["cost"]
+        out[f"mae_{name}"] = round(float((w[known] - rg.loc[known, "y_weeks"]).abs().mean()), 2)
+    return out
 
 
 if __name__ == "__main__":
