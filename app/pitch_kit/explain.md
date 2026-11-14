@@ -1,4 +1,4 @@
-STATUS: DEMO DATA - DO NOT USE
+STATUS: PROVISIONAL - DO NOT USE IN THE FINAL VIDEO OR WRITE-UP
 
 # Explain sheet
 Everyone on the team reads this before recording the video.
@@ -19,7 +19,7 @@ The county's own recent drought history, the drought in nearby counties, the Pac
 The real job is predicting the future. Drought weeks next to each other look almost identical, so a random split lets the model peek at the answer through a neighboring week and the score looks better than it is. A time split trains on the past and tests on years it never saw.
 
 ## 6. What is leakage, and how did we check for it?
-Leakage is when information from the future sneaks into training. We guard against it with time-based splits, automated leakage tests, and a shuffled-label check: with the answers scrambled, the model's AUC should be near 0.5. Ours was 0.5.
+Leakage is when information from the future sneaks into training. We guard against it with time-based splits, automated leakage tests, and a shuffled-label check: with the answers scrambled, the model's AUC should be near 0.5. Ours was 0.44.
 
 ## 7. What is the persistence baseline? What is climatology?
 Persistence is 'the future equals today': warn if the county is in severe drought right now. Climatology is 'the usual for this county': what normally happens, ignoring today. A forecast is only useful if it beats both.
@@ -31,13 +31,13 @@ Precision: of the warnings we gave, how many were followed by severe drought. Re
 It is our assumption (miss cost = 3), not a farmer's number. If a miss is 3 times worse than a false alarm, it pays to warn whenever the chance is at least 1 divided by (1 + 3). The 6-month threshold in metrics.json is 0.25.
 
 ## 10. Why does the 12-month outlook predict a number of weeks, and not yes or no?
-A yes-or-no warning a year ahead is nearly always 'yes' on the Rio Grande, so 'always warn' beats any model. A number of weeks is something a rancher can plan around. It is a planning range, not a precise forecast: the typical error is about 5.5 weeks, on an average of 27.5 weeks.
+A yes-or-no warning a year ahead is nearly always 'yes' on the Rio Grande, so 'always warn' beats any model. A number of weeks is something a rancher can plan around. It is a planning range, not a precise forecast: the typical error is about 14.0 weeks, on an average of 22.1 weeks.
 
 ## 11. Why does the Rio Grande model fail on the Ohio?
-The model learned a place where drought is the norm. On the Ohio severe drought is rare, so what it learned does not carry over. On the Ohio our system cost 187 against 175 for the best simple rule (Persistence).
+The model learned a place where drought is the norm. On the Ohio severe drought is rare, so what it learned does not carry over. On the Ohio our system cost 4592 against 4470 for the best simple rule (Persistence).
 
 ## 12. What are the three weakest points of this project?
-1) Onset: for counties not yet in severe drought our system cost 300 against 310 for the best simple rule (D1 now). 2) The 6-month margin: our cost 600 against 1428 for the 'D1 or worse now' rule, so much of the skill is persistence. 3) Small sample: the 12 Rio Grande counties move together, so the real sample is far smaller than the row count.
+1) Onset: for counties not yet in severe drought our system cost 1735 against 1794 for the best simple rule (Worsening). 2) The 6-month margin: our cost 2324 against 2382 for the 'D1 or worse now' rule, so much of the skill is persistence. 3) Small sample: the 31 Rio Grande counties move together, so the real sample is far smaller than the row count.
 
 ## 13. Which parts did AI tools write, and how did we check them?
 [TEAM: write this yourselves, honestly - which AI tools were used for what, and how each part was checked (tests, reading the code, comparing with the numbers in metrics.json).]

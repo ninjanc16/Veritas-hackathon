@@ -89,3 +89,13 @@ def test_load_falls_back_to_demo_when_no_real_files():
 def test_real_files_pass_when_present():
     *_, source, problems = load()
     assert problems == [] and source == "real"
+
+
+def test_python_dates_pass_but_text_dates_fail(demo):
+    # Real parquet DATE columns arrive as Python dates: that is a valid "date".
+    pred = demo[0].copy()
+    pred["date"] = pred["date"].dt.date
+    assert validate_predictions(pred) == []
+    # Dates stored as text are NOT dates, so they must still fail.
+    pred["date"] = pred["date"].astype(str)
+    assert validate_predictions(pred) != []

@@ -25,10 +25,16 @@ def _run_app():
     return at
 
 
-def test_app_runs_on_demo_data_and_shows_red_banner():
+def test_app_shows_the_right_banner_for_its_data():
     at = _run_app()
     assert not at.exception
-    assert any("DEMO DATA" in e.value for e in at.error)
+    _, _, _, metrics, source, problems = load()
+    if source == "demo":
+        assert any("DEMO DATA" in e.value for e in at.error)          # red banner
+    elif not metrics["is_final"]:
+        assert any("Provisional results" in w.value for w in at.warning)   # yellow banner
+    else:
+        assert not at.error and not at.warning                          # final data: no banner
 
 
 def test_app_runs_for_every_river():

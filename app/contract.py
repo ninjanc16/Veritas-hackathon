@@ -9,6 +9,7 @@ What it does (plain English, for the judges):
 
 The app never computes results itself - it only shows what is in these files.
 """
+import datetime
 import json
 from pathlib import Path
 
@@ -95,7 +96,11 @@ METRICS_NESTED_KEYS = {
 def _type_ok(series, kind):
     """True if a pandas column has the type the contract asks for."""
     if kind == "date":
-        return pd.api.types.is_datetime64_any_dtype(series)
+        # A parquet DATE column reads back as plain Python dates (object); a timestamp
+        # column reads back as datetime64. Both are real dates. Text like "2026-01-06" is not.
+        if pd.api.types.is_datetime64_any_dtype(series):
+            return True
+        return series.dtype == object and all(isinstance(v, datetime.date) for v in series.dropna())
     if kind in ("str", "fips"):
         return pd.api.types.is_string_dtype(series)
     if kind == "int":
@@ -255,9 +260,15 @@ def _paths(folder, metrics_path):
             folder / "latest.parquet", metrics_path)
 
 
+def _datetime_dates(pred, outlook, latest):
+    """Turn every 'date' column into pandas datetimes, so the app can use .dt.year etc."""
+    return tuple(df.assign(date=pd.to_datetime(df["date"])) for df in (pred, outlook, latest))
+
+
 def load_demo():
     """Read the four FAKE files from app/demo_data/."""
-    return _read(*_paths(DEMO_DIR, DEMO_DIR / "metrics.json"))
+    pred, outlook, latest, metrics = _read(*_paths(DEMO_DIR, DEMO_DIR / "metrics.json"))
+    return (*_datetime_dates(pred, outlook, latest), metrics)
 
 
 def validate_all(pred, outlook, latest, metrics):
@@ -290,5 +301,6 @@ def load():
         real, problems = None, [f"could not read the real files: {err}"]
 
     if not problems:
-        return (*real, "real", [])
+        # Validated as-is first; only then convert the date columns for the app's use.
+        return (*_datetime_dates(*real[:3]), real[3], "real", [])
     return (*load_demo(), "demo", problems)  # broken real files: show demo + the problem list

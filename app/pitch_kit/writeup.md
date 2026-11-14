@@ -1,4 +1,4 @@
-STATUS: DEMO DATA - DO NOT USE
+STATUS: PROVISIONAL - DO NOT USE IN THE FINAL VIDEO OR WRITE-UP
 
 # Rio Grande Farm Drought Outlook
 
@@ -9,7 +9,7 @@ Along the Rio Grande, drought is the normal risk, and it forces expensive decisi
 buy hay, plant or leave a field fallow, file for disaster aid or not. Farmers get a weekly map of
 where drought is now (the U.S. Drought Monitor), but not a county-level answer to "what is likely here
 next month, next season and next year?" Our users are ranchers and irrigated-crop farmers in
-12 counties in Colorado, New Mexico and Texas, and the county Farm Service Agency
+31 counties in Colorado, New Mexico and Texas, and the county Farm Service Agency
 offices and irrigation districts that work with them. [TEAM: name one real irrigation district after
 checking it.]
 
@@ -33,14 +33,14 @@ checking it.]
 - **Goes in:** weekly county drought maps from the U.S. Drought Monitor, the county's neighbors, and the
   Pacific El Nino index. [TEAM: Pipeline owner to confirm the exact inputs.]
 - **Comes out:** a tier and risk score (4 weeks), a percent (6 months) and a number of weeks (12 months).
-- **Model:** random forests trained on Rio Grande counties only (DEMO).
+- **Model:** random forests trained on Rio Grande counties only.
 - **Time split:** the 4-week alert trained on 2000 to 2014, tuned on
   2015 to 2018, tested on 2019 to 2026. Each
   outlook test year is predicted by a model trained only on earlier years.
 - **Baselines:** "the future equals today", "D1 or worse now", "getting worse", "typical for the time
   of year", and "usual for the county".
 - **Leakage checks:** time splits, leakage tests, and a shuffled-label check (average AUC
-  0.5).
+  0.44).
 
 ## Results
 Cost = 3 x missed droughts + false alarms. That cost rule is our assumption, not a farmer's number.
@@ -49,47 +49,55 @@ Cost = 3 x missed droughts + false alarms. That cost rule is our assumption, not
 
 | Rule | Cost | Precision | Recall |
 |---|---|---|---|
-| Our system | 603 | 0.864 | 0.993 |
-| Persistence (D2 or worse now) | 4119 | 0.913 | 0.619 |
-| D1 or worse now | 1649 | 0.782 | 0.926 |
-| Worsening | 3771 | 0.862 | 0.669 |
-| Typical for the time of year | 1412 | 0.708 | 1.0 |
+| Our system | 1912 | 0.932 | 0.935 |
+| Persistence | 2403 | 0.974 | 0.898 |
+| D1 now | 2333 | 0.782 | 0.984 |
+| Worsening | 1971 | 0.933 | 0.932 |
+| Calendar | 21735 | 0.0 | 0.0 |
 
 **6-month outlook.** Beats every baseline: yes.
 
 | Rule | Cost | Precision | Recall |
 |---|---|---|---|
-| Our system | 600 | 0.691 | 0.995 |
-| Persistence (D2 or worse now) | 2123 | - | - |
-| D1 or worse now | 1428 | - | - |
-| Usual for the county | 1240 | - | - |
+| Our system | 2324 | 0.733 | 0.868 |
+| Persistence (D2 or worse now) | 3133 | - | - |
+| D1 or worse now | 2382 | - | - |
+| Usual for the county | 3871 | - | - |
 
 **12-month outlook.** Beats every baseline: yes.
 
 | Rule | Average error (weeks) |
 |---|---|
-| Our system | 5.5 |
-| Same as now | 23.8 |
-| Same as last year | 10.8 |
-| Usual for the county | 6.7 |
+| Our system | 14.0 |
+| Same as now | 14.52 |
+| Same as last year | 15.18 |
+| Usual for the county | 17.39 |
 
 **Other rivers.** The model was trained on the Rio Grande only:
 
 | River | Our cost | Best simple rule | Its cost |
 |---|---|---|---|
-| Colorado | 272 | D1 now | 769 |
-| Rio Grande | 603 | D1 now | 1649 |
-| Mississippi | 431 | D1 now | 1013 |
-| Ohio | 187 | Persistence | 175 |
-| Missouri | 402 | D1 now | 982 |
+| Rio Grande | 1912 | Worsening | 1971 |
+| Mississippi | 9232 | Worsening | 8677 |
+| Missouri | 5455 | Worsening | 5358 |
+| Colorado | 572 | Worsening | 512 |
+| Ohio | 4592 | Persistence | 4470 |
 
 **A weak result.** On counties not yet in severe drought (the hard part), our system cost
-300 against 310 for the best simple rule (D1 now).
+1735 against 1794 for the best simple rule (Worsening).
 
-**A failure example.** 2019-01-15, Demo County RI3, Texas (4-week alert): DEMO: the system stayed quiet but severe drought arrived within 4 weeks.
+**A failure example.** 2023-04-04, Hidalgo, Texas (4-week alert): False alarm: the system warned with a risk score of 1.00, but the county did not reach severe drought in the next 4 weeks.
 
 **What the results do not show:**
-- DEMO DATA - these are not real results
+- Provisional: river flow not tested yet.
+- The cost rule (a miss costs 3 false alarms) is our assumption.
+- The 4-week risk score is not a calibrated probability.
+- On the Rio Grande the 4-week system (cost 1912) is close to a tie with the best simple rule, Worsening (cost 1971).
+- On the other four rivers the Rio Grande-trained 4-week system beats persistence on the Mississippi, Missouri and Colorado, but it does not beat the best simple rule on any of them.
+- The 6-month outlook (cost 2324) is close to a tie with the 'D1 or worse now' rule (cost 2382). It fails on the Mississippi, Missouri and Ohio.
+- The 12-month outlook is off by 14.0 weeks on average, against an average of 22.1 weeks. It is a planning range, not a precise forecast.
+- The 31 Rio Grande counties move together, so the real sample is about 18 years, not thousands of rows.
+- Design choices were made after exploratory runs on the same test years.
 
 ## What we'd do next
 Snowpack and river flow as inputs, the real grazing-period rule, a rancher's own cost numbers, and
