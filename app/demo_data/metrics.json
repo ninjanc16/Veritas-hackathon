@@ -1,6 +1,6 @@
 {
   "contract_version": 2,
-  "generated_at": "2026-11-14T16:07:18+00:00",
+  "generated_at": "2026-11-14T19:46:24+00:00",
   "is_final": false,
   "focus_river": "Rio Grande",
   "training_scope": "Rio Grande counties only (DEMO)",
@@ -411,5 +411,162 @@
     "feed_cost_per_head_month": 35.66,
     "feed_cost_source": "DEMO placeholder, not a real source",
     "tested": "DEMO DATA - these are not real estimates."
+  },
+  "trigger": {
+    "issue_months": [
+      1,
+      2,
+      3
+    ],
+    "threshold": 0.25,
+    "rows": 120,
+    "drought_seasons": 30,
+    "rules": [
+      {
+        "name": "Our forecast",
+        "fires": 40,
+        "caught": 24,
+        "missed": 6,
+        "false_alarms": 16,
+        "recall": 0.8,
+        "precision": 0.6
+      },
+      {
+        "name": "Our forecast with reservoirs",
+        "fires": 38,
+        "caught": 24,
+        "missed": 6,
+        "false_alarms": 14,
+        "recall": 0.8,
+        "precision": 0.631578947368421
+      },
+      {
+        "name": "D1 or worse now",
+        "fires": 50,
+        "caught": 25,
+        "missed": 5,
+        "false_alarms": 25,
+        "recall": 0.8333333333333334,
+        "precision": 0.5
+      },
+      {
+        "name": "D2 or worse now",
+        "fires": 30,
+        "caught": 18,
+        "missed": 12,
+        "false_alarms": 12,
+        "recall": 0.6,
+        "precision": 0.6
+      },
+      {
+        "name": "Seal every year",
+        "fires": 120,
+        "caught": 30,
+        "missed": 0,
+        "false_alarms": 90,
+        "recall": 1.0,
+        "precision": 0.25
+      }
+    ],
+    "value_sweep": [
+      {
+        "cost_ratio": 0.02,
+        "forecast": 0.08,
+        "forecast_reservoir": 0.09,
+        "d1_rule": 0.06999999999999999,
+        "persistence": 0.06,
+        "seal_every_year": 0.21
+      },
+      {
+        "cost_ratio": 0.05,
+        "forecast": 0.05,
+        "forecast_reservoir": 0.06,
+        "d1_rule": 0.039999999999999994,
+        "persistence": 0.03,
+        "seal_every_year": 0.15
+      },
+      {
+        "cost_ratio": 0.1,
+        "forecast": 0.0,
+        "forecast_reservoir": 0.009999999999999995,
+        "d1_rule": -0.010000000000000009,
+        "persistence": -0.020000000000000004,
+        "seal_every_year": 0.04999999999999999
+      },
+      {
+        "cost_ratio": 0.2,
+        "forecast": -0.1,
+        "forecast_reservoir": -0.09000000000000001,
+        "d1_rule": -0.11000000000000001,
+        "persistence": -0.12000000000000001,
+        "seal_every_year": -0.15000000000000002
+      }
+    ],
+    "forecast_beats_d1_rule": false,
+    "reservoir_forecast_beats_d1_rule": false
+  },
+  "reservoir": {
+    "systems": [
+      {
+        "name": "Amistad-Falcon",
+        "counties": 4,
+        "first_date": "2000-01-01",
+        "last_date": "2026-10-13"
+      },
+      {
+        "name": "Elephant Butte",
+        "counties": 4,
+        "first_date": "2000-01-01",
+        "last_date": "2026-10-13"
+      }
+    ],
+    "counties_without_reservoir": 4,
+    "note": "DEMO DATA - counties were matched to reservoirs at random."
+  },
+  "losses": {
+    "source": "DEMO DATA, not the real USDA files",
+    "years": [
+      2000,
+      2025
+    ],
+    "causes_included": [
+      "Drought"
+    ],
+    "total_usd": 1000000,
+    "by_year": [
+      {
+        "year": 2000,
+        "usd": 50000
+      },
+      {
+        "year": 2005,
+        "usd": 300000
+      },
+      {
+        "year": 2010,
+        "usd": 550000
+      },
+      {
+        "year": 2015,
+        "usd": 800000
+      },
+      {
+        "year": 2020,
+        "usd": 1050000
+      },
+      {
+        "year": 2025,
+        "usd": 1300000
+      }
+    ],
+    "by_county": [
+      {
+        "fips": "48215",
+        "county": "Demo County",
+        "state": "Texas",
+        "usd": 400000
+      }
+    ],
+    "note": "DEMO DATA. Insured losses only. Not all drought losses."
   }
 }

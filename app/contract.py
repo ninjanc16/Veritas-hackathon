@@ -68,6 +68,23 @@ MAP_COLUMNS = ["risk_level", "weeks_low", "weeks_high", "typical_drought_weeks",
 MAP_FIELDS_KEYS = ["feed_cost_per_head_month", "feed_cost_source", "tested"]
 
 # ---------------------------------------------------------------------------
+# Optional pieces added by the "Canal action" pivot. Every one may be missing: the app
+# then still opens and says "not available yet". When one IS there, we check its type.
+# (name, kind) pairs, same kinds as above.
+# ---------------------------------------------------------------------------
+OPTIONAL_OUTLOOK_COLUMNS = [("p_season_res", "float")]
+OPTIONAL_LATEST_COLUMNS = [("p_season_res", "float"), ("d2_share_history", "float"),
+                           ("res_name", "str"), ("res_pct_full", "float")]
+RESERVOIR_NAMES = ["Amistad-Falcon", "Elephant Butte", "none"]   # allowed values of res_name
+# Optional keys of metrics.json and the sub-keys each must have when present.
+OPTIONAL_METRICS_KEYS = {
+    "trigger": ["issue_months", "threshold", "rows", "drought_seasons", "rules", "value_sweep",
+                "forecast_beats_d1_rule", "reservoir_forecast_beats_d1_rule"],
+    "reservoir": ["systems", "counties_without_reservoir", "note"],
+    "losses": ["source", "years", "causes_included", "total_usd", "by_year", "by_county", "note"],
+}
+
+# ---------------------------------------------------------------------------
 # metrics.json: every key the contract requires. A dotted name like
 # "season.focus" means "the key 'focus' inside the key 'season'".
 # ---------------------------------------------------------------------------
@@ -201,6 +218,8 @@ def validate_outlook(df):
     problems += _check_range(df, "y_weeks", 0, 52, name)
     for col in ("p_season", "p_season_usual"):
         problems += _check_range(df, col, 0, 1, name)
+    problems += _check_optional_columns(df, OPTIONAL_OUTLOOK_COLUMNS, name)
+    problems += _check_range(df, "p_season_res", 0, 1, name)
     return problems
 
 
@@ -231,6 +250,35 @@ def _check_map_columns(df, name):
     return problems
 
 
+def _check_optional_columns(df, spec, name):
+    """Optional columns: fine when absent; when present they need the right type and no gaps."""
+    problems = []
+    for col, kind in spec:
+        if col not in df.columns:
+            continue
+        if not _type_ok(df[col], kind):
+            problems.append(f"{name}: optional column '{col}' should be {kind}, got {df[col].dtype}")
+        if df[col].isna().any():
+            problems.append(f"{name}: optional column '{col}' has missing values")
+    return problems
+
+
+def _check_pivot_latest(df, name):
+    """Checks for the optional canal-pivot columns of latest.parquet."""
+    problems = _check_optional_columns(df, OPTIONAL_LATEST_COLUMNS, name)
+    for col in ("p_season_res", "d2_share_history"):
+        problems += _check_range(df, col, 0, 1, name)
+    problems += _check_in(df, "res_name", RESERVOIR_NAMES, name)
+    if "res_pct_full" in df.columns and "res_name" in df.columns:
+        # -1 means "no reservoir"; otherwise a percent from 0 to 100.
+        none = df["res_name"] == "none"
+        if not (df.loc[none, "res_pct_full"] == -1).all():
+            problems.append(f"{name}: 'res_pct_full' must be -1 when 'res_name' is 'none'")
+        if not df.loc[~none, "res_pct_full"].between(0, 100).all():
+            problems.append(f"{name}: 'res_pct_full' must be 0 to 100 for a real reservoir")
+    return problems
+
+
 def validate_latest(df):
     name = "latest"
     problems = _check_frame(df, LATEST_COLUMNS, name)
@@ -245,6 +293,7 @@ def validate_latest(df):
     for col in ("p_model", "p_season"):
         problems += _check_range(df, col, 0, 1, name)
     problems += _check_map_columns(df, name)
+    problems += _check_pivot_latest(df, name)
     return problems
 
 
@@ -270,6 +319,14 @@ def validate_metrics(d, n_rows=None):
         for child in children:
             if child not in block:
                 problems.append(f"metrics: missing key '{parent}.{child}'")
+    # Optional blocks (trigger / reservoir / losses): absent is fine, present must be complete.
+    for parent, children in OPTIONAL_METRICS_KEYS.items():
+        if parent not in d:
+            continue
+        if not isinstance(d[parent], dict):
+            problems.append(f"metrics: '{parent}' should be an object")
+            continue
+        problems += [f"metrics: missing key '{parent}.{c}'" for c in children if c not in d[parent]]
     if d.get("contract_version") != CONTRACT_VERSION:
         problems.append(f"metrics: contract_version must be {CONTRACT_VERSION}")
     if n_rows is not None and d.get("n_rows") != n_rows:
@@ -347,3 +404,17 @@ def load():
         # Validated as-is first; only then convert the date columns for the app's use.
         return (*_datetime_dates(*real[:3]), real[3], "real", [])
     return (*load_demo(), "demo", problems)  # broken real files: show demo + the problem list
+
+
+# ---------------------------------------------------------------------------
+# Fixed reference files for the "Canal action" tab (published figures, not handoff data)
+# ---------------------------------------------------------------------------
+REFERENCE_DIR = REPO_ROOT / "app" / "reference"
+
+
+def load_reference():
+    """Returns (districts DataFrame, costs dict) from app/reference/. Read only."""
+    districts = pd.read_csv(REFERENCE_DIR / "districts.csv")
+    with open(REFERENCE_DIR / "costs.json", encoding="utf-8") as f:
+        costs = json.load(f)
+    return districts, costs

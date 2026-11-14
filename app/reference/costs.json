@@ -1,0 +1,17 @@
+{
+  "sealant_usd_per_sqft": 0.004,
+  "sealant_months_effective": 3,
+  "sealant_cut_low": 0.28,
+  "sealant_cut_high": 0.87,
+  "lining_usd_per_sqft_low": 5,
+  "lining_usd_per_sqft_high": 10,
+  "pipe_usd_per_mile_low": 250000,
+  "pipe_usd_per_mile_high": 1000000,
+  "fallow_usd_per_acre_low": 425,
+  "fallow_usd_per_acre_high": 700,
+  "fallow_af_per_acre": 3,
+  "seepage_gal_sqft_day": {"Clay": 1.5, "Silty clay loam": 2.24, "Clay loam": 2.99,
+    "Silt loam": 4.49, "Loam": 7.48, "Fine sandy loam": 9.35, "Sandy loam": 11.22},
+  "gallons_per_af": 325851,
+  "valley_program": {"usd": 164000000, "af_per_year": 44000, "districts": 12}
+}

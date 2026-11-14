@@ -212,8 +212,11 @@ def build_outlook(full):
     o["weeks_usual"] = by_county["y_weeks"].transform(lambda s: s.shift().expanding().mean()).fillna(22.0)
     o["weeks_model"] = np.clip(0.6 * o["y_weeks"] + 0.4 * o["weeks_usual"] + rng.normal(0, 6, len(o)), 0, 52)
 
+    # Canal pivot (optional column, fake): the same score nudged a little, as if the forest also saw reservoirs.
+    o["p_season_res"] = np.clip(o["p_season"] + rng.normal(0, 0.03, len(o)), 0, 1)
+
     o = o.sort_values(["date", "fips"], kind="stable").reset_index(drop=True)
-    return o[[c for c, _ in OUTLOOK_COLUMNS]]
+    return o[[c for c, _ in OUTLOOK_COLUMNS] + ["p_season_res"]]
 
 
 def build_latest(full, outlook):
@@ -238,7 +241,18 @@ def build_latest(full, outlook):
     last["longest_drought_weeks"] = [float(max(spells[f])) if spells[f] else 0.0 for f in last["fips"]]
     last["damage_months"] = last["weeks_model"] / 4.345
     last["damage_usd_per_100_head"] = last["damage_months"] * FAKE_FEED_COST * 100
-    columns = [c for c, _ in LATEST_COLUMNS] + MAP_COLUMNS
+
+    # --- the optional canal-pivot columns (fake) ---
+    last["p_season_res"] = np.clip(last["p_season"] + rng.normal(0, 0.03, len(last)), 0, 1)
+    last["d2_share_history"] = np.clip(0.08 * last["cls"] + 0.10 + rng.normal(0, 0.03, len(last)), 0, 1)
+    # Fake reservoirs: the first 4 Rio Grande counties get Elephant Butte, the next 4 Amistad-Falcon.
+    rio = last.index[last["river"] == "Rio Grande"].to_list()
+    last["res_name"] = "none"
+    last.loc[rio[:4], "res_name"] = "Elephant Butte"
+    last.loc[rio[4:8], "res_name"] = "Amistad-Falcon"
+    last["res_pct_full"] = np.where(last["res_name"] == "none", -1.0, 35.0)   # -1 = no reservoir
+    columns = ([c for c, _ in LATEST_COLUMNS] + MAP_COLUMNS
+               + ["p_season_res", "d2_share_history", "res_name", "res_pct_full"])
     return last[columns]
 
 
@@ -390,6 +404,27 @@ def build_metrics(pred, outlook, latest):
             feed_cost_per_head_month=FAKE_FEED_COST,
             feed_cost_source="DEMO placeholder, not a real source",
             tested="DEMO DATA - these are not real estimates."),
+        # Canal pivot blocks: all fixed fake numbers, labeled DEMO.
+        trigger=dict(
+            issue_months=[1, 2, 3], threshold=0.25, rows=120, drought_seasons=30,
+            rules=[dict(name=n, fires=f, caught=c, missed=30 - c, false_alarms=f - c,
+                        recall=c / 30, precision=c / f)
+                   for n, f, c in [("Our forecast", 40, 24), ("Our forecast with reservoirs", 38, 24),
+                                   ("D1 or worse now", 50, 25), ("D2 or worse now", 30, 18),
+                                   ("Seal every year", 120, 30)]],
+            value_sweep=[dict(cost_ratio=r, forecast=0.10 - r, forecast_reservoir=0.11 - r, d1_rule=0.09 - r,
+                              persistence=0.08 - r, seal_every_year=0.25 - 2 * r) for r in (0.02, 0.05, 0.10, 0.20)],
+            forecast_beats_d1_rule=False, reservoir_forecast_beats_d1_rule=False),
+        reservoir=dict(
+            systems=[dict(name="Amistad-Falcon", counties=4, first_date="2000-01-01", last_date="2026-10-13"),
+                     dict(name="Elephant Butte", counties=4, first_date="2000-01-01", last_date="2026-10-13")],
+            counties_without_reservoir=4,
+            note="DEMO DATA - counties were matched to reservoirs at random."),
+        losses=dict(
+            source="DEMO DATA, not the real USDA files", years=[2000, 2025], causes_included=["Drought"],
+            total_usd=1_000_000, by_year=[dict(year=y, usd=50_000 * (y - 1999)) for y in range(2000, 2026, 5)],
+            by_county=[dict(fips="48215", county="Demo County", state="Texas", usd=400_000)],
+            note="DEMO DATA. Insured losses only. Not all drought losses."),
     )
 
 

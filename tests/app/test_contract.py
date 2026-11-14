@@ -6,7 +6,8 @@ import copy
 
 import pytest
 
-from app.contract import (REAL_DIR, REAL_METRICS, load, load_demo, validate_all,
+from app.contract import (OPTIONAL_LATEST_COLUMNS, OPTIONAL_METRICS_KEYS, REAL_DIR, REAL_METRICS,
+                          load, load_demo, load_reference, validate_all,
                           validate_latest, validate_metrics, validate_outlook,
                           validate_predictions)
 
@@ -128,3 +129,27 @@ def test_files_without_map_columns_still_pass(demo):
     from app.contract import MAP_COLUMNS
     pred, outlook, latest, metrics = demo
     assert validate_all(pred, outlook, latest.drop(columns=MAP_COLUMNS), metrics) == []
+
+
+# --- optional canal-pivot columns and keys -------------------------------------------------
+def test_pivot_pieces_are_optional(demo):
+    """Files without the new columns/keys still validate (the app just says 'not available yet')."""
+    pred, outlook, latest, metrics = demo
+    latest = latest.drop(columns=[c for c, _ in OPTIONAL_LATEST_COLUMNS])
+    outlook = outlook.drop(columns=["p_season_res"])
+    metrics = {k: v for k, v in metrics.items() if k not in OPTIONAL_METRICS_KEYS}
+    assert validate_all(pred, outlook, latest, metrics) == []
+
+
+def test_pivot_pieces_are_checked_when_present(demo):
+    pred, outlook, latest, metrics = demo
+    assert any("p_season_res" in p for p in validate_latest(latest.assign(p_season_res=5.0)))
+    assert any("res_name" in p for p in validate_latest(latest.assign(res_name="Nowhere")))
+    assert any("res_pct_full" in p for p in validate_latest(latest.assign(res_name="none", res_pct_full=40.0)))
+    broken = {**metrics, "losses": {"source": "x"}}
+    assert any("losses.total_usd" in p for p in validate_metrics(broken))
+
+
+def test_load_reference():
+    districts, costs = load_reference()
+    assert len(districts) == 19 and costs["gallons_per_af"] == 325851
