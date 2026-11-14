@@ -1,0 +1,80 @@
+##### python notebooks/transfer_test.py data/raw  (run 2026-11-14 06:56)
+counties with full history: 3203 | river counties: 436
+{'Mississippi': 164, 'Ohio': 125, 'Missouri': 103, 'Rio Grande': 31, 'Colorado': 13}
+done h 4
+done h 13
+done h 26
+done h 52
+
+A) one forest on all rivers, per-river test (saving vs best simple rule; + = forest cheaper)
+ h       river  pos_rate  forest best_rule  best_cost  saving_pct
+ 4  Rio Grande     0.574    1733   D1+ now       2323        25.4
+ 4    Colorado     0.532     537   D2+ now        664        19.1
+ 4    Missouri     0.262    5258   D2+ now       6097        13.8
+ 4 Mississippi     0.163    8035   D2+ now      10316        22.1
+ 4        Ohio     0.055    4427   D2+ now       4461         0.8
+13  Rio Grande     0.692    5241   D1+ now       4070       -28.8
+13    Colorado     0.609    1772   D1+ now       1689        -4.9
+13    Missouri     0.356   15534   D1+ now      13938       -11.5
+13 Mississippi     0.256   24858   D1+ now      25718         3.3
+13        Ohio     0.117   12936   D1+ now      13244         2.3
+26  Rio Grande     0.810    7490   D1+ now       6425       -16.6
+26    Colorado     0.704    3112   D1+ now       2752       -13.1
+26    Missouri     0.471   26101   D1+ now      22682       -15.1
+26 Mississippi     0.373   44966   D1+ now      42312        -6.3
+26        Ohio     0.207   24855   D1+ now      24706        -0.6
+52  Rio Grande     0.935    2159   D1+ now       8803        75.5
+52    Colorado     0.823    1235   D1+ now       3672        66.4
+52    Missouri     0.655   20077   D1+ now      34887        42.5
+52 Mississippi     0.541   35091   D1+ now      64127        45.3
+52        Ohio     0.347   32377   D1+ now      38540        16.0
+
+B) trained on Rio Grande only (no lat/lon) -> tested on each river
+ h      target best_rule  rule_cost  RGonly_cost  RGonly_save  own_cost  own_save  allriv_cost  allriv_save
+ 4  Rio Grande   D1+ now       2323         1921         17.3      1921      17.3         1770         23.8
+ 4    Colorado   D2+ now        664          577         13.1       529      20.3          523         21.2
+ 4    Missouri   D2+ now       6097         5445         10.7      5799       4.9         5012         17.8
+ 4 Mississippi   D2+ now      10316         9175         11.1      8313      19.4         7988         22.6
+ 4        Ohio   D2+ now       4461         4562         -2.3      4565      -2.3         4636         -3.9
+26  Rio Grande   D1+ now       6425         6268          2.4      6268       2.4         7068        -10.0
+26    Colorado   D1+ now       2752         2715          1.3      2489       9.6         2817         -2.4
+26    Missouri   D1+ now      22682        24162         -6.5     26059     -14.9        24664         -8.7
+26 Mississippi   D1+ now      42312        43650         -3.2     43808      -3.5        42865         -1.3
+26        Ohio   D1+ now      24706        26425         -7.0     25197      -2.0        24088          2.5
+##### exit code: 0
+
+##### python notebooks/seasonal_test.py data/raw  (run 2026-11-14 06:57)
+counties with full history: 3203 | river counties: 436
+{'Mississippi': 164, 'Ohio': 125, 'Missouri': 103, 'Rio Grande': 31, 'Colorado': 13}
+finished lfp 26
+finished d3 26
+finished anom 26
+finished lfp 52
+finished d3 52
+finished anom 52
+DONE
+##### exit code: 0
+
+##### python notebooks/year_weeks_test.py data/raw  (run 2026-11-14 07:06)
+counties with full history: 3203 | river counties: 436
+{'Mississippi': 164, 'Ohio': 125, 'Missouri': 103, 'Rio Grande': 31, 'Colorado': 13}
+
+H 26
+              rows mean_weeks    S1    S2 RG-only S1 persist_trailing persist_state  clim yrs_S1_beats_trailing yrs_S1_beats_clim yrs_RG_beats_trailing
+Colorado      2808        9.7  5.38  5.52       5.55             6.33           4.4  9.51                 12/18             18/18                 11/18
+Mississippi  35424        2.4  2.76  2.81       4.46             3.29           2.9  3.62                  8/18             17/18                  4/18
+Missouri     22248        3.9  3.37  3.42       4.68             3.97          3.09  5.56                 11/18             18/18                  8/18
+Ohio         27000        0.8  1.38  1.44       3.29             1.43          1.17  1.48                  7/18             11/18                  0/18
+Rio Grande    6696       10.9  5.76  5.88       5.82             6.74          5.08  9.95                 14/18             18/18                 12/18
+ALL          94176        3.1   2.8  2.86       4.31             3.26          2.65  4.09                 11/18             18/18                  4/18
+
+H 52
+              rows mean_weeks     S1     S2 RG-only S1 persist_trailing persist_state   clim yrs_S1_beats_trailing yrs_S1_beats_clim yrs_RG_beats_trailing
+Colorado      2795       19.8  12.78  13.15      13.56            17.06         13.21   16.8                 14/18             15/18                 14/18
+Mississippi  35260        5.0   5.78   5.73      12.29             6.56          7.16   6.49                 10/18             15/18                  2/18
+Missouri     22145        7.8   7.94   7.75      12.84             9.35          8.63   9.99                 10/18             15/18                  6/18
+Ohio         26875        1.6   2.87   3.11      11.77             2.86          2.65   2.63                  8/18              6/18                  0/18
+Rio Grande    6665       22.1   13.5  13.78      14.01            15.18         14.52  17.39                 12/18             14/18                 11/18
+ALL          93740        6.4   6.21   6.25      12.43             7.08          6.92   7.29                 10/18             17/18                  1/18
+##### exit code: 0
+
