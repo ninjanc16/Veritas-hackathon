@@ -1,0 +1,49 @@
+<!doctype html>
+<!--
+  index.html - puts the hosted Streamlit app inside a page on our own domain.
+
+  Why: Streamlit Community Cloud gives the app an address like https://NAME.streamlit.app and
+  does not let us use our own domain. This one-file page is hosted for free (for example on
+  Vercel) under our domain, and simply fills the whole window with the app.
+
+  To set it up: replace APP_URL below with the real address after the app is deployed.
+  Links like  https://our-domain/?fips=48215&view=Canal%20action  work too: everything after
+  the "?" is passed on to the app, so the county and tab open just as they do in the app itself.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rio Grande Farm Drought Outlook</title>
+  <style>
+    /* The app fills the whole window, with no margins or page scrollbar of our own. */
+    html, body { margin: 0; height: 100%; background: #f3f1ea; }
+    [hidden] { display: none !important; }   /* make the hidden flag win over the rules below */
+    iframe { display: block; border: 0; width: 100%; height: 100%; }
+    /* Shown only if the app link has not been filled in yet. */
+    #missing { font: 16px/1.5 Georgia, serif; padding: 2rem; color: #1f3a2d; }
+  </style>
+</head>
+<body>
+  <iframe id="app" title="Rio Grande Farm Drought Outlook" allow="clipboard-write"></iframe>
+  <p id="missing" hidden>The app link is not set yet. Edit <code>APP_URL</code> in this file.</p>
+
+  <script>
+    // 1) The address of the hosted app (no "?" part). CHANGE THIS after deploying.
+    var APP_URL = "https://REPLACE-ME.streamlit.app";
+
+    // 2) Keep whatever came after "?" in our address (county, river, tab) and add embed=true,
+    //    which tells Streamlit to hide its own page chrome because it is shown inside a page.
+    var params = new URLSearchParams(window.location.search);
+    params.set("embed", "true");
+
+    if (APP_URL.indexOf("REPLACE-ME") !== -1) {
+      document.getElementById("app").hidden = true;
+      document.getElementById("missing").hidden = false;
+    } else {
+      // URLSearchParams writes spaces as "+"; use %20 so the link matches the ones the app itself makes.
+      document.getElementById("app").src = APP_URL + "/?" + params.toString().replace(/\+/g, "%20");
+    }
+  </script>
+</body>
+</html>
