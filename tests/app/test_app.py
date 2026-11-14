@@ -4,6 +4,7 @@ on the fake data - for the focus river AND for a transfer river.
 """
 from pathlib import Path
 
+import streamlit as st
 from streamlit.testing.v1 import AppTest
 
 from app.contract import LATEST_COLUMNS, METRICS_KEYS, OUTLOOK_COLUMNS, PRED_COLUMNS, load
@@ -89,3 +90,51 @@ def test_changing_river_picks_a_valid_county():
     assert not at.exception
     colorado = set(latest[latest["river"] == "Colorado"]["fips"])
     assert at.sidebar.selectbox[1].value in colorado
+
+
+# --- the "Canal action" tab ----------------------------------------------------------------
+def _all_text(at):
+    """Every piece of text the app drew (markdown, captions, info boxes), as one string."""
+    return " ".join(e.value for group in (at.markdown, at.caption, at.info) for e in group)
+
+
+def test_canal_tab_opens_for_a_valley_county():
+    """Hidalgo is one of the three Valley counties, so the district table shows."""
+    _, _, latest, *_ = load()
+    if "48215" not in set(latest["fips"]):
+        return                                           # demo data has no real counties
+    at = _run_with_link(fips="48215", view="Canal action")
+    assert not at.exception
+    text = _all_text(at)
+    assert "Which irrigation districts matter most" in text
+    assert "CCID#2 (San Benito)" in " ".join(str(d.value.to_string()) for d in at.dataframe)
+    assert "Estimate from published figures" in text
+    assert "Read this first" in text
+
+
+def test_canal_tab_works_without_and_with_the_new_columns(monkeypatch):
+    """Other counties show the 'no district table' note; the tab never crashes either way."""
+    import app.contract as contract
+    # With the pivot columns (the fake files have them).
+    monkeypatch.setattr(contract, "load", lambda: (*contract.load_demo(), "demo", []))
+    st.cache_data.clear()                # the app caches the loaded files; start fresh
+    at = _run_with_link(view="Canal action")
+    assert not at.exception
+    text = _all_text(at)
+    assert "No public district table for this county" in text
+    assert "score from the forest that also sees reservoir storage" in text   # new column was used
+    # Without them: strip the optional columns and keys.
+    def stripped():
+        pred, outlook, latest, metrics = contract.load_demo()
+        latest = latest.drop(columns=[c for c, _ in contract.OPTIONAL_LATEST_COLUMNS])
+        outlook = outlook.drop(columns=["p_season_res"])
+        metrics = {k: v for k, v in metrics.items() if k not in contract.OPTIONAL_METRICS_KEYS}
+        return pred, outlook, latest, metrics, "demo", []
+    monkeypatch.setattr(contract, "load", stripped)
+    st.cache_data.clear()
+    at = _run_with_link(view="Canal action")
+    assert not at.exception
+    text = _all_text(at)
+    assert "reservoir version is not available yet" in text
+    assert "not available yet" in text
+    st.cache_data.clear()                # don't leave the fake data cached for other tests

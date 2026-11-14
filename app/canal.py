@@ -94,3 +94,18 @@ def district_priority(districts, p):
     # Stable sort: ties (e.g. all the zeros) keep the file's order, so the result is repeatable.
     return out.sort_values(["priority_high", "priority_low"], ascending=False,
                            kind="stable").reset_index(drop=True)
+
+
+# The three Valley counties the Texas A&M district report covers. The report does not say which
+# district sits in which county, so the app shows the district list for all three together.
+VALLEY_FIPS = {"48061": "Cameron", "48215": "Hidalgo", "48489": "Willacy"}
+
+
+def valley_probability(latest):
+    """Highest 6-month probability among Cameron, Hidalgo and Willacy (None if they are absent).
+    Uses the reservoir-aware score when the pipeline provides it, else the plain one."""
+    rows = latest[latest["fips"].isin(VALLEY_FIPS)]
+    if rows.empty:
+        return None
+    col = "p_season_res" if "p_season_res" in rows.columns else "p_season"
+    return float(rows[col].max())

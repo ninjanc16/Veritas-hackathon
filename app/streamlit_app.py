@@ -1,5 +1,5 @@
 """
-streamlit_app.py - the demo app (six tabs).
+streamlit_app.py - the demo app (seven tabs).
 
 How it works, in plain English:
   * It gets ALL its data from app/contract.py -> load(). Nothing else. No internet.
@@ -24,8 +24,9 @@ import plotly.graph_objects as go        # noqa: E402
 import streamlit as st                   # noqa: E402
 
 from app import theme                    # noqa: E402
+from app import canal                    # noqa: E402
 from app.brief import CLASS_WORDS, build_brief, md_escape, streak_sentence   # noqa: E402
-from app.contract import has_map_fields, load   # noqa: E402
+from app.contract import has_map_fields, load, load_reference   # noqa: E402
 from app.mapdata import load_river_line   # noqa: E402
 from app.tallies import (errors_table, reconcile, river_grid, tally,   # noqa: E402
                          weeks_error)
@@ -58,6 +59,12 @@ def get_data():
 def get_river_line(river):
     """The river's line for the map (from the app's own small file)."""
     return load_river_line(river)
+
+
+@st.cache_data
+def get_reference():
+    """District table and cost figures for the Canal action tab (fixed files in app/reference/)."""
+    return load_reference()
 
 
 pred, outlook, latest, metrics, source, problems = get_data()
@@ -94,7 +101,7 @@ others = sorted(r for r in latest["river"].unique() if r != focus)
 # Links can open the app on one river, county and tab (?river=Ohio&fips=39900&view=Replay).
 # We read the address ONCE per visit, validate it, and use it as the starting choice.
 TAB_NAMES = ["This week", "Replay", "Outlook check", "Farm brief",
-             "Other rivers and misses", "How good is it"]
+             "Other rivers and misses", "How good is it", "Canal action"]
 if "url_read" not in st.session_state:
     st.session_state["url_read"] = True
     q = st.query_params
@@ -533,6 +540,118 @@ def tab_other_rivers():
     show_failures()
 
 
+def tab_canal():
+    """
+    The "Canal action" tab. The forecast above is the AI part. Everything on THIS tab is plain
+    arithmetic on published figures (see app/canal.py), so every output carries the estimate label.
+    """
+    st.subheader(f"Canal action - {md_escape(county_label)}")
+    theme.callout("Our AI forecasts drought. This tab turns that forecast into a canal plan "
+                  "using published figures. Estimates, not results.")
+    districts, costs = get_reference()
+    row = latest[latest["fips"] == fips].iloc[0]
+
+    # 1) Forecast card. Use the reservoir-aware score when the pipeline provides it.
+    has_res = "p_season_res" in latest.columns
+    p = float(row["p_season_res"] if has_res else row["p_season"])
+    source_note = ("score from the forest that also sees reservoir storage" if has_res
+                   else "score without reservoir data (the reservoir version is not available yet)")
+    cards = [dict(label="Next 6 months", value=f"{round(p * 100)}%", accent=theme.CHART_COLORS[0],
+                  caption="chance of 8 straight weeks of severe drought", rows=[source_note])]
+    if "res_name" in latest.columns and row["res_name"] != "none":
+        cards.append(dict(label="Reservoir", value=f"{round(row['res_pct_full'])}% full",
+                          accent=theme.CHART_COLORS[0], caption=str(row["res_name"]),
+                          rows=["Storage on the latest date"]))
+    if "d2_share_history" in latest.columns:
+        cards.append(dict(label="History since 2000", value=f"{round(row['d2_share_history'] * 100)}%",
+                          accent=TIER_COLOR["Watch"], caption="of weeks in severe drought (D2 or worse)"))
+    theme.card_grid(cards)
+
+    # 2) The action tier and one sentence on why.
+    tier, why = canal.action_tier(p)
+    theme.callout(f"{tier}. {why}")
+    st.caption("The tier is a proposal built from the forecast, not a tested result.")
+
+    # 3) District ranking - only for the three Valley counties.
+    st.markdown("#### Which irrigation districts matter most")
+    valley_p = canal.valley_probability(latest)
+    if fips in canal.VALLEY_FIPS and valley_p is not None:
+        ranked = canal.district_priority(districts, valley_p)
+        table = ranked.rename(columns={
+            "district": "District", "efficiency_pct": "Efficiency %",
+            "save80_low": "Recoverable at 80%, low (acre-ft)", "save80_high": "Recoverable at 80%, high (acre-ft)",
+            "priority_low": "Priority, low", "priority_high": "Priority, high"})
+        st.dataframe(table.round(0), hide_index=True, width="stretch")
+        st.caption(f"Priority = the highest 6-month probability among Cameron, Hidalgo and Willacy "
+                   f"({round(valley_p * 100)}%) times the water a district could recover by reaching 80% "
+                   "efficiency. The source report puts these districts in Cameron, Hidalgo and Willacy "
+                   "counties together but does not say which district is in which county, so the list is "
+                   "shown for all three. The figures are from 1998 (Texas A&M, Fipps), 28 years old.")
+        st.caption(canal.ESTIMATE_LABEL)
+    else:
+        st.info("No public district table for this county. Use the calculator below.")
+
+    # 4) Calculator.
+    st.markdown("#### Canal calculator")
+    c1, c2, c3, c4 = st.columns(4)
+    miles = c1.number_input("Miles of earthen canal", min_value=0.1, max_value=500.0, value=1.0, step=0.5)
+    width = c2.number_input("Wetted width (feet)", min_value=1.0, max_value=200.0, value=20.0, step=1.0)
+    soil = c3.selectbox("Soil type", list(costs["seepage_gal_sqft_day"]), index=len(costs["seepage_gal_sqft_day"]) - 1)
+    days = c4.number_input("Days of flow per year", min_value=1, max_value=365, value=300, step=10)
+
+    seep = canal.seepage_af_per_year(miles, width, costs["seepage_gal_sqft_day"][soil], days, costs["gallons_per_af"])
+    cost = canal.sealant_cost_per_season(miles, width, days, costs)
+    saved_low, saved_high = canal.water_saved_range(seep, costs)
+    cpa_low, cpa_high = canal.cost_per_af_range(cost, saved_low, saved_high)
+    apps = canal.applications_per_season(days, costs["sealant_months_effective"])
+    theme.card_grid([
+        dict(label="Seepage per year", value=f"{round(seep):,} acre-ft", accent=theme.CHART_COLORS[0],
+             caption="water that leaks out of the canal"),
+        dict(label="Sealant cost per season", value=f"${round(cost):,}", accent=TIER_COLOR["Watch"],
+             caption=f"materials only, {apps} coats"),
+        dict(label="Water saved", value=f"{round(saved_low):,} to {round(saved_high):,} acre-ft",
+             accent=TIER_COLOR["Low"], caption="if it works as in trials elsewhere (28% to 87%)"),
+        dict(label="Cost per acre-foot", value=f"${round(cpa_low):,} to ${round(cpa_high):,}",
+             accent=TIER_COLOR["Warning"], caption="sealant, materials only"),
+    ])
+    st.caption(canal.ESTIMATE_LABEL)
+
+    # 5) Compare the three options per acre-foot, on a log axis (they differ by orders of magnitude).
+    fallow_low, fallow_high = (v / costs["fallow_af_per_acre"] for v in
+                               (costs["fallow_usd_per_acre_low"], costs["fallow_usd_per_acre_high"]))
+    lin_low, lin_high = canal.lining_cost_per_af_range(miles, width, seep, costs)
+    options = [("Sealant", cpa_low, cpa_high), ("Fallowing", fallow_low, fallow_high),
+               ("Concrete lining", lin_low, lin_high)]
+    fig = go.Figure()
+    for name, lo, hi in options:
+        fig.add_trace(go.Scatter(x=[lo, hi], y=[name, name], mode="lines+markers", name=name,
+                                 line=dict(width=8), marker=dict(size=12),
+                                 hovertemplate=f"{name}: $%{{x:,.0f}} per acre-foot<extra></extra>"))
+    fig.update_xaxes(type="log", title="Cost per acre-foot (US dollars, log scale)")
+    fig.update_layout(showlegend=False)
+    st.plotly_chart(theme.style_fig(fig, height=260), width="stretch")
+    st.caption("Each bar runs from the low to the high estimate. Lining assumes it stops all seepage and "
+               "lasts 50 years. Fallowing = paying for 3 acre-feet per acre left dry at $425 to $700 an acre. "
+               + canal.ESTIMATE_LABEL)
+
+    # 6) The fixed "Read this first" box (the five lines the plan requires).
+    trig = metrics.get("trigger")
+    if isinstance(trig, dict) and "forecast_beats_d1_rule" in trig:
+        d1 = ("On the pre-season test our forecast did better than the simple 'D1 or worse now' rule."
+              if trig["forecast_beats_d1_rule"] else
+              "On the pre-season test our forecast did about as well as the simple 'D1 or worse now' rule.")
+    else:
+        d1 = "How the forecast compared with the simple 'D1 or worse now' rule: not available yet."
+    st.markdown("#### Read this first")
+    st.markdown("\n".join(f"{i}. {line}" for i, line in enumerate([
+        "The forecast is tested. The canal plan is a proposal built from published figures.",
+        d1,
+        "The sealant has not been field-tested on the Rio Grande. Results elsewhere ranged from no effect to a full stop of seepage.",
+        "District figures are from 1998. Some canals have been lined since.",
+        "Valley canals also carry city water. Any sealant would need the district's and regulators' approval.",
+    ], start=1)))
+
+
 # ---------------------------------------------------------------------------
 # Put the tabs on the page
 # ---------------------------------------------------------------------------
@@ -549,6 +668,8 @@ with tabs[4]:
     tab_other_rivers()
 with tabs[5]:
     tab_how_good()
+with tabs[6]:
+    tab_canal()
 
 theme.footer("Drought data: U.S. Drought Monitor (NDMC, USDA, NOAA), county archive by the Montana "
              "Climate Office. ENSO index: NOAA Climate Prediction Center. River lines: Natural Earth. "
