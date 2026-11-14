@@ -48,3 +48,38 @@ def test_replay_buttons_work():
 def test_data_checks_are_green_on_demo_data():
     at = _run_app()
     assert any("App counts match metrics.json" in s.value for s in at.sidebar.success)
+
+
+def _run_with_link(**params):
+    """Open the app as if someone clicked a link with these web-address parameters."""
+    at = AppTest.from_file(str(APP_FILE), default_timeout=60)
+    for key, value in params.items():
+        at.query_params[key] = value
+    at.run()
+    return at
+
+
+def test_link_opens_the_right_river_county_and_tab():
+    _, _, latest, _, *_ = load()
+    ohio = latest[latest["river"] == "Ohio"].iloc[1]
+    at = _run_with_link(river="Ohio", fips=ohio["fips"], view="Replay")
+    assert not at.exception
+    assert at.sidebar.selectbox[0].value == "Ohio"
+    assert at.sidebar.selectbox[1].value == ohio["fips"]
+    assert at.session_state["view"] == "Replay"
+
+
+def test_bad_link_values_are_ignored():
+    at = _run_with_link(river="Nope", fips="00000", view="zzz")
+    assert not at.exception
+    assert at.sidebar.selectbox[0].value == "Rio Grande"
+
+
+def test_changing_river_picks_a_valid_county():
+    _, _, latest, _, *_ = load()
+    ohio = latest[latest["river"] == "Ohio"].iloc[0]
+    at = _run_with_link(river="Ohio", fips=ohio["fips"])
+    at.sidebar.selectbox[0].set_value("Colorado").run()
+    assert not at.exception
+    colorado = set(latest[latest["river"] == "Colorado"]["fips"])
+    assert at.sidebar.selectbox[1].value in colorado

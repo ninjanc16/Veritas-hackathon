@@ -1,0 +1,316 @@
+STATUS: DEMO DATA - DO NOT USE
+
+# Numbers for the video and write-up
+Copy numbers only from this file, and only when the first line says STATUS: FINAL.
+Every value below is copied from reports/metrics.json. Nothing is computed here.
+
+## Setup
+
+- `contract_version`: 2
+- `generated_at`: 2026-11-14T14:59:01+00:00
+- `is_final`: False
+- `focus_river`: Rio Grande
+- `training_scope`: Rio Grande counties only (DEMO)
+- `n_rows`: 16120
+- `n_focus_rows`: 4836
+- `n_counties`: 40
+- `n_focus_counties`: 12
+- `horizon_weeks`: 4
+- `train_years[0]`: 2000
+- `train_years[1]`: 2014
+- `val_years[0]`: 2015
+- `val_years[1]`: 2018
+- `test_years[0]`: 2019
+- `test_years[1]`: 2026
+- `latest_week`: 2026-10-13
+- `miss_cost`: 3
+
+## 4-week alert
+
+- `policies[0].name`: Our system
+- `policies[0].column`: alarm_system
+- `policies[0].cost`: 603
+- `policies[0].precision`: 0.864
+- `policies[0].recall`: 0.993
+- `policies[0].alarms`: 3935
+- `policies[0].caught`: 3401
+- `policies[0].missed`: 23
+- `policies[0].false_alarms`: 534
+- `policies[0].auc`: 0.8
+- `policies[1].name`: Persistence (D2 or worse now)
+- `policies[1].column`: alarm_persistence
+- `policies[1].cost`: 4119
+- `policies[1].precision`: 0.913
+- `policies[1].recall`: 0.619
+- `policies[1].alarms`: 2319
+- `policies[1].caught`: 2118
+- `policies[1].missed`: 1306
+- `policies[1].false_alarms`: 201
+- `policies[1].auc`: n/a
+- `policies[2].name`: D1 or worse now
+- `policies[2].column`: alarm_d1_now
+- `policies[2].cost`: 1649
+- `policies[2].precision`: 0.782
+- `policies[2].recall`: 0.926
+- `policies[2].alarms`: 4053
+- `policies[2].caught`: 3169
+- `policies[2].missed`: 255
+- `policies[2].false_alarms`: 884
+- `policies[2].auc`: n/a
+- `policies[3].name`: Worsening
+- `policies[3].column`: alarm_worsening
+- `policies[3].cost`: 3771
+- `policies[3].precision`: 0.862
+- `policies[3].recall`: 0.669
+- `policies[3].alarms`: 2655
+- `policies[3].caught`: 2289
+- `policies[3].missed`: 1135
+- `policies[3].false_alarms`: 366
+- `policies[3].auc`: n/a
+- `policies[4].name`: Typical for the time of year
+- `policies[4].column`: alarm_calendar
+- `policies[4].cost`: 1412
+- `policies[4].precision`: 0.708
+- `policies[4].recall`: 1.0
+- `policies[4].alarms`: 4836
+- `policies[4].caught`: 3424
+- `policies[4].missed`: 0
+- `policies[4].false_alarms`: 1412
+- `policies[4].auc`: n/a
+- `headline.system_cost`: 603
+- `headline.persistence_cost`: 4119
+- `headline.pct_cheaper_than_persistence`: 85.4
+- `headline.cheapest_baseline_on_test`: alarm_calendar
+- `headline.cheapest_baseline_cost`: 1412
+- `headline.honesty_check_pass`: True
+- `onset.rows`: 1000
+- `onset.positives`: 120
+- `onset.system_cost`: 300
+- `onset.best_rule`: D1 now
+- `onset.best_rule_cost`: 310
+- `onset.never_warn_cost`: 360
+- `onset.precision`: 0.4
+- `onset.recall`: 0.3
+- `onset.auc`: 0.7
+- `events.n`: 20
+- `events.warned_within_4_weeks`: 9
+- `events.median_lead_weeks`: 2.0
+- `cost_sensitivity[0].miss_cost`: 2
+- `cost_sensitivity[0].system_cost`: 603
+- `cost_sensitivity[0].best_baseline_cost`: 1412
+- `year_by_year[0].year`: 2019
+- `year_by_year[0].positives`: 449
+- `year_by_year[0].system_cost`: 98
+- `year_by_year[0].persistence_cost`: 858
+- `year_by_year[1].year`: 2020
+- `year_by_year[1].positives`: 442
+- `year_by_year[1].system_cost`: 79
+- `year_by_year[1].persistence_cost`: 569
+- `year_by_year[2].year`: 2021
+- `year_by_year[2].positives`: 324
+- `year_by_year[2].system_cost`: 108
+- `year_by_year[2].persistence_cost`: 407
+- `year_by_year[3].year`: 2022
+- `year_by_year[3].positives`: 599
+- `year_by_year[3].system_cost`: 17
+- `year_by_year[3].persistence_cost`: 486
+- `year_by_year[4].year`: 2023
+- `year_by_year[4].positives`: 418
+- `year_by_year[4].system_cost`: 93
+- `year_by_year[4].persistence_cost`: 537
+- `year_by_year[5].year`: 2024
+- `year_by_year[5].positives`: 401
+- `year_by_year[5].system_cost`: 103
+- `year_by_year[5].persistence_cost`: 417
+- `year_by_year[6].year`: 2025
+- `year_by_year[6].positives`: 462
+- `year_by_year[6].system_cost`: 47
+- `year_by_year[6].persistence_cost`: 471
+- `year_by_year[7].year`: 2026
+- `year_by_year[7].positives`: 329
+- `year_by_year[7].system_cost`: 58
+- `year_by_year[7].persistence_cost`: 374
+
+## 6-month outlook
+
+- `season.horizon_weeks`: 26
+- `season.target`: 8 or more consecutive weeks at D2 or worse inside the next 26 weeks
+- `season.test_years[0]`: 2008
+- `season.test_years[1]`: 2025
+- `season.threshold`: 0.25
+- `season.focus.rows`: 2568
+- `season.focus.base_rate`: 0.509
+- `season.focus.precision`: 0.691
+- `season.focus.recall`: 0.995
+- `season.focus.auc`: 0.8
+- `season.focus.system_cost`: 600
+- `season.focus.persistence_cost`: 2123
+- `season.focus.d1_rule_cost`: 1428
+- `season.focus.usual_cost`: 1240
+- `season.focus.always_warn_cost`: 1260
+- `season.focus.never_warn_cost`: 3924
+- `season.focus.pct_cheaper_than_persistence`: 71.7
+- `season.focus.beats_every_baseline`: True
+- `season.focus.years_better_than_usual`: 10/18
+
+## 12-month outlook
+
+- `year.horizon_weeks`: 52
+- `year.target`: number of weeks at D2 or worse in the next 52 weeks
+- `year.test_years[0]`: 2008
+- `year.test_years[1]`: 2025
+- `year.focus.rows`: 2568
+- `year.focus.mean_weeks`: 27.5
+- `year.focus.mae_system`: 5.5
+- `year.focus.mae_same_as_now`: 23.8
+- `year.focus.mae_last_year`: 10.8
+- `year.focus.mae_usual`: 6.7
+- `year.focus.beats_every_baseline`: True
+- `year.focus.years_better_than_last_year`: 9/18
+- `year.focus.years_better_than_usual`: 11/18
+
+## Other rivers
+
+- `per_river[0].river`: Colorado
+- `per_river[0].counties`: 7
+- `per_river[0].system_cost`: 272
+- `per_river[0].persistence_cost`: 2440
+- `per_river[0].best_rule`: D1 now
+- `per_river[0].best_rule_cost`: 769
+- `per_river[0].pct_cheaper_than_best_rule`: 64.6
+- `per_river[0].own_river_cost`: 258
+- `per_river[0].precision`: 0.901
+- `per_river[0].recall`: 0.994
+- `per_river[0].auc`: 0.78
+- `per_river[1].river`: Rio Grande
+- `per_river[1].counties`: 12
+- `per_river[1].system_cost`: 603
+- `per_river[1].persistence_cost`: 4119
+- `per_river[1].best_rule`: D1 now
+- `per_river[1].best_rule_cost`: 1649
+- `per_river[1].pct_cheaper_than_best_rule`: 63.4
+- `per_river[1].own_river_cost`: 603
+- `per_river[1].precision`: 0.864
+- `per_river[1].recall`: 0.993
+- `per_river[1].auc`: 0.78
+- `per_river[2].river`: Mississippi
+- `per_river[2].counties`: 7
+- `per_river[2].system_cost`: 431
+- `per_river[2].persistence_cost`: 1401
+- `per_river[2].best_rule`: D1 now
+- `per_river[2].best_rule_cost`: 1013
+- `per_river[2].pct_cheaper_than_best_rule`: 57.5
+- `per_river[2].own_river_cost`: 409
+- `per_river[2].precision`: 0.634
+- `per_river[2].recall`: 0.986
+- `per_river[2].auc`: 0.78
+- `per_river[3].river`: Ohio
+- `per_river[3].counties`: 7
+- `per_river[3].system_cost`: 187
+- `per_river[3].persistence_cost`: 175
+- `per_river[3].best_rule`: Persistence
+- `per_river[3].best_rule_cost`: 175
+- `per_river[3].pct_cheaper_than_best_rule`: -6.9
+- `per_river[3].own_river_cost`: 177
+- `per_river[3].precision`: 0.24
+- `per_river[3].recall`: 1.0
+- `per_river[3].auc`: 0.78
+- `per_river[4].river`: Missouri
+- `per_river[4].counties`: 7
+- `per_river[4].system_cost`: 402
+- `per_river[4].persistence_cost`: 1375
+- `per_river[4].best_rule`: D1 now
+- `per_river[4].best_rule_cost`: 982
+- `per_river[4].pct_cheaper_than_best_rule`: 59.1
+- `per_river[4].own_river_cost`: 381
+- `per_river[4].precision`: 0.649
+- `per_river[4].recall`: 0.978
+- `per_river[4].auc`: 0.78
+- `season.per_river[0].river`: Colorado
+- `season.per_river[0].system_cost`: 406
+- `season.per_river[0].persistence_cost`: 1114
+- `season.per_river[0].best_rule`: D1 now
+- `season.per_river[0].best_rule_cost`: 966
+- `season.per_river[0].pct_cheaper_than_best_rule`: 58.0
+- `season.per_river[0].own_river_cost`: 385
+- `season.per_river[1].river`: Rio Grande
+- `season.per_river[1].system_cost`: 600
+- `season.per_river[1].persistence_cost`: 2123
+- `season.per_river[1].best_rule`: D1 now
+- `season.per_river[1].best_rule_cost`: 1428
+- `season.per_river[1].pct_cheaper_than_best_rule`: 58.0
+- `season.per_river[1].own_river_cost`: 600
+- `season.per_river[2].river`: Mississippi
+- `season.per_river[2].system_cost`: 211
+- `season.per_river[2].persistence_cost`: 169
+- `season.per_river[2].best_rule`: Persistence
+- `season.per_river[2].best_rule_cost`: 169
+- `season.per_river[2].pct_cheaper_than_best_rule`: -24.9
+- `season.per_river[2].own_river_cost`: 200
+- `season.per_river[3].river`: Ohio
+- `season.per_river[3].system_cost`: 69
+- `season.per_river[3].persistence_cost`: 10
+- `season.per_river[3].best_rule`: Persistence
+- `season.per_river[3].best_rule_cost`: 10
+- `season.per_river[3].pct_cheaper_than_best_rule`: -590.0
+- `season.per_river[3].own_river_cost`: 65
+- `season.per_river[4].river`: Missouri
+- `season.per_river[4].system_cost`: 228
+- `season.per_river[4].persistence_cost`: 191
+- `season.per_river[4].best_rule`: Persistence
+- `season.per_river[4].best_rule_cost`: 191
+- `season.per_river[4].pct_cheaper_than_best_rule`: -19.4
+- `season.per_river[4].own_river_cost`: 216
+- `year.per_river[0].river`: Colorado
+- `year.per_river[0].mae_system`: 5.3
+- `year.per_river[0].best_baseline`: Usual
+- `year.per_river[0].mae_best_baseline`: 6.5
+- `year.per_river[0].mae_own_river`: 5.0
+- `year.per_river[1].river`: Rio Grande
+- `year.per_river[1].mae_system`: 5.5
+- `year.per_river[1].best_baseline`: Usual
+- `year.per_river[1].mae_best_baseline`: 6.7
+- `year.per_river[1].mae_own_river`: 5.5
+- `year.per_river[2].river`: Mississippi
+- `year.per_river[2].mae_system`: 3.6
+- `year.per_river[2].best_baseline`: Usual
+- `year.per_river[2].mae_best_baseline`: 2.8
+- `year.per_river[2].mae_own_river`: 3.4
+- `year.per_river[3].river`: Ohio
+- `year.per_river[3].mae_system`: 2.6
+- `year.per_river[3].best_baseline`: Same as last year
+- `year.per_river[3].mae_best_baseline`: 0.5
+- `year.per_river[3].mae_own_river`: 2.5
+- `year.per_river[4].river`: Missouri
+- `year.per_river[4].mae_system`: 4.0
+- `year.per_river[4].best_baseline`: Usual
+- `year.per_river[4].mae_best_baseline`: 3.5
+- `year.per_river[4].mae_own_river`: 3.8
+
+## Failure examples
+
+- `failure_examples[0].product`: 4-week alert
+- `failure_examples[0].date`: 2019-01-15
+- `failure_examples[0].county`: Demo County RI3
+- `failure_examples[0].state`: Texas
+- `failure_examples[0].what_happened`: DEMO: the system stayed quiet but severe drought arrived within 4 weeks.
+- `failure_examples[1].product`: 4-week alert
+- `failure_examples[1].date`: 2019-02-05
+- `failure_examples[1].county`: Demo County RI3
+- `failure_examples[1].state`: Texas
+- `failure_examples[1].what_happened`: DEMO: the system warned but severe drought did not arrive within 4 weeks.
+
+## Ablations and checks
+
+- `ablations[0].name`: DEMO: without the Pacific El Nino index
+- `ablations[0].product`: 6-month outlook
+- `ablations[0].result`: DEMO: no change in cost.
+- `shuffled_auc_mean`: 0.5
+- `feature_importance[0].feature`: nb_mean
+- `feature_importance[0].importance`: 0.4
+- `feature_importance[1].feature`: cls
+- `feature_importance[1].importance`: 0.3
+
+## Limits
+
+- `limits[0]`: DEMO DATA - these are not real results

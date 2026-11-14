@@ -71,15 +71,34 @@ st.title("Rio Grande Farm Drought Outlook")
 # ---------------------------------------------------------------------------
 focus = metrics["focus_river"]
 others = sorted(r for r in latest["river"].unique() if r != focus)
+# Links can open the app on one river, county and tab (?river=Ohio&fips=39900&view=Replay).
+# We read the address ONCE per visit, validate it, and use it as the starting choice.
+TAB_NAMES = ["This week", "Replay", "Outlook check", "Farm brief",
+             "Other rivers and misses", "How good is it"]
+if "url_read" not in st.session_state:
+    st.session_state["url_read"] = True
+    q = st.query_params
+    if q.get("river") in [focus] + others:                  # ignore anything that isn't a real river
+        st.session_state["river"] = q["river"]
+    match = latest[latest["fips"] == q.get("fips", "")]     # ignore an unknown county code
+    if not match.empty:
+        st.session_state["river"] = match.iloc[0]["river"]  # a county's own river wins
+        st.session_state["fips"] = match.iloc[0]["fips"]
+    st.session_state["start_tab"] = q.get("view") if q.get("view") in TAB_NAMES else None
+
 river = st.sidebar.selectbox(
-    "River", [focus] + others,
+    "River", [focus] + others, key="river",
     format_func=lambda r: r if r == focus else f"{r} (transfer test)")
 st.sidebar.caption(f"Transfer test rivers (model trained on the {focus}): " + ", ".join(others))
 
 river_latest = latest[latest["river"] == river]
-labels = {f"{r.county}, {r.state}": r.fips for r in river_latest.itertuples()}
-county_label = st.sidebar.selectbox("County", sorted(labels))
-fips = labels[county_label]
+names = {r.fips: f"{r.county}, {r.state}" for r in river_latest.itertuples()}   # fips -> label
+fips_options = sorted(names, key=names.get)                                     # sorted by name
+# If the river just changed, a county from the old river is no longer valid: pick the first one.
+if st.session_state.get("fips") not in fips_options and "fips" in st.session_state:
+    st.session_state["fips"] = fips_options[0]
+fips = st.sidebar.selectbox("County", fips_options, format_func=names.get, key="fips")
+county_label = names[fips]
 is_transfer = river != focus
 
 # Sidebar "Data checks": re-count the alarms in the app and compare with metrics.json.
@@ -457,8 +476,7 @@ def tab_other_rivers():
 # ---------------------------------------------------------------------------
 # Put the tabs on the page
 # ---------------------------------------------------------------------------
-tabs = st.tabs(["This week", "Replay", "Outlook check", "Farm brief",
-                "Other rivers and misses", "How good is it"])
+tabs = st.tabs(TAB_NAMES, key="view", on_change="rerun", default=st.session_state["start_tab"])
 with tabs[0]:
     tab_this_week()
 with tabs[1]:
@@ -475,3 +493,9 @@ with tabs[5]:
 st.divider()
 st.caption("Drought data: U.S. Drought Monitor (NDMC, USDA, NOAA), county archive by the Montana "
            "Climate Office. ENSO index: NOAA Climate Prediction Center.")
+
+# Write the current choices back to the web address, so "copy link" shares exactly this view.
+st.query_params["river"] = river
+st.query_params["fips"] = fips
+if st.session_state.get("view"):
+    st.query_params["view"] = st.session_state["view"]
