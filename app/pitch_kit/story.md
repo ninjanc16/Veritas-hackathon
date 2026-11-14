@@ -1,6 +1,6 @@
 STATUS: FINAL
 
-# Demo story: four moments
+# Demo story: five moments
 Each moment was picked by a fixed rule from the handoff files (not hand-picked).
 
 ## 1. A warning before the drought arrived
@@ -23,3 +23,7 @@ Rule: the focus-river county with the highest 4-week risk score this week.
 Rule: the Ohio county with the most missed droughts in the test years (counted in the app, not a reported result).
 - Crittenden, Kentucky
 - Link: [TEAM: paste the live app link here]/?river=Ohio&fips=21055&view=Other+rivers+and+misses
+
+## 5. The canal plan
+Rule: Hidalgo County, Texas (one of the three Valley counties the district table covers).
+- Link: [TEAM: paste the live app link here]/?river=Rio+Grande&fips=48215&view=Canal+action

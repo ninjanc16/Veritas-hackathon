@@ -41,3 +41,15 @@ The model learned a place where drought is the norm. On the Ohio severe drought 
 
 ## 13. Which parts did AI tools write, and how did we check them?
 [TEAM: write this yourselves, honestly - which AI tools were used for what, and how each part was checked (tests, reading the code, comparing with the numbers in metrics.json).]
+
+## 14. What does the forecast have to do with canals?
+It is the signal to act before the season. It does not find leaks.
+
+## 15. Why seal only in dry years?
+Leakage refills groundwater that farm wells use, and crews and money are limited.
+
+## 16. What is the sealant and what is the evidence?
+A polymer that plugs earthen canals. Field trials elsewhere cut seepage 28% to 87% in most tests. None on the Rio Grande.
+
+## 17. Where is the AI and where is it not?
+The forecast is a tested random forest. The district ranking and the cost calculator are arithmetic on published figures.

@@ -109,11 +109,17 @@ def numbers_md(metrics, status):
         ("Ablations and checks", {k: metrics[k] for k in ("ablations", "shuffled_auc_mean",
                                                           "feature_importance") if k in metrics}),
         ("Limits", {"limits": metrics["limits"]}),
+        # Canal pivot blocks: each gets its own heading (left out if the pipeline did not write it).
+        ("Pre-season trigger", {"trigger": metrics["trigger"]} if "trigger" in metrics else {}),
+        ("Reservoirs", {"reservoir": metrics["reservoir"]} if "reservoir" in metrics else {}),
+        ("Measured drought losses", {"losses": metrics["losses"]} if "losses" in metrics else {}),
     ]
+    groups = [(title, content) for title, content in groups if content]
     # Anything the pipeline adds later still shows up, so no number is ever left out.
     used = set(setup_keys) | {"policies", "headline", "onset", "events", "cost_sensitivity",
                               "year_by_year", "season", "year", "per_river", "failure_examples",
-                              "ablations", "shuffled_auc_mean", "feature_importance", "limits"}
+                              "ablations", "shuffled_auc_mean", "feature_importance", "limits",
+                              "trigger", "reservoir", "losses"}
     extra = {k: v for k, v in metrics.items() if k not in used}
     if extra:
         groups.append(("Other keys", extra))
@@ -307,6 +313,17 @@ def explain_md(metrics, status):
         ("Which parts did AI tools write, and how did we check them?",
          "[TEAM: write this yourselves, honestly - which AI tools were used for what, and how each part "
          "was checked (tests, reading the code, comparing with the numbers in metrics.json).]"),
+        # Questions 14 to 17: the canal part (wording fixed by the app plan).
+        ("What does the forecast have to do with canals?",
+         "It is the signal to act before the season. It does not find leaks."),
+        ("Why seal only in dry years?",
+         "Leakage refills groundwater that farm wells use, and crews and money are limited."),
+        ("What is the sealant and what is the evidence?",
+         "A polymer that plugs earthen canals. Field trials elsewhere cut seepage 28% to 87% in most "
+         "tests. None on the Rio Grande."),
+        ("Where is the AI and where is it not?",
+         "The forecast is a tested random forest. The district ranking and the cost calculator are "
+         "arithmetic on published figures."),
     ]
     lines = [STATUS_LINES[status], "", "# Explain sheet",
              "Everyone on the team reads this before recording the video.", ""]
@@ -326,7 +343,7 @@ def link(river, fips, view):
 def story_md(pred, latest, metrics, status):
     focus = metrics["focus_river"]
     rg = pred[pred["river"] == focus]
-    lines = [STATUS_LINES[status], "", "# Demo story: four moments",
+    lines = [STATUS_LINES[status], "", "# Demo story: five moments",
              "Each moment was picked by a fixed rule from the handoff files (not hand-picked).", ""]
 
     # 1) A county the system warned about BEFORE it entered severe drought, and drought followed.
@@ -381,6 +398,16 @@ def story_md(pred, latest, metrics, status):
         r = ohio[ohio["fips"] == fips].iloc[0]
         lines += [f"- {r['county']}, {r['state']}",
                   f"- Link: {link('Ohio', fips, 'Other rivers and misses')}"]
+    lines.append("")
+
+    # 5) The canal plan for Hidalgo County (a Valley county, so the district table shows).
+    lines.append("## 5. The canal plan")
+    lines.append("Rule: Hidalgo County, Texas (one of the three Valley counties the district table covers).")
+    hid = latest[latest["fips"] == "48215"]
+    if hid.empty:
+        lines.append("- Hidalgo County is not in the handoff files.")
+    else:
+        lines.append(f"- Link: {link(hid.iloc[0]['river'], '48215', 'Canal action')}")
     lines.append("")
     return "\n".join(lines)
 

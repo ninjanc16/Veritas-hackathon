@@ -50,7 +50,7 @@ def test_export_writes_only_inside_pitch_kit():
 
 def test_kit_has_all_the_pieces():
     export()
-    assert (OUT_DIR / "explain.md").read_text().count("\n## ") == 13          # 13 questions
+    assert (OUT_DIR / "explain.md").read_text().count("\n## ") == 17          # 17 questions
     assert (OUT_DIR / "story.md").read_text().count("\n## ") == 4             # 4 moments
     for name in ("four_week_policies", "twelve_month_error", "other_rivers", "this_week_map"):
         assert (OUT_DIR / "charts" / f"{name}.html").exists()
@@ -68,3 +68,15 @@ def test_write_text_refuses_to_leave_pitch_kit(tmp_path):
         write_text(tmp_path / "oops.md", "x")
     with pytest.raises(ValueError):
         write_text(REPO_ROOT / "README.md", "x")
+
+
+def test_numbers_md_has_the_canal_headings_and_explain_has_17_questions():
+    from app.export_pitch_kit import explain_md
+    _, _, _, metrics = load_demo()
+    text = numbers_md(metrics, "DEMO")
+    for heading in ("## Pre-season trigger", "## Reservoirs", "## Measured drought losses"):
+        assert heading in text
+    assert "- `trigger.forecast_beats_d1_rule`: False" in text
+    explain = explain_md(metrics, "DEMO")
+    assert "## 14. What does the forecast have to do with canals?" in explain
+    assert "## 17. Where is the AI and where is it not?" in explain
