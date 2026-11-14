@@ -16,6 +16,7 @@ Rules it follows (plain English, for the judges):
 Run:  python app/export_pitch_kit.py
 """
 import html
+import logging
 import sys
 from pathlib import Path
 from urllib.parse import urlencode
@@ -26,6 +27,8 @@ from plotly.subplots import make_subplots
 
 # Make "import app.xxx" work when this file is run as a script.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+logging.getLogger("streamlit").setLevel(logging.ERROR)   # theme.py imports Streamlit; keep this script quiet
+from app import theme                                           # noqa: E402
 from app.contract import REPO_ROOT, load                       # noqa: E402
 
 OUT_DIR = REPO_ROOT / "app" / "pitch_kit"
@@ -384,7 +387,7 @@ def story_md(pred, latest, metrics, status):
 # ---------------------------------------------------------------------------
 # charts/ - four standalone plotly files (each opens in any browser)
 # ---------------------------------------------------------------------------
-TIER_COLOR = {"Low": "#9e9e9e", "Watch": "#f5a623", "Warning": "#d62728"}
+TIER_COLOR = theme.TIER_COLOR            # same earth tones as the app
 
 
 def save_chart(fig, name, status):
@@ -393,6 +396,8 @@ def save_chart(fig, name, status):
         fig.update_layout(title_text=f"{fig.layout.title.text} ({STATUS_LINES[status][8:]})")
     # "directory" = the page loads plotly.min.js from the SAME folder (written once in build_charts),
     # so opening a chart never downloads a script from the internet. Fixed div id = same file each run.
+    theme.style_fig(fig)                                   # same fonts and colors as the app
+    fig.update_layout(paper_bgcolor="#f4f1e8", plot_bgcolor="#f4f1e8")   # warm paper, not transparent
     page = fig.to_html(include_plotlyjs="directory", full_html=True, div_id="chart")
     write_text(OUT_DIR / "charts" / name, page)
 
@@ -402,7 +407,7 @@ def build_charts(latest, metrics, status):
     write_text(OUT_DIR / "charts" / "plotly.min.js", get_plotlyjs())   # local copy of the chart library
     # 1) The 4-week rules compared by cost (lower is better). Our system in blue.
     names = [p["name"] for p in m["policies"]]
-    colors = ["#1f77b4" if p["column"] == "alarm_system" else "#b0b0b0" for p in m["policies"]]
+    colors = [theme.CHART_COLORS[1] if p["column"] == "alarm_system" else "#b9b49f" for p in m["policies"]]
     fig = go.Figure(go.Bar(x=[p["cost"] for p in m["policies"]], y=names, orientation="h",
                            marker_color=colors))
     fig.update_layout(title_text="4-week alert: cost by rule (lower is better)", xaxis_title="Cost",
@@ -414,7 +419,7 @@ def build_charts(latest, metrics, status):
     bars = {"Our system": yf["mae_system"], "Same as now": yf["mae_same_as_now"],
             "Same as last year": yf["mae_last_year"], "Usual for the county": yf["mae_usual"]}
     fig = go.Figure(go.Bar(x=list(bars), y=list(bars.values()),
-                           marker_color=["#1f77b4", "#b0b0b0", "#b0b0b0", "#b0b0b0"]))
+                           marker_color=[theme.CHART_COLORS[1], "#b9b49f", "#b9b49f", "#b9b49f"]))
     fig.update_layout(title_text="12-month outlook: average error in weeks (lower is better)",
                       yaxis_title="Weeks")
     save_chart(fig, "twelve_month_error.html", status)
@@ -428,9 +433,9 @@ def build_charts(latest, metrics, status):
     for row, (rows, ours, best) in enumerate(tables, 1):
         rivers = [r["river"] for r in rows]
         fig.add_trace(go.Bar(x=rivers, y=[r[ours] for r in rows], name="Our system",
-                             marker_color="#1f77b4", showlegend=(row == 1), legendgroup="a"), row=row, col=1)
+                             marker_color=theme.CHART_COLORS[1], showlegend=(row == 1), legendgroup="a"), row=row, col=1)
         fig.add_trace(go.Bar(x=rivers, y=[r[best] for r in rows], name="Best simple rule",
-                             marker_color="#b0b0b0", showlegend=(row == 1), legendgroup="b"), row=row, col=1)
+                             marker_color="#b9b49f", showlegend=(row == 1), legendgroup="b"), row=row, col=1)
     fig.update_layout(title_text="Other rivers: our system vs the best simple rule (lower is better)",
                       barmode="group", height=900)
     save_chart(fig, "other_rivers.html", status)

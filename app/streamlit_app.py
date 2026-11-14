@@ -23,18 +23,19 @@ import pandas as pd                      # noqa: E402
 import plotly.graph_objects as go        # noqa: E402
 import streamlit as st                   # noqa: E402
 
+from app import theme                    # noqa: E402
 from app.brief import CLASS_WORDS, build_brief, md_escape, streak_sentence   # noqa: E402
 from app.contract import load            # noqa: E402
 from app.tallies import (errors_table, reconcile, river_grid, tally,   # noqa: E402
                          weeks_error)
 
 st.set_page_config(page_title="Rio Grande Farm Drought Outlook", layout="wide")
+theme.apply_theme()                      # fonts, colors and spacing for the whole page (app/theme.py)
 
 # ---------------------------------------------------------------------------
 # Words and colors used on several screens
 # ---------------------------------------------------------------------------
-TIER_COLOR = {"Low": "#9e9e9e", "Watch": "#f5a623", "Warning": "#d62728"}   # grey / amber / red
-TIER_TEXT = {"Low": "gray", "Watch": "orange", "Warning": "red"}            # Streamlit text colors
+TIER_COLOR = theme.TIER_COLOR            # sage / ochre / clay, shared with the charts
 
 # The alarms the Replay tab can show: our system first, then the simple baselines.
 ALARM_CHOICES = {
@@ -55,8 +56,19 @@ def get_data():
 pred, outlook, latest, metrics, source, problems = get_data()
 
 # ---------------------------------------------------------------------------
-# Banners at the very top: tell the viewer how much to trust what they see
+# Top of the page: the hero banner, then banners that tell the viewer how much to trust the data
 # ---------------------------------------------------------------------------
+STATUS_CHIP = {"demo": "Demo data", "provisional": "Provisional results", "final": "Final results"}
+status_key = "demo" if source == "demo" else ("final" if metrics["is_final"] else "provisional")
+theme.hero(
+    title="Rio Grande Farm Drought Outlook",
+    kicker="AI + Climate  -  Veritas AI Hackathon",
+    subtitle=(f"A 4-week alert, a 6-month outlook and a 12-month outlook for severe drought in "
+              f"{metrics['n_focus_counties']} farm counties along the {metrics['focus_river']}, "
+              "then a test of the same method on four other rivers."),
+    chips=[STATUS_CHIP[status_key], f"Week of {latest['date'].max():%B %d, %Y}",
+           f"{metrics['n_focus_counties']} counties"])
+
 if source == "demo":
     st.error("DEMO DATA - not real results")
 if problems:
@@ -64,8 +76,6 @@ if problems:
              + "\n".join(f"- {p}" for p in problems))
 elif source == "real" and not metrics["is_final"]:
     st.warning("Provisional results")
-
-st.title("Rio Grande Farm Drought Outlook")
 
 # ---------------------------------------------------------------------------
 # Sidebar: choose a river, then a county on that river
@@ -87,6 +97,9 @@ if "url_read" not in st.session_state:
         st.session_state["fips"] = match.iloc[0]["fips"]
     st.session_state["start_tab"] = q.get("view") if q.get("view") in TAB_NAMES else None
 
+theme.sidebar_brand("Choose a place",
+                    "The Rio Grande carries mountain snowmelt through Colorado, New Mexico and Texas "
+                    "to the Gulf of Mexico.")
 river = st.sidebar.selectbox(
     "River", [focus] + others, key="river",
     format_func=lambda r: r if r == focus else f"{r} (transfer test)")
@@ -128,61 +141,63 @@ def tab_this_week():
     st.subheader(f"{md_escape(county_label)} - week of {row['date']:%B %d, %Y}")
 
     # Three cards: the 4-week alert, the 6-month outlook, the 12-month outlook.
-    c1, c2, c3 = st.columns(3)
-    with c1.container(border=True):
-        st.markdown("**Next 4 weeks**")
-        st.markdown(f"## :{TIER_TEXT[row['tier']]}[{row['tier']}]")
-        st.write(f"Risk score: **{round(row['p_model'] * 100)}%**")
-        st.caption(f"Drought now: {CLASS_WORDS[int(row['cls'])]}. "
-                   "A risk score, not a calibrated probability.")
-    with c2.container(border=True):
-        st.markdown("**Next 6 months**")
-        st.markdown(f"## {round(row['p_season'] * 100)}%")
-        st.caption("chance of 8 straight weeks of severe drought")
-        st.markdown(f"Level: :{TIER_TEXT[row['season_tier']]}[**{row['season_tier']}**]")
-    with c3.container(border=True):
-        st.markdown("**Next 12 months**")
-        st.markdown(f"## about {round(row['weeks_model'])} weeks")
-        st.caption("of severe drought")
-        st.write(f"Usual for this county: {round(row['weeks_usual'])} weeks")
-        st.write(f"Typical error: about {metrics['year']['focus']['mae_system']} weeks")
+    theme.card_grid([
+        dict(label="Next 4 weeks", value=row["tier"], dot=True, accent=TIER_COLOR[row["tier"]],
+             caption=f"Risk score {round(row['p_model'] * 100)}%. A risk score, not a calibrated probability.",
+             rows=[f"Drought now: {CLASS_WORDS[int(row['cls'])]}"]),
+        dict(label="Next 6 months", value=f"{round(row['p_season'] * 100)}%",
+             accent=TIER_COLOR[row["season_tier"]],
+             caption="chance of 8 straight weeks of severe drought",
+             rows=[f"Level: {row['season_tier']}"]),
+        dict(label="Next 12 months", value=f"about {round(row['weeks_model'])} weeks", accent=theme.CHART_COLORS[0],
+             caption="of severe drought",
+             rows=[f"Usual for this county: {round(row['weeks_usual'])} weeks",
+                   f"Typical error: about {metrics['year']['focus']['mae_system']} weeks"]),
+    ])
 
     # The link to the USDA program, in careful words (we never predict a payment).
     note = streak_sentence(int(row["d2_streak"]))    # wording shared with the Farm brief
     if note:
-        st.info(note)
+        theme.callout(note)
     st.caption("This is a forecast tool, not a payment decision.")
 
-    # Map of the river's counties, colored by tier. No base map, so it works offline.
-    st.markdown("#### Map")
-    fig = go.Figure()
-    for tier in TIER_COLOR:
-        sub = river_latest[river_latest["tier"] == tier]
-        # html.escape: a county name from the data can never inject HTML into the hover box.
-        hover = [f"{html.escape(r.county)}, {html.escape(r.state)}<br>4-week: {r.tier}<br>6-month: {round(r.p_season * 100)}%"
-                 f"<br>12-month: about {round(r.weeks_model)} weeks" for r in sub.itertuples()]
-        fig.add_trace(go.Scatter(x=sub["lon"], y=sub["lat"], mode="markers", name=tier,
-                                 text=hover, hoverinfo="text",
-                                 marker=dict(size=13, color=TIER_COLOR[tier])))
-    fig.add_trace(go.Scatter(x=[row["lon"]], y=[row["lat"]], mode="markers", name="Selected county",
-                             hoverinfo="skip",
-                             marker=dict(size=26, symbol="circle-open", color="black", line=dict(width=3))))
-    fig.update_yaxes(scaleanchor="x", scaleratio=1, title="Latitude")   # equal aspect = no stretching
-    fig.update_xaxes(title="Longitude")
-    fig.update_layout(height=450, margin=dict(l=10, r=10, t=10, b=10))
-    st.plotly_chart(fig, width="stretch")
-
-    # Table of counties on a Warning.
-    st.markdown("#### Counties on Warning")
-    warn = river_latest[river_latest["tier"] == "Warning"].sort_values("p_model", ascending=False)
-    if warn.empty:
-        st.write("No counties on Warning this week.")
-    else:
-        table = pd.DataFrame({"County": warn["county"], "State": warn["state"],
-                              "4-week risk %": (warn["p_model"] * 100).round(),
-                              "6-month %": (warn["p_season"] * 100).round(),
-                              "12-month weeks": warn["weeks_model"].round()})
-        st.dataframe(table, hide_index=True, width="stretch")
+    # Map on the left, the counties on Warning on the right. No base map, so it works offline.
+    left, right = st.columns([2, 3], gap="large")
+    with left:
+        st.markdown("#### Where the risk is")
+        fig = go.Figure()
+        for tier in TIER_COLOR:
+            sub = river_latest[river_latest["tier"] == tier]
+            # html.escape: a county name from the data can never inject HTML into the hover box.
+            hover = [f"{html.escape(r.county)}, {html.escape(r.state)}<br>4-week: {r.tier}<br>6-month: {round(r.p_season * 100)}%"
+                     f"<br>12-month: about {round(r.weeks_model)} weeks" for r in sub.itertuples()]
+            fig.add_trace(go.Scatter(x=sub["lon"], y=sub["lat"], mode="markers", name=tier,
+                                     text=hover, hoverinfo="text",
+                                     marker=dict(size=13, color=TIER_COLOR[tier],
+                                                 line=dict(width=1.5, color="#fbf9f3"))))
+        fig.add_trace(go.Scatter(x=[row["lon"]], y=[row["lat"]], mode="markers", name="Selected county",
+                                 hoverinfo="skip",
+                                 marker=dict(size=26, symbol="circle-open", color=theme.palette()["heading"],
+                                             line=dict(width=3))))
+        fig.update_yaxes(scaleanchor="x", scaleratio=1, title="Latitude")   # equal aspect = no stretching
+        fig.update_xaxes(title="Longitude")
+        fig.update_layout(margin=dict(l=10, r=10, t=30, b=10))
+        st.plotly_chart(theme.style_fig(fig, 560), width="stretch")
+    with right:
+        # Two small tables: the counties on Warning, then the ones on Watch.
+        for tier, note in (("Warning", "Review stocking, feed and water plans."),
+                           ("Watch", "Keep an eye on hay and water plans.")):
+            st.markdown(f"#### Counties on {tier}")
+            hot = river_latest[river_latest["tier"] == tier].sort_values("p_model", ascending=False)
+            if hot.empty:
+                st.write(f"No counties on {tier} this week.")
+            else:
+                st.caption(note)
+                table = pd.DataFrame({"County": hot["county"], "State": hot["state"],
+                                      "4-week risk %": (hot["p_model"] * 100).round(),
+                                      "6-month %": (hot["p_season"] * 100).round(),
+                                      "12-month weeks": hot["weeks_model"].round()})
+                st.dataframe(table, hide_index=True, width="stretch")
 
 
 # ---------------------------------------------------------------------------
@@ -203,17 +218,21 @@ def tab_replay():
     # Pick a year. Default: the year with the most severe-drought weeks for this county.
     years = sorted(hist["date"].dt.year.unique())
     worst = hist.groupby(hist["date"].dt.year)["y"].sum().idxmax()
-    year = st.selectbox("Year", years, index=years.index(worst), key=f"year_{fips}")
+    pick_year, pick_alarm = st.columns(2)
+    year = pick_year.selectbox("Year", years, index=years.index(worst), key=f"year_{fips}")
     wk = hist[hist["date"].dt.year == year].reset_index(drop=True)
     last = len(wk) - 1
 
-    alarm_name = st.selectbox("Which alarm to show", list(ALARM_CHOICES))
+    alarm_name = pick_alarm.selectbox("Which alarm to show", list(ALARM_CHOICES))
     alarm_col = ALARM_CHOICES[alarm_name]
 
     # Week slider plus step buttons. The chosen week lives in session_state.
     key = f"week_{fips}_{year}"
     if key not in st.session_state:
-        st.session_state[key] = 0
+        # Start 12 weeks into the year, or at the first alarm if that comes later, so the chart
+        # already has some history on screen when the viewer arrives.
+        fired = wk.index[wk[alarm_col]]           # weeks when the chosen alarm went off
+        st.session_state[key] = min(last, max(int(fired[0]) if len(fired) else 0, 12))
     b = st.columns(4)
     b[0].button("Back 4 weeks", on_click=step_week, args=(key, -4, last), width="stretch")
     b[1].button("Previous week", on_click=step_week, args=(key, -1, last), width="stretch")
@@ -231,17 +250,17 @@ def tab_replay():
 
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=shown["date"], y=shown["cls"], mode="lines", line_shape="hv",
-                             name="Drought class"))
+                             name="Drought class", line=dict(color=theme.CHART_COLORS[0], width=3)))
     fig.add_trace(go.Scatter(x=alarms["date"], y=alarms["cls"], mode="markers", name="Alarm",
-                             marker=dict(size=11, color="#d62728", symbol="triangle-up")))
-    fig.add_hline(y=3, line_dash="dash", line_color="gray",
+                             marker=dict(size=12, color=TIER_COLOR["Warning"], symbol="triangle-up")))
+    fig.add_hline(y=3, line_dash="dash", line_color=TIER_COLOR["Watch"],
                   annotation_text="D2 severe", annotation_position="top left")
     fig.add_shape(type="line", x0=chosen_date, x1=chosen_date, y0=-0.2, y1=5.2,
-                  line=dict(color="black", width=2))
+                  line=dict(color=theme.palette()["heading"], width=2))
     fig.update_xaxes(range=[wk["date"].min(), wk["date"].max()])
     fig.update_yaxes(range=[-0.2, 5.2], tickvals=list(CLASS_WORDS), ticktext=list(CLASS_WORDS.values()))
-    fig.update_layout(height=400, margin=dict(l=10, r=10, t=10, b=10))
-    st.plotly_chart(fig, width="stretch")
+    fig.update_layout(margin=dict(l=10, r=10, t=30, b=10))
+    st.plotly_chart(theme.style_fig(fig, 400), width="stretch")
 
     # Alert log. We only say what happened next if 4 full weeks have passed since the alarm.
     st.markdown("#### Alert log")
@@ -277,7 +296,7 @@ def kv_table(d):
 def colored(df, good):
     """Green row when `good` is True, red when False. Used for the other-rivers tables."""
     def paint(row):
-        color = "#d4edda" if good.loc[row.name] else "#f8d7da"
+        color = "#dfead9" if good.loc[row.name] else "#f0d9d0"      # soft sage / soft clay
         return [f"background-color: {color}; color: #111"] * len(row)
     return df.style.apply(paint, axis=1)
 
@@ -299,11 +318,17 @@ def tab_how_good():
 
     h = m["headline"]
     verdict = "PASSED" if h["honesty_check_pass"] else "FAILED"
-    st.write(f"Our system cost **{h['system_cost']}** against **{h['persistence_cost']}** for "
-             f"'the future equals today' ({h['pct_cheaper_than_persistence']}% cheaper). "
-             f"The cheapest simple rule was **{md_escape(h['cheapest_baseline_on_test'])}** at "
-             f"**{h['cheapest_baseline_cost']}**.")
-    st.write(f"Honesty check (beats every simple rule on years it never saw): **{verdict}**")
+    # Three big numbers first, then the details. All values come straight from metrics.json.
+    theme.card_grid([
+        dict(label="Our system's cost", value=str(h["system_cost"]), accent=theme.CHART_COLORS[1],
+             caption=f"against {h['persistence_cost']} for 'the future equals today'"),
+        dict(label="Cheaper than that rule", value=f"{h['pct_cheaper_than_persistence']}%",
+             accent=theme.CHART_COLORS[0],
+             caption=f"best simple rule: {h['cheapest_baseline_on_test']} at {h['cheapest_baseline_cost']}"),
+        dict(label="Honesty check", value=verdict.capitalize(),
+             accent=TIER_COLOR["Low"] if h["honesty_check_pass"] else TIER_COLOR["Warning"],
+             caption="beats every simple rule on years it never saw"),
+    ])
     st.markdown("**Hard part: counties not yet in severe drought (onset)**")
     st.dataframe(kv_table(m["onset"]), hide_index=True)
     ev = m["events"]
@@ -327,9 +352,10 @@ def tab_how_good():
     st.write(f"Beats every baseline: **{yes_no(yf['beats_every_baseline'])}**")
     bars = {"Our system": yf["mae_system"], "Same as now": yf["mae_same_as_now"],
             "Same as last year": yf["mae_last_year"], "Usual for the county": yf["mae_usual"]}
-    st.plotly_chart(go.Figure(go.Bar(x=list(bars), y=list(bars.values()))).update_layout(
-        height=300, yaxis_title="Average error (weeks)", margin=dict(l=10, r=10, t=10, b=10)),
-        width="stretch")
+    bar_fig = go.Figure(go.Bar(x=list(bars), y=list(bars.values()),
+                               marker_color=[theme.CHART_COLORS[1]] + ["#b9b49f"] * 3))   # ours in green
+    bar_fig.update_layout(yaxis_title="Average error (weeks)", margin=dict(l=10, r=10, t=10, b=10))
+    st.plotly_chart(theme.style_fig(bar_fig, 320), width="stretch")
 
     # 4) Other rivers: green row = the system beats that river's best simple rule.
     st.header("Does it work on other rivers?")
@@ -353,9 +379,10 @@ def tab_how_good():
     st.header("Extra checks and limits")
     st.dataframe(pd.DataFrame(m["ablations"]), hide_index=True, width="stretch")
     fi = pd.DataFrame(m["feature_importance"])
-    st.plotly_chart(go.Figure(go.Bar(x=fi["importance"], y=fi["feature"], orientation="h")).update_layout(
-        height=300, xaxis_title="Importance", margin=dict(l=10, r=10, t=10, b=10)),
-        width="stretch")
+    fi_fig = go.Figure(go.Bar(x=fi["importance"], y=fi["feature"], orientation="h",
+                              marker_color=theme.CHART_COLORS[0]))
+    fi_fig.update_layout(xaxis_title="Importance", margin=dict(l=10, r=10, t=10, b=10))
+    st.plotly_chart(theme.style_fig(fi_fig, 320), width="stretch")
     for sentence in m["limits"]:
         st.write(f"- {md_escape(sentence)}")
 
@@ -380,13 +407,14 @@ def tab_outlook_check():
     hit = o[o["y_season"] == 1]
     figa = go.Figure()
     figa.add_trace(go.Bar(x=hit["date"], y=[1] * len(hit), width=month, name="8 straight weeks really followed",
-                          marker=dict(color="red", opacity=0.2)))
-    figa.add_trace(go.Scatter(x=o["date"], y=o["p_season"], mode="lines", name="6-month risk"))
-    figa.add_hline(y=metrics["season"]["threshold"], line_dash="dash", line_color="gray",
-                   annotation_text="alarm line")
+                          marker=dict(color=TIER_COLOR["Warning"], opacity=0.25)))
+    figa.add_trace(go.Scatter(x=o["date"], y=o["p_season"], mode="lines", name="6-month risk",
+                              line=dict(color=theme.CHART_COLORS[1], width=2.5)))
+    figa.add_hline(y=metrics["season"]["threshold"], line_dash="dash", line_color=TIER_COLOR["Watch"],
+                   annotation_text="alarm line", annotation_position="top left")
     figa.update_yaxes(range=[0, 1], title="Risk")
-    figa.update_layout(height=350, margin=dict(l=10, r=10, t=10, b=10))
-    st.plotly_chart(figa, width="stretch")
+    figa.update_layout(margin=dict(l=10, r=10, t=30, b=10))
+    st.plotly_chart(theme.style_fig(figa, 350), width="stretch")
     st.caption("Shaded = the next 6 months really did contain 8 straight weeks of severe drought.")
     t = tally(o, "alarm_season", "y_season", metrics["miss_cost"])
     st.caption(f"This county: {t['alarms']} alarms, {t['caught']} caught, {t['missed']} missed, "
@@ -396,13 +424,13 @@ def tab_outlook_check():
     st.markdown("#### 12-month outlook, checked")
     figb = go.Figure()
     figb.add_trace(go.Bar(x=o["date"], y=o["y_weeks"], width=month, name="Weeks that really happened",
-                          marker=dict(color="lightgray")))
+                          marker=dict(color="#e2d8bd")))
     for col, name in [("weeks_model", "Our estimate"), ("weeks_usual", "Usual for this county"),
                       ("weeks_same_as_now", "Same as now")]:
         figb.add_trace(go.Scatter(x=o["date"], y=o[col], mode="lines", name=name))
     figb.update_yaxes(title="Weeks of severe drought (next 52)")
-    figb.update_layout(height=350, margin=dict(l=10, r=10, t=10, b=10))
-    st.plotly_chart(figb, width="stretch")
+    figb.update_layout(margin=dict(l=10, r=10, t=30, b=10))
+    st.plotly_chart(theme.style_fig(figb, 350), width="stretch")
     st.caption(f"Average error for this county: ours {weeks_error(o, 'weeks_model'):.1f} weeks, "
                f"usual {weeks_error(o, 'weeks_usual'):.1f}, same as now {weeks_error(o, 'weeks_same_as_now'):.1f} "
                f"- {COUNT_NOTE}.")
@@ -433,8 +461,8 @@ def heat(matrix, title, scale, zmax, ticks):
         z=matrix.values, x=matrix.columns, y=list(matrix.index), colorscale=scale, zmin=0, zmax=zmax,
         colorbar=dict(tickvals=list(ticks), ticktext=list(ticks.values()))))
     fig.update_yaxes(autorange="reversed")                 # first county (northernmost) at the top
-    fig.update_layout(title=title, height=120 + 28 * len(matrix), margin=dict(l=10, r=10, t=40, b=10))
-    return fig
+    fig.update_layout(title=title, margin=dict(l=10, r=10, t=40, b=10))
+    return theme.style_fig(fig, 120 + 28 * len(matrix))
 
 
 def tab_other_rivers():
@@ -446,10 +474,12 @@ def tab_other_rivers():
 
     # Two heat-maps side by side in time: what our alert said, then what really happened.
     tiers, cls = river_grid(pred, river, year)
-    st.plotly_chart(heat(tiers, f"Our alert - {river}, {year}",
-                         [[0, TIER_COLOR["Low"]], [0.5, TIER_COLOR["Watch"]], [1, TIER_COLOR["Warning"]]],
-                         2, {0: "Low", 1: "Watch", 2: "Warning"}), width="stretch")
-    st.plotly_chart(heat(cls, f"Actual drought class - {river}, {year}", "YlOrRd", 5, CLASS_WORDS),
+    # Three flat colors (no gradient): each tier fills a third of the color bar.
+    steps = [[0, TIER_COLOR["Low"]], [1 / 3, TIER_COLOR["Low"]], [1 / 3, TIER_COLOR["Watch"]],
+             [2 / 3, TIER_COLOR["Watch"]], [2 / 3, TIER_COLOR["Warning"]], [1, TIER_COLOR["Warning"]]]
+    st.plotly_chart(heat(tiers, f"Our alert - {river}, {year}", steps, 2,
+                         {1 / 3: "Low", 1: "Watch", 5 / 3: "Warning"}), width="stretch")
+    st.plotly_chart(heat(cls, f"Actual drought class - {river}, {year}", theme.DROUGHT_SCALE, 5, CLASS_WORDS),
                     width="stretch")
     st.caption("Counties run north (top) to south (bottom). Compare the two maps: "
                "red in the lower one with grey in the upper one is a miss.")
@@ -493,9 +523,8 @@ with tabs[4]:
 with tabs[5]:
     tab_how_good()
 
-st.divider()
-st.caption("Drought data: U.S. Drought Monitor (NDMC, USDA, NOAA), county archive by the Montana "
-           "Climate Office. ENSO index: NOAA Climate Prediction Center.")
+theme.footer("Drought data: U.S. Drought Monitor (NDMC, USDA, NOAA), county archive by the Montana "
+             "Climate Office. ENSO index: NOAA Climate Prediction Center.")
 
 # Write the current choices back to the web address, so "copy link" shares exactly this view.
 st.query_params["river"] = river
