@@ -1,11 +1,13 @@
 """
-streamlit_app.py - the demo app (Phase 2: three tabs).
+streamlit_app.py - the demo app (five tabs so far).
 
 How it works, in plain English:
   * It gets ALL its data from app/contract.py -> load(). Nothing else. No internet.
   * It never works out a reported result. Every number about how good the system is
     comes straight out of metrics.json.
   * Tabs so far:  "This week" (today's forecast), "Replay" (step through a past year),
+                  "Outlook check" (past 6/12-month outlooks vs what happened),
+                  "Farm brief" (plain-English page to download),
                   "How good is it" (the honest scorecard).
 Run it with:  streamlit run app/streamlit_app.py
 """
@@ -19,15 +21,15 @@ import pandas as pd                      # noqa: E402
 import plotly.graph_objects as go        # noqa: E402
 import streamlit as st                   # noqa: E402
 
+from app.brief import CLASS_WORDS, build_brief, streak_sentence   # noqa: E402
 from app.contract import load            # noqa: E402
+from app.tallies import tally, weeks_error                        # noqa: E402
 
 st.set_page_config(page_title="Rio Grande Farm Drought Outlook", layout="wide")
 
 # ---------------------------------------------------------------------------
 # Words and colors used on several screens
 # ---------------------------------------------------------------------------
-CLASS_WORDS = {0: "None", 1: "D0 Abnormally dry", 2: "D1 Moderate", 3: "D2 Severe",
-               4: "D3 Extreme", 5: "D4 Exceptional"}
 TIER_COLOR = {"Low": "#9e9e9e", "Watch": "#f5a623", "Warning": "#d62728"}   # grey / amber / red
 TIER_TEXT = {"Low": "gray", "Watch": "orange", "Warning": "red"}            # Streamlit text colors
 
@@ -114,14 +116,9 @@ def tab_this_week():
         st.write(f"Typical error: about {metrics['year']['focus']['mae_system']} weeks")
 
     # The link to the USDA program, in careful words (we never predict a payment).
-    streak = int(row["d2_streak"])
-    if 1 <= streak <= 7:
-        st.info(f"In severe drought for {streak} weeks in a row. USDA's Livestock Forage Disaster "
-                "Program can open at 8 consecutive weeks during the grazing period. "
-                "Check with your county FSA office.")
-    elif streak >= 8:
-        st.info("8 or more weeks in a row. Ask your county FSA office about the "
-                "Livestock Forage Disaster Program.")
+    note = streak_sentence(int(row["d2_streak"]))    # wording shared with the Farm brief
+    if note:
+        st.info(note)
     st.caption("This is a forecast tool, not a payment decision.")
 
     # Map of the river's counties, colored by tier. No base map, so it works offline.
@@ -325,14 +322,79 @@ def tab_how_good():
 
 
 # ---------------------------------------------------------------------------
+# TAB: Outlook check - every past 6- and 12-month outlook next to what really happened
+# ---------------------------------------------------------------------------
+COUNT_NOTE = "counted in the app for this one county, not a reported result"
+
+
+def tab_outlook_check():
+    transfer_note()
+    st.caption("Every point was predicted by a model trained only on earlier years.")
+    o = outlook[outlook["fips"] == fips].sort_values("date")
+    if o.empty:
+        st.info("No outlook history for this county.")
+        return
+    month = 28 * 24 * 3600 * 1000            # bar width in milliseconds (about one month)
+
+    # Chart A: the 6-month risk over time. Red bands = it really did get 8 straight bad weeks.
+    st.markdown("#### 6-month outlook, checked")
+    hit = o[o["y_season"] == 1]
+    figa = go.Figure()
+    figa.add_trace(go.Bar(x=hit["date"], y=[1] * len(hit), width=month, name="8 straight weeks really followed",
+                          marker=dict(color="red", opacity=0.2)))
+    figa.add_trace(go.Scatter(x=o["date"], y=o["p_season"], mode="lines", name="6-month risk"))
+    figa.add_hline(y=metrics["season"]["threshold"], line_dash="dash", line_color="gray",
+                   annotation_text="alarm line")
+    figa.update_yaxes(range=[0, 1], title="Risk")
+    figa.update_layout(height=350, margin=dict(l=10, r=10, t=10, b=10))
+    st.plotly_chart(figa, width="stretch")
+    st.caption("Shaded = the next 6 months really did contain 8 straight weeks of severe drought.")
+    t = tally(o, "alarm_season", "y_season", metrics["miss_cost"])
+    st.caption(f"This county: {t['alarms']} alarms, {t['caught']} caught, {t['missed']} missed, "
+               f"{t['false_alarms']} false alarms (cost {t['cost']}) - {COUNT_NOTE}.")
+
+    # Chart B: the 12-month weeks estimate against the real number of weeks (bars).
+    st.markdown("#### 12-month outlook, checked")
+    figb = go.Figure()
+    figb.add_trace(go.Bar(x=o["date"], y=o["y_weeks"], width=month, name="Weeks that really happened",
+                          marker=dict(color="lightgray")))
+    for col, name in [("weeks_model", "Our estimate"), ("weeks_usual", "Usual for this county"),
+                      ("weeks_same_as_now", "Same as now")]:
+        figb.add_trace(go.Scatter(x=o["date"], y=o[col], mode="lines", name=name))
+    figb.update_yaxes(title="Weeks of severe drought (next 52)")
+    figb.update_layout(height=350, margin=dict(l=10, r=10, t=10, b=10))
+    st.plotly_chart(figb, width="stretch")
+    st.caption(f"Average error for this county: ours {weeks_error(o, 'weeks_model'):.1f} weeks, "
+               f"usual {weeks_error(o, 'weeks_usual'):.1f}, same as now {weeks_error(o, 'weeks_same_as_now'):.1f} "
+               f"- {COUNT_NOTE}.")
+
+
+# ---------------------------------------------------------------------------
+# TAB: Farm brief - a plain-English page for one county, with a download button
+# ---------------------------------------------------------------------------
+def tab_farm_brief():
+    transfer_note()
+    status = "DEMO" if source == "demo" else ("FINAL" if metrics["is_final"] else "PROVISIONAL")
+    row = latest[latest["fips"] == fips].iloc[0]
+    brief = build_brief(row, pred[pred["fips"] == fips], metrics, status)
+    st.markdown(brief)
+    st.download_button("Download this brief (.md)", brief, file_name=f"farm_brief_{fips}.md",
+                       mime="text/markdown")
+
+
+# ---------------------------------------------------------------------------
 # Put the tabs on the page
 # ---------------------------------------------------------------------------
-tabs = st.tabs(["This week", "Replay", "How good is it"])
+tabs = st.tabs(["This week", "Replay", "Outlook check", "Farm brief", "How good is it"])
 with tabs[0]:
     tab_this_week()
 with tabs[1]:
     tab_replay()
 with tabs[2]:
+    tab_outlook_check()
+with tabs[3]:
+    tab_farm_brief()
+with tabs[4]:
     tab_how_good()
 
 st.divider()
