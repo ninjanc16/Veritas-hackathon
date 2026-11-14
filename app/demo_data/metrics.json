@@ -1,6 +1,6 @@
 {
   "contract_version": 2,
-  "generated_at": "2026-11-14T19:46:24+00:00",
+  "generated_at": "2026-11-14T19:57:22+00:00",
   "is_final": false,
   "focus_river": "Rio Grande",
   "training_scope": "Rio Grande counties only (DEMO)",
@@ -471,38 +471,46 @@
     "value_sweep": [
       {
         "cost_ratio": 0.02,
-        "forecast": 0.08,
-        "forecast_reservoir": 0.09,
-        "d1_rule": 0.06999999999999999,
-        "persistence": 0.06,
-        "seal_every_year": 0.21
+        "forecast": 0.48,
+        "forecast_reservoir": 0.475,
+        "d1_rule": 0.477,
+        "persistence": 0.38,
+        "seal_every_year": 0.48
       },
       {
         "cost_ratio": 0.05,
-        "forecast": 0.05,
-        "forecast_reservoir": 0.06,
-        "d1_rule": 0.039999999999999994,
-        "persistence": 0.03,
-        "seal_every_year": 0.15
+        "forecast": 0.45,
+        "forecast_reservoir": 0.445,
+        "d1_rule": 0.447,
+        "persistence": 0.35000000000000003,
+        "seal_every_year": 0.45
       },
       {
         "cost_ratio": 0.1,
-        "forecast": 0.0,
-        "forecast_reservoir": 0.009999999999999995,
-        "d1_rule": -0.010000000000000009,
-        "persistence": -0.020000000000000004,
-        "seal_every_year": 0.04999999999999999
+        "forecast": 0.4,
+        "forecast_reservoir": 0.395,
+        "d1_rule": 0.397,
+        "persistence": 0.30000000000000004,
+        "seal_every_year": 0.4
       },
       {
-        "cost_ratio": 0.2,
-        "forecast": -0.1,
-        "forecast_reservoir": -0.09000000000000001,
-        "d1_rule": -0.11000000000000001,
-        "persistence": -0.12000000000000001,
-        "seal_every_year": -0.15000000000000002
+        "cost_ratio": 0.25,
+        "forecast": 0.25,
+        "forecast_reservoir": 0.245,
+        "d1_rule": 0.247,
+        "persistence": 0.15000000000000002,
+        "seal_every_year": 0.25
+      },
+      {
+        "cost_ratio": 0.5,
+        "forecast": 0.0,
+        "forecast_reservoir": -0.0050000000000000044,
+        "d1_rule": -0.0030000000000000027,
+        "persistence": -0.09999999999999998,
+        "seal_every_year": 0.0
       }
     ],
-    "forecast_beats_d1_rule": false,
+    "forecast_beats_d1_rule": true,
     "reservoir_forecast_beats_d1_rule": false
   },
   "reservoir": {

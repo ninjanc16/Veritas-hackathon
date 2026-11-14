@@ -46,3 +46,15 @@ def test_action_tiers():
     assert canal.action_tier(0.25)[0].startswith("Seal")
     assert canal.action_tier(0.2)[0].startswith("Inspect")
     assert canal.action_tier(0.05)[0].startswith("No extra")
+
+
+def test_trigger_verdict_calls_a_tiny_gap_a_tie():
+    # The shape of the real handoff: forecast 0.3135 vs D1 0.3132 at the 25% threshold.
+    trig = {"threshold": 0.25, "value_sweep": [
+        {"cost_ratio": 0.1, "forecast": 0.4216, "forecast_reservoir": 0.4179, "d1_rule": 0.4048},
+        {"cost_ratio": 0.25, "forecast": 0.3135, "forecast_reservoir": 0.3065, "d1_rule": 0.3132}]}
+    vs_d1, res = canal.trigger_verdict(trig)
+    assert "about as well as" in vs_d1 and "ties" in vs_d1
+    assert "did not help" in res
+    trig["value_sweep"][1]["d1_rule"] = 0.25
+    assert "did better" in canal.trigger_verdict(trig)[0]

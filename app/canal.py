@@ -109,3 +109,29 @@ def valley_probability(latest):
         return None
     col = "p_season_res" if "p_season_res" in rows.columns else "p_season"
     return float(rows[col].max())
+
+
+def trigger_verdict(trig):
+    """
+    Plain words on how the forecast did as a pre-season trigger, written from the scores in
+    metrics.json (the row at the trigger threshold). Returns (vs_d1_sentence, reservoir_sentence).
+    A gap smaller than 0.01 is called a tie: the yes/no flag in the file can be 'true' by 0.0003.
+    """
+    row = min(trig["value_sweep"], key=lambda r: abs(r["cost_ratio"] - trig["threshold"]))
+    gap = row["forecast"] - row["d1_rule"]
+    if abs(gap) < 0.01:
+        vs_d1 = (f"On the pre-season test our forecast did about as well as the simple 'D1 or worse now' rule "
+                 f"(score {row['forecast']:.3f} against {row['d1_rule']:.3f}). It ties; it does not beat it.")
+    elif gap > 0:
+        vs_d1 = (f"On the pre-season test our forecast did better than the simple 'D1 or worse now' rule "
+                 f"(score {row['forecast']:.3f} against {row['d1_rule']:.3f}).")
+    else:
+        vs_d1 = (f"On the pre-season test our forecast did worse than the simple 'D1 or worse now' rule "
+                 f"(score {row['forecast']:.3f} against {row['d1_rule']:.3f}).")
+    if row["forecast_reservoir"] - row["forecast"] < 0.01:
+        res = (f"Adding reservoir storage did not help (score {row['forecast_reservoir']:.3f} with it, "
+               f"{row['forecast']:.3f} without).")
+    else:
+        res = (f"Adding reservoir storage helped a little (score {row['forecast_reservoir']:.3f} with it, "
+               f"{row['forecast']:.3f} without).")
+    return vs_d1, res

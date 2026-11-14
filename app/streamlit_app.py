@@ -456,11 +456,13 @@ def show_trigger(trig):
         fig.update_layout(xaxis_title="Cost of acting, as a share of the loss avoided",
                           yaxis_title="Value per row (higher is better)")
         st.plotly_chart(theme.style_fig(fig, 340), width="stretch")
-    st.write("Our forecast beats the simple 'D1 or worse now' rule: "
-             f"**{yes_no(trig['forecast_beats_d1_rule'])}**. With reservoir storage added: "
-             f"**{yes_no(trig['reservoir_forecast_beats_d1_rule'])}**.")
-    if not trig["forecast_beats_d1_rule"]:
-        st.write("For this decision our model does about as well as a simple drought rule.")
+    if trig["value_sweep"]:
+        for sentence in canal.trigger_verdict(trig):
+            st.write(sentence)
+    st.caption("The file's own yes/no flags: forecast beats the D1 rule = "
+               f"{yes_no(trig['forecast_beats_d1_rule'])}; with reservoirs = "
+               f"{yes_no(trig['reservoir_forecast_beats_d1_rule'])}. The flag counts any margin, however small, "
+               "so we word the result from the scores above.")
 
 
 def show_losses(loss):
@@ -628,8 +630,12 @@ def tab_canal():
     p = float(row["p_season_res"] if has_res else row["p_season"])
     source_note = ("score from the forest that also sees reservoir storage" if has_res
                    else "score without reservoir data (the reservoir version is not available yet)")
+    card_rows = [source_note]
+    trig = metrics.get("trigger")
+    if has_res and isinstance(trig, dict) and trig.get("value_sweep"):
+        card_rows.append(canal.trigger_verdict(trig)[1])      # e.g. "Adding reservoir storage did not help ..."
     cards = [dict(label="Next 6 months", value=f"{round(p * 100)}%", accent=theme.CHART_COLORS[0],
-                  caption="chance of 8 straight weeks of severe drought", rows=[source_note])]
+                  caption="chance of 8 straight weeks of severe drought", rows=card_rows)]
     if "res_name" in latest.columns and row["res_name"] != "none":
         cards.append(dict(label="Reservoir", value=f"{round(row['res_pct_full'])}% full",
                           accent=theme.CHART_COLORS[0], caption=str(row["res_name"]),
@@ -708,10 +714,8 @@ def tab_canal():
 
     # 6) The fixed "Read this first" box (the five lines the plan requires).
     trig = metrics.get("trigger")
-    if isinstance(trig, dict) and "forecast_beats_d1_rule" in trig:
-        d1 = ("On the pre-season test our forecast did better than the simple 'D1 or worse now' rule."
-              if trig["forecast_beats_d1_rule"] else
-              "On the pre-season test our forecast did about as well as the simple 'D1 or worse now' rule.")
+    if isinstance(trig, dict) and trig.get("value_sweep"):
+        d1 = " ".join(canal.trigger_verdict(trig))
     else:
         d1 = "How the forecast compared with the simple 'D1 or worse now' rule: not available yet."
     st.markdown("#### Read this first")

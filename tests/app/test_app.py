@@ -150,7 +150,7 @@ def test_how_good_tab_shows_trigger_losses_and_reservoirs(monkeypatch):
     headers = [h.value for h in at.header]
     for h in ("Does the forecast work as a pre-season trigger?", "Measured drought losses", "Reservoirs"):
         assert h in headers
-    assert any("does about as well as a simple drought rule" in e.value for e in at.markdown)
+    assert any("did about as well as the simple" in str(e.value) for e in at.markdown)
 
     def stripped():
         pred, outlook, latest, metrics = contract.load_demo()

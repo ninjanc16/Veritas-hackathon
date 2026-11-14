@@ -113,6 +113,11 @@ Cost = 3 x missed droughts + false alarms. That cost rule is our assumption, not
 - Buffer check: with a 100 km county rule (53 counties), the 4-week system cost 3269 against 3243 for the best simple rule (Worsening).
 - An outside review suggested two simple rules that were not in our baseline list. They were scored after the final run. 4-week rule 'D2 now, or D1 and worse than 4 or 8 weeks ago': cost 1840 on the test years, against 1912 for the system. 12-month rule 'average of 'same as now' and 'same as the last 52 weeks'': average error 13.21 weeks, against 14.0 for the system.
 - The 6-month outlook uses an El Nino value that NOAA publishes a few days into the month, around the same days the outlook is issued. A real-time forecast might have to use the value from a month earlier.
+- Pre-season trigger (outlooks issued January to March): our forecast caught 790 of 852 drought seasons with 271 false alarms. The simple rule 'D1 or worse now' caught 780 with 243. At a cost ratio of 0.25 the forecast is worth 0.3135 per decision against 0.3132 for the rule. That is a tie, not a win.
+- Reservoir storage did not help. The 6-month outlook costs 2452 with reservoir inputs, against 2324 without them. As a pre-season trigger the reservoir forecast caught 771 drought seasons with 261 false alarms.
+- Only 14 of the 31 Rio Grande counties are matched to a reservoir, and that matching is our assumption.
+- County drought is not the same as water supply. Water in the canals also depends on reservoir releases and on Mexico's deliveries under the 1944 water treaty, which are not modeled.
+- The loss figures are insured crop losses only, not all drought losses, and are not adjusted for inflation.
 
 ## What we'd do next
 Snowpack and river flow as inputs, the real grazing-period rule, a rancher's own cost numbers, and

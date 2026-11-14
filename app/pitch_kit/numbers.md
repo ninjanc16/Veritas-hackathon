@@ -7,7 +7,7 @@ Every value below is copied from reports/metrics.json. Nothing is computed here.
 ## Setup
 
 - `contract_version`: 2
-- `generated_at`: 2026-11-14T08:02:28-08:00
+- `generated_at`: 2026-11-14T11:53:38-08:00
 - `is_final`: True
 - `focus_river`: Rio Grande
 - `training_scope`: Rio Grande counties only
@@ -435,6 +435,379 @@ Every value below is copied from reports/metrics.json. Nothing is computed here.
 - `limits[21]`: Buffer check: with a 100 km county rule (53 counties), the 4-week system cost 3269 against 3243 for the best simple rule (Worsening).
 - `limits[22]`: An outside review suggested two simple rules that were not in our baseline list. They were scored after the final run. 4-week rule 'D2 now, or D1 and worse than 4 or 8 weeks ago': cost 1840 on the test years, against 1912 for the system. 12-month rule 'average of 'same as now' and 'same as the last 52 weeks'': average error 13.21 weeks, against 14.0 for the system.
 - `limits[23]`: The 6-month outlook uses an El Nino value that NOAA publishes a few days into the month, around the same days the outlook is issued. A real-time forecast might have to use the value from a month earlier.
+- `limits[24]`: Pre-season trigger (outlooks issued January to March): our forecast caught 790 of 852 drought seasons with 271 false alarms. The simple rule 'D1 or worse now' caught 780 with 243. At a cost ratio of 0.25 the forecast is worth 0.3135 per decision against 0.3132 for the rule. That is a tie, not a win.
+- `limits[25]`: Reservoir storage did not help. The 6-month outlook costs 2452 with reservoir inputs, against 2324 without them. As a pre-season trigger the reservoir forecast caught 771 drought seasons with 261 false alarms.
+- `limits[26]`: Only 14 of the 31 Rio Grande counties are matched to a reservoir, and that matching is our assumption.
+- `limits[27]`: County drought is not the same as water supply. Water in the canals also depends on reservoir releases and on Mexico's deliveries under the 1944 water treaty, which are not modeled.
+- `limits[28]`: The loss figures are insured crop losses only, not all drought losses, and are not adjusted for inflation.
+
+## Pre-season trigger
+
+- `trigger.issue_months[0]`: 1
+- `trigger.issue_months[1]`: 2
+- `trigger.issue_months[2]`: 3
+- `trigger.threshold`: 0.25
+- `trigger.rows`: 1674
+- `trigger.drought_seasons`: 852
+- `trigger.rules[0].name`: Our forecast
+- `trigger.rules[0].fires`: 1061
+- `trigger.rules[0].caught`: 790
+- `trigger.rules[0].missed`: 62
+- `trigger.rules[0].false_alarms`: 271
+- `trigger.rules[0].recall`: 0.927
+- `trigger.rules[0].precision`: 0.745
+- `trigger.rules[1].name`: Our forecast with reservoirs
+- `trigger.rules[1].fires`: 1032
+- `trigger.rules[1].caught`: 771
+- `trigger.rules[1].missed`: 81
+- `trigger.rules[1].false_alarms`: 261
+- `trigger.rules[1].recall`: 0.905
+- `trigger.rules[1].precision`: 0.747
+- `trigger.rules[2].name`: D1 or worse now
+- `trigger.rules[2].fires`: 1023
+- `trigger.rules[2].caught`: 780
+- `trigger.rules[2].missed`: 72
+- `trigger.rules[2].false_alarms`: 243
+- `trigger.rules[2].recall`: 0.915
+- `trigger.rules[2].precision`: 0.762
+- `trigger.rules[3].name`: D2 or worse now
+- `trigger.rules[3].fires`: 661
+- `trigger.rules[3].caught`: 591
+- `trigger.rules[3].missed`: 261
+- `trigger.rules[3].false_alarms`: 70
+- `trigger.rules[3].recall`: 0.694
+- `trigger.rules[3].precision`: 0.894
+- `trigger.rules[4].name`: Seal every year
+- `trigger.rules[4].fires`: 1674
+- `trigger.rules[4].caught`: 852
+- `trigger.rules[4].missed`: 0
+- `trigger.rules[4].false_alarms`: 822
+- `trigger.rules[4].recall`: 1.0
+- `trigger.rules[4].precision`: 0.509
+- `trigger.value_sweep[0].cost_ratio`: 0.02
+- `trigger.value_sweep[0].forecast`: 0.4893
+- `trigger.value_sweep[0].forecast_reservoir`: 0.4896
+- `trigger.value_sweep[0].d1_rule`: 0.4537
+- `trigger.value_sweep[0].persistence`: 0.3451
+- `trigger.value_sweep[0].seal_every_year`: 0.489
+- `trigger.value_sweep[1].cost_ratio`: 0.05
+- `trigger.value_sweep[1].forecast`: 0.4628
+- `trigger.value_sweep[1].forecast_reservoir`: 0.4632
+- `trigger.value_sweep[1].d1_rule`: 0.4354
+- `trigger.value_sweep[1].persistence`: 0.3333
+- `trigger.value_sweep[1].seal_every_year`: 0.459
+- `trigger.value_sweep[2].cost_ratio`: 0.1
+- `trigger.value_sweep[2].forecast`: 0.4216
+- `trigger.value_sweep[2].forecast_reservoir`: 0.4179
+- `trigger.value_sweep[2].d1_rule`: 0.4048
+- `trigger.value_sweep[2].persistence`: 0.3136
+- `trigger.value_sweep[2].seal_every_year`: 0.409
+- `trigger.value_sweep[3].cost_ratio`: 0.18
+- `trigger.value_sweep[3].forecast`: 0.3612
+- `trigger.value_sweep[3].forecast_reservoir`: 0.3599
+- `trigger.value_sweep[3].d1_rule`: 0.3559
+- `trigger.value_sweep[3].persistence`: 0.282
+- `trigger.value_sweep[3].seal_every_year`: 0.329
+- `trigger.value_sweep[4].cost_ratio`: 0.25
+- `trigger.value_sweep[4].forecast`: 0.3135
+- `trigger.value_sweep[4].forecast_reservoir`: 0.3065
+- `trigger.value_sweep[4].d1_rule`: 0.3132
+- `trigger.value_sweep[4].persistence`: 0.2543
+- `trigger.value_sweep[4].seal_every_year`: 0.259
+- `trigger.value_sweep[5].cost_ratio`: 0.5
+- `trigger.value_sweep[5].forecast`: 0.158
+- `trigger.value_sweep[5].forecast_reservoir`: 0.1679
+- `trigger.value_sweep[5].d1_rule`: 0.1604
+- `trigger.value_sweep[5].persistence`: 0.1556
+- `trigger.value_sweep[5].seal_every_year`: 0.009
+- `trigger.forecast_beats_d1_rule`: True
+- `trigger.reservoir_forecast_beats_d1_rule`: False
+- `trigger.reservoir_counties_only.counties`: 14
+- `trigger.reservoir_counties_only.rows`: 756
+- `trigger.reservoir_counties_only.drought_seasons`: 402
+- `trigger.reservoir_counties_only.rules[0].name`: Our forecast
+- `trigger.reservoir_counties_only.rules[0].fires`: 493
+- `trigger.reservoir_counties_only.rules[0].caught`: 379
+- `trigger.reservoir_counties_only.rules[0].missed`: 23
+- `trigger.reservoir_counties_only.rules[0].false_alarms`: 114
+- `trigger.reservoir_counties_only.rules[0].recall`: 0.943
+- `trigger.reservoir_counties_only.rules[0].precision`: 0.769
+- `trigger.reservoir_counties_only.rules[1].name`: Our forecast with reservoirs
+- `trigger.reservoir_counties_only.rules[1].fires`: 513
+- `trigger.reservoir_counties_only.rules[1].caught`: 381
+- `trigger.reservoir_counties_only.rules[1].missed`: 21
+- `trigger.reservoir_counties_only.rules[1].false_alarms`: 132
+- `trigger.reservoir_counties_only.rules[1].recall`: 0.948
+- `trigger.reservoir_counties_only.rules[1].precision`: 0.743
+- `trigger.reservoir_counties_only.rules[2].name`: D1 or worse now
+- `trigger.reservoir_counties_only.rules[2].fires`: 477
+- `trigger.reservoir_counties_only.rules[2].caught`: 369
+- `trigger.reservoir_counties_only.rules[2].missed`: 33
+- `trigger.reservoir_counties_only.rules[2].false_alarms`: 108
+- `trigger.reservoir_counties_only.rules[2].recall`: 0.918
+- `trigger.reservoir_counties_only.rules[2].precision`: 0.774
+- `trigger.reservoir_counties_only.rules[3].name`: D2 or worse now
+- `trigger.reservoir_counties_only.rules[3].fires`: 308
+- `trigger.reservoir_counties_only.rules[3].caught`: 285
+- `trigger.reservoir_counties_only.rules[3].missed`: 117
+- `trigger.reservoir_counties_only.rules[3].false_alarms`: 23
+- `trigger.reservoir_counties_only.rules[3].recall`: 0.709
+- `trigger.reservoir_counties_only.rules[3].precision`: 0.925
+- `trigger.reservoir_counties_only.rules[4].name`: Seal every year
+- `trigger.reservoir_counties_only.rules[4].fires`: 756
+- `trigger.reservoir_counties_only.rules[4].caught`: 402
+- `trigger.reservoir_counties_only.rules[4].missed`: 0
+- `trigger.reservoir_counties_only.rules[4].false_alarms`: 354
+- `trigger.reservoir_counties_only.rules[4].recall`: 1.0
+- `trigger.reservoir_counties_only.rules[4].precision`: 0.532
+- `trigger.reservoir_counties_only.value_sweep[0].cost_ratio`: 0.02
+- `trigger.reservoir_counties_only.value_sweep[0].forecast`: 0.5121
+- `trigger.reservoir_counties_only.value_sweep[0].forecast_reservoir`: 0.512
+- `trigger.reservoir_counties_only.value_sweep[0].d1_rule`: 0.4755
+- `trigger.reservoir_counties_only.value_sweep[0].persistence`: 0.3688
+- `trigger.reservoir_counties_only.value_sweep[0].seal_every_year`: 0.5117
+- `trigger.reservoir_counties_only.value_sweep[1].cost_ratio`: 0.05
+- `trigger.reservoir_counties_only.value_sweep[1].forecast`: 0.487
+- `trigger.reservoir_counties_only.value_sweep[1].forecast_reservoir`: 0.4861
+- `trigger.reservoir_counties_only.value_sweep[1].d1_rule`: 0.4565
+- `trigger.reservoir_counties_only.value_sweep[1].persistence`: 0.3566
+- `trigger.reservoir_counties_only.value_sweep[1].seal_every_year`: 0.4817
+- `trigger.reservoir_counties_only.value_sweep[2].cost_ratio`: 0.1
+- `trigger.reservoir_counties_only.value_sweep[2].forecast`: 0.4497
+- `trigger.reservoir_counties_only.value_sweep[2].forecast_reservoir`: 0.4472
+- `trigger.reservoir_counties_only.value_sweep[2].d1_rule`: 0.425
+- `trigger.reservoir_counties_only.value_sweep[2].persistence`: 0.3362
+- `trigger.reservoir_counties_only.value_sweep[2].seal_every_year`: 0.4317
+- `trigger.reservoir_counties_only.value_sweep[3].cost_ratio`: 0.18
+- `trigger.reservoir_counties_only.value_sweep[3].forecast`: 0.3891
+- `trigger.reservoir_counties_only.value_sweep[3].forecast_reservoir`: 0.3828
+- `trigger.reservoir_counties_only.value_sweep[3].d1_rule`: 0.3745
+- `trigger.reservoir_counties_only.value_sweep[3].persistence`: 0.3037
+- `trigger.reservoir_counties_only.value_sweep[3].seal_every_year`: 0.3517
+- `trigger.reservoir_counties_only.value_sweep[4].cost_ratio`: 0.25
+- `trigger.reservoir_counties_only.value_sweep[4].forecast`: 0.3383
+- `trigger.reservoir_counties_only.value_sweep[4].forecast_reservoir`: 0.3343
+- `trigger.reservoir_counties_only.value_sweep[4].d1_rule`: 0.3304
+- `trigger.reservoir_counties_only.value_sweep[4].persistence`: 0.2751
+- `trigger.reservoir_counties_only.value_sweep[4].seal_every_year`: 0.2817
+- `trigger.reservoir_counties_only.value_sweep[5].cost_ratio`: 0.5
+- `trigger.reservoir_counties_only.value_sweep[5].forecast`: 0.1799
+- `trigger.reservoir_counties_only.value_sweep[5].forecast_reservoir`: 0.1971
+- `trigger.reservoir_counties_only.value_sweep[5].d1_rule`: 0.1726
+- `trigger.reservoir_counties_only.value_sweep[5].persistence`: 0.1733
+- `trigger.reservoir_counties_only.value_sweep[5].seal_every_year`: 0.0317
+
+## Reservoirs
+
+- `reservoir.systems[0].name`: Amistad-Falcon
+- `reservoir.systems[0].counties`: 10
+- `reservoir.systems[0].first_date`: 1990-01-01
+- `reservoir.systems[0].last_date`: 2026-11-14
+- `reservoir.systems[1].name`: Elephant Butte
+- `reservoir.systems[1].counties`: 4
+- `reservoir.systems[1].first_date`: 1990-01-01
+- `reservoir.systems[1].last_date`: 2026-11-14
+- `reservoir.counties_without_reservoir`: 17
+- `reservoir.note`: Counties were matched to reservoirs by us, not from a published list. The ten Texas counties from Val Verde to Cameron use Amistad-Falcon (the two lakes added together). Sierra, Dona Ana, El Paso and Hudspeth use Elephant Butte. Counties upstream of a reservoir cannot draw from it, so they get no reservoir input. Storage data: Texas Water Development Board, waterdatafortexas.org.
+- `reservoir.season_cost_without`: 2324
+- `reservoir.season_cost_with`: 2452
+- `reservoir.helped`: False
+
+## Measured drought losses
+
+- `losses.source`: USDA Risk Management Agency, Cause of Loss files
+- `losses.years[0]`: 2000
+- `losses.years[1]`: 2025
+- `losses.causes_included[0]`: Drought
+- `losses.total_usd`: 361225400
+- `losses.by_year[0].year`: 2000
+- `losses.by_year[0].usd`: 8803452
+- `losses.by_year[1].year`: 2001
+- `losses.by_year[1].usd`: 31484632
+- `losses.by_year[2].year`: 2002
+- `losses.by_year[2].usd`: 33054222
+- `losses.by_year[3].year`: 2003
+- `losses.by_year[3].usd`: 1589818
+- `losses.by_year[4].year`: 2004
+- `losses.by_year[4].usd`: 9421
+- `losses.by_year[5].year`: 2005
+- `losses.by_year[5].usd`: 8306741
+- `losses.by_year[6].year`: 2006
+- `losses.by_year[6].usd`: 33664730
+- `losses.by_year[7].year`: 2007
+- `losses.by_year[7].usd`: 262393
+- `losses.by_year[8].year`: 2008
+- `losses.by_year[8].usd`: 10746466
+- `losses.by_year[9].year`: 2009
+- `losses.by_year[9].usd`: 18496014
+- `losses.by_year[10].year`: 2010
+- `losses.by_year[10].usd`: 24238
+- `losses.by_year[11].year`: 2011
+- `losses.by_year[11].usd`: 20864908
+- `losses.by_year[12].year`: 2012
+- `losses.by_year[12].usd`: 5325326
+- `losses.by_year[13].year`: 2013
+- `losses.by_year[13].usd`: 60813172
+- `losses.by_year[14].year`: 2014
+- `losses.by_year[14].usd`: 1751048
+- `losses.by_year[15].year`: 2015
+- `losses.by_year[15].usd`: 45642
+- `losses.by_year[16].year`: 2016
+- `losses.by_year[16].usd`: 706208
+- `losses.by_year[17].year`: 2017
+- `losses.by_year[17].usd`: 5483716
+- `losses.by_year[18].year`: 2018
+- `losses.by_year[18].usd`: 40572558
+- `losses.by_year[19].year`: 2019
+- `losses.by_year[19].usd`: 2963112
+- `losses.by_year[20].year`: 2020
+- `losses.by_year[20].usd`: 20049947
+- `losses.by_year[21].year`: 2021
+- `losses.by_year[21].usd`: 21878262
+- `losses.by_year[22].year`: 2022
+- `losses.by_year[22].usd`: 8544004
+- `losses.by_year[23].year`: 2023
+- `losses.by_year[23].usd`: 12155007
+- `losses.by_year[24].year`: 2024
+- `losses.by_year[24].usd`: 9577369
+- `losses.by_year[25].year`: 2025
+- `losses.by_year[25].usd`: 4052994
+- `losses.by_county[0].fips`: 48489
+- `losses.by_county[0].county`: Willacy
+- `losses.by_county[0].state`: Texas
+- `losses.by_county[0].usd`: 149710654
+- `losses.by_county[1].fips`: 48215
+- `losses.by_county[1].county`: Hidalgo
+- `losses.by_county[1].state`: Texas
+- `losses.by_county[1].usd`: 88326018
+- `losses.by_county[2].fips`: 48061
+- `losses.by_county[2].county`: Cameron
+- `losses.by_county[2].state`: Texas
+- `losses.by_county[2].usd`: 85659348
+- `losses.by_county[3].fips`: 48427
+- `losses.by_county[3].county`: Starr
+- `losses.by_county[3].state`: Texas
+- `losses.by_county[3].usd`: 29831166
+- `losses.by_county[4].fips`: 08109
+- `losses.by_county[4].county`: Saguache
+- `losses.by_county[4].state`: Colorado
+- `losses.by_county[4].usd`: 2794237
+- `losses.by_county[5].fips`: 48271
+- `losses.by_county[5].county`: Kinney
+- `losses.by_county[5].state`: Texas
+- `losses.by_county[5].usd`: 1737209
+- `losses.by_county[6].fips`: 48505
+- `losses.by_county[6].county`: Zapata
+- `losses.by_county[6].state`: Texas
+- `losses.by_county[6].usd`: 1149666
+- `losses.by_county[7].fips`: 48127
+- `losses.by_county[7].county`: Dimmit
+- `losses.by_county[7].state`: Texas
+- `losses.by_county[7].usd`: 842424
+- `losses.by_county[8].fips`: 48229
+- `losses.by_county[8].county`: Hudspeth
+- `losses.by_county[8].state`: Texas
+- `losses.by_county[8].usd`: 584419
+- `losses.by_county[9].fips`: 48141
+- `losses.by_county[9].county`: El Paso
+- `losses.by_county[9].state`: Texas
+- `losses.by_county[9].usd`: 417930
+- `losses.by_county[10].fips`: 48323
+- `losses.by_county[10].county`: Maverick
+- `losses.by_county[10].state`: Texas
+- `losses.by_county[10].usd`: 53322
+- `losses.by_county[11].fips`: 35053
+- `losses.by_county[11].county`: Socorro
+- `losses.by_county[11].state`: New Mexico
+- `losses.by_county[11].usd`: 32759
+- `losses.by_county[12].fips`: 08003
+- `losses.by_county[12].county`: Alamosa
+- `losses.by_county[12].state`: Colorado
+- `losses.by_county[12].usd`: 32594
+- `losses.by_county[13].fips`: 08021
+- `losses.by_county[13].county`: Conejos
+- `losses.by_county[13].state`: Colorado
+- `losses.by_county[13].usd`: 26023
+- `losses.by_county[14].fips`: 35013
+- `losses.by_county[14].county`: Doña Ana
+- `losses.by_county[14].state`: New Mexico
+- `losses.by_county[14].usd`: 14722
+- `losses.by_county[15].fips`: 08105
+- `losses.by_county[15].county`: Rio Grande
+- `losses.by_county[15].state`: Colorado
+- `losses.by_county[15].usd`: 12908
+- `losses.by_county[16].fips`: 08023
+- `losses.by_county[16].county`: Costilla
+- `losses.by_county[16].state`: Colorado
+- `losses.by_county[16].usd`: 0
+- `losses.by_county[17].fips`: 08053
+- `losses.by_county[17].county`: Hinsdale
+- `losses.by_county[17].state`: Colorado
+- `losses.by_county[17].usd`: 0
+- `losses.by_county[18].fips`: 08079
+- `losses.by_county[18].county`: Mineral
+- `losses.by_county[18].state`: Colorado
+- `losses.by_county[18].usd`: 0
+- `losses.by_county[19].fips`: 08111
+- `losses.by_county[19].county`: San Juan
+- `losses.by_county[19].state`: Colorado
+- `losses.by_county[19].usd`: 0
+- `losses.by_county[20].fips`: 35001
+- `losses.by_county[20].county`: Bernalillo
+- `losses.by_county[20].state`: New Mexico
+- `losses.by_county[20].usd`: 0
+- `losses.by_county[21].fips`: 35028
+- `losses.by_county[21].county`: Los Alamos
+- `losses.by_county[21].state`: New Mexico
+- `losses.by_county[21].usd`: 0
+- `losses.by_county[22].fips`: 35043
+- `losses.by_county[22].county`: Sandoval
+- `losses.by_county[22].state`: New Mexico
+- `losses.by_county[22].usd`: 0
+- `losses.by_county[23].fips`: 35049
+- `losses.by_county[23].county`: Santa Fe
+- `losses.by_county[23].state`: New Mexico
+- `losses.by_county[23].usd`: 0
+- `losses.by_county[24].fips`: 35051
+- `losses.by_county[24].county`: Sierra
+- `losses.by_county[24].state`: New Mexico
+- `losses.by_county[24].usd`: 0
+- `losses.by_county[25].fips`: 35055
+- `losses.by_county[25].county`: Taos
+- `losses.by_county[25].state`: New Mexico
+- `losses.by_county[25].usd`: 0
+- `losses.by_county[26].fips`: 35061
+- `losses.by_county[26].county`: Valencia
+- `losses.by_county[26].state`: New Mexico
+- `losses.by_county[26].usd`: 0
+- `losses.by_county[27].fips`: 48043
+- `losses.by_county[27].county`: Brewster
+- `losses.by_county[27].state`: Texas
+- `losses.by_county[27].usd`: 0
+- `losses.by_county[28].fips`: 48377
+- `losses.by_county[28].county`: Presidio
+- `losses.by_county[28].state`: Texas
+- `losses.by_county[28].usd`: 0
+- `losses.by_county[29].fips`: 48465
+- `losses.by_county[29].county`: Val Verde
+- `losses.by_county[29].state`: Texas
+- `losses.by_county[29].usd`: 0
+- `losses.by_county[30].fips`: 48479
+- `losses.by_county[30].county`: Webb
+- `losses.by_county[30].state`: Texas
+- `losses.by_county[30].usd`: 0
+- `losses.note`: Insured crop losses only, paid for the cause 'Drought'. Not all drought losses: uninsured crops and most pasture and cattle losses are missing. Dollars are not adjusted for inflation. The latest year may still be incomplete. Losses for the separate cause 'Failure of Irrigation Supply' are not in the total. They were $375,345,508 over the same years.
+- `losses.irrigation_supply_usd`: 375345508
+- `losses.top_crops[0].crop`: Cotton
+- `losses.top_crops[0].usd`: 203254495
+- `losses.top_crops[1].crop`: Grain Sorghum
+- `losses.top_crops[1].usd`: 125747507
+- `losses.top_crops[2].crop`: Corn
+- `losses.top_crops[2].usd`: 13859527
+- `losses.top_crops[3].crop`: Sunflowers
+- `losses.top_crops[3].usd`: 4971454
+- `losses.top_crops[4].crop`: Sesame
+- `losses.top_crops[4].usd`: 4366448
 
 ## Other keys
 

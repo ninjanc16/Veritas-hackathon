@@ -76,7 +76,7 @@ def test_numbers_md_has_the_canal_headings_and_explain_has_17_questions():
     text = numbers_md(metrics, "DEMO")
     for heading in ("## Pre-season trigger", "## Reservoirs", "## Measured drought losses"):
         assert heading in text
-    assert "- `trigger.forecast_beats_d1_rule`: False" in text
+    assert "- `trigger.forecast_beats_d1_rule`: True" in text
     explain = explain_md(metrics, "DEMO")
     assert "## 14. What does the forecast have to do with canals?" in explain
     assert "## 17. Where is the AI and where is it not?" in explain

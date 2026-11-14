@@ -412,9 +412,9 @@ def build_metrics(pred, outlook, latest):
                    for n, f, c in [("Our forecast", 40, 24), ("Our forecast with reservoirs", 38, 24),
                                    ("D1 or worse now", 50, 25), ("D2 or worse now", 30, 18),
                                    ("Seal every year", 120, 30)]],
-            value_sweep=[dict(cost_ratio=r, forecast=0.10 - r, forecast_reservoir=0.11 - r, d1_rule=0.09 - r,
-                              persistence=0.08 - r, seal_every_year=0.25 - 2 * r) for r in (0.02, 0.05, 0.10, 0.20)],
-            forecast_beats_d1_rule=False, reservoir_forecast_beats_d1_rule=False),
+            value_sweep=[dict(cost_ratio=r, forecast=0.50 - r, forecast_reservoir=0.495 - r, d1_rule=0.497 - r,
+                              persistence=0.40 - r, seal_every_year=0.50 - r) for r in (0.02, 0.05, 0.10, 0.25, 0.50)],
+            forecast_beats_d1_rule=True, reservoir_forecast_beats_d1_rule=False),
         reservoir=dict(
             systems=[dict(name="Amistad-Falcon", counties=4, first_date="2000-01-01", last_date="2026-10-13"),
                      dict(name="Elephant Butte", counties=4, first_date="2000-01-01", last_date="2026-10-13")],
