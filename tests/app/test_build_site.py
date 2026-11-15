@@ -3,6 +3,7 @@ import json
 
 import pytest
 
+from app import contract
 from app.build_site import OUT, build
 from app.contract import REPO_ROOT
 
@@ -78,3 +79,31 @@ def test_scan_base_map_and_frozen_model_are_packed(site):
     if frozen is not None:                                # app/forecast_pre2020.py has been run
         assert frozen["trainedOn"]["to"] < "2020-01-01"   # nothing after the cut-off was learned from
         assert set(frozen["live"]) == {c["fips"] for c in core["river"]}
+
+
+def test_the_build_refuses_inputs_that_break_the_contract(tmp_path, monkeypatch):
+    # Arrange: a copy of the real metrics file with one required key removed
+    broken = json.loads(contract.REAL_METRICS.read_text())
+    del broken["headline"]
+    bad_metrics = tmp_path / "metrics.json"
+    bad_metrics.write_text(json.dumps(broken))
+    monkeypatch.setattr(contract, "REAL_METRICS", bad_metrics)
+    out = tmp_path / "site_data"
+
+    # Act / Assert: the build stops with the problem in plain words, and writes nothing
+    with pytest.raises(SystemExit) as stopped:
+        build(out)
+    message = str(stopped.value)
+    assert "NOT built" in message and "missing key 'headline'" in message
+    assert not out.exists()
+
+
+def test_the_build_refuses_when_a_handoff_file_is_missing(tmp_path, monkeypatch):
+    # Arrange: point the contract at an empty folder
+    monkeypatch.setattr(contract, "REAL_DIR", tmp_path)
+    out = tmp_path / "site_data"
+
+    # Act / Assert
+    with pytest.raises(SystemExit, match="missing real file"):
+        build(out)
+    assert not out.exists()

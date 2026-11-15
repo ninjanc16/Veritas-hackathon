@@ -14,6 +14,9 @@ selects, rounds and renames. The exceptions, all simple:
     reading, so they are never ranked or priced.
   - The forecast model frozen at the end of 2019 is packed in from app/forecast_pre2020.py.
 
+It first checks the pipeline's files against the data contract (app/contract.py) and refuses
+to build from files that break it.
+
 Run it with:   python -m app.build_site        (from the repo root)
 Run it again whenever the pipeline outputs change (the daily refresh changes them).
 """
@@ -29,6 +32,8 @@ ROOT = Path(__file__).resolve().parents[1]
 # The line-matching helpers are shared with the pipeline (src/farmdrought/canal_class.py), so
 # both match canals to OpenStreetMap the same way. That module imports nothing heavy.
 sys.path.insert(0, str(ROOT / "src"))
+sys.path.insert(0, str(ROOT))                                                # so "from app import contract" works as a script
+from app import contract  # noqa: E402
 from farmdrought.canal_class import OSM_KINDS, dense, line_near, point_grid  # noqa: E402
 RAW = ROOT / "data" / "raw"
 LIVE = ROOT / "data" / "live"        # the daily refresh saves its downloads here; data/raw is a fixed snapshot
@@ -429,12 +434,23 @@ def write_js(path, variable, data):
     print(f"wrote {shown}  ({path.stat().st_size / 1e6:.2f} MB)")
 
 
+def check_inputs():
+    """Check the four handoff files against the data contract (app/contract.py) BEFORE anything
+    is written. If a file is missing or breaks the contract, stop with the list of problems:
+    a website built from bad inputs would show wrong numbers without saying so."""
+    *_, problems = contract.load()
+    if problems:
+        raise SystemExit("The site was NOT built, and no file was written, because the pipeline's files do not "
+                         "meet the data contract:\n  - " + "\n  - ".join(problems))
+
+
 def build(out_dir=None):
     """Write core.js and sim.js into out_dir (app/site/data when no folder is given).
 
     The tests pass a temporary folder, so running them never rewrites the tracked data files.
     """
     out_dir = OUT if out_dir is None else Path(out_dir)
+    check_inputs()
     metrics = load_json(ROOT / "reports" / "metrics.json")
     usdm = load_json(newest("usdm-counties.json"))
     latest = pd.read_parquet(PROCESSED / "latest.parquet")
