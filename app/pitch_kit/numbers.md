@@ -7,7 +7,7 @@ Every value below is copied from reports/metrics.json. Nothing is computed here.
 ## Setup
 
 - `contract_version`: 2
-- `generated_at`: 2026-11-14T17:21:39-08:00
+- `generated_at`: 2026-11-15T02:03:14+00:00
 - `is_final`: True
 - `focus_river`: Rio Grande
 - `training_scope`: Rio Grande counties only
@@ -152,13 +152,13 @@ Every value below is copied from reports/metrics.json. Nothing is computed here.
 - `season.focus.precision`: 0.733
 - `season.focus.recall`: 0.868
 - `season.focus.auc`: 0.868
-- `season.focus.system_cost`: 2324
+- `season.focus.system_cost`: 2328
 - `season.focus.persistence_cost`: 3133
 - `season.focus.d1_rule_cost`: 2382
 - `season.focus.usual_cost`: 3871
 - `season.focus.always_warn_cost`: 3403
 - `season.focus.never_warn_cost`: 9786
-- `season.focus.pct_cheaper_than_persistence`: 25.8
+- `season.focus.pct_cheaper_than_persistence`: 25.7
 - `season.focus.beats_every_baseline`: True
 - `season.focus.years_better_than_usual`: 16/18
 
@@ -188,7 +188,7 @@ Every value below is copied from reports/metrics.json. Nothing is computed here.
 - `per_river[0].best_rule_cost`: 1971
 - `per_river[0].pct_cheaper_than_best_rule`: 3.0
 - `per_river[0].own_river_cost`: 1912
-- `per_river[0].all_rivers_cost`: 1760
+- `per_river[0].all_rivers_cost`: 1883
 - `per_river[0].precision`: 0.932
 - `per_river[0].recall`: 0.935
 - `per_river[0].auc`: 0.975
@@ -199,8 +199,8 @@ Every value below is copied from reports/metrics.json. Nothing is computed here.
 - `per_river[1].best_rule`: Worsening
 - `per_river[1].best_rule_cost`: 8677
 - `per_river[1].pct_cheaper_than_best_rule`: -6.4
-- `per_river[1].own_river_cost`: 8190
-- `per_river[1].all_rivers_cost`: 8087
+- `per_river[1].own_river_cost`: 8195
+- `per_river[1].all_rivers_cost`: 8231
 - `per_river[1].precision`: 0.811
 - `per_river[1].recall`: 0.779
 - `per_river[1].auc`: 0.955
@@ -211,8 +211,8 @@ Every value below is copied from reports/metrics.json. Nothing is computed here.
 - `per_river[2].best_rule`: Worsening
 - `per_river[2].best_rule_cost`: 5358
 - `per_river[2].pct_cheaper_than_best_rule`: -1.8
-- `per_river[2].own_river_cost`: 5848
-- `per_river[2].all_rivers_cost`: 5093
+- `per_river[2].own_river_cost`: 5851
+- `per_river[2].all_rivers_cost`: 5239
 - `per_river[2].precision`: 0.877
 - `per_river[2].recall`: 0.875
 - `per_river[2].auc`: 0.972
@@ -224,7 +224,7 @@ Every value below is copied from reports/metrics.json. Nothing is computed here.
 - `per_river[3].best_rule_cost`: 512
 - `per_river[3].pct_cheaper_than_best_rule`: -11.7
 - `per_river[3].own_river_cost`: 562
-- `per_river[3].all_rivers_cost`: 525
+- `per_river[3].all_rivers_cost`: 549
 - `per_river[3].precision`: 0.957
 - `per_river[3].recall`: 0.946
 - `per_river[3].auc`: 0.983
@@ -235,46 +235,46 @@ Every value below is copied from reports/metrics.json. Nothing is computed here.
 - `per_river[4].best_rule`: Persistence
 - `per_river[4].best_rule_cost`: 4470
 - `per_river[4].pct_cheaper_than_best_rule`: -2.7
-- `per_river[4].own_river_cost`: 4625
-- `per_river[4].all_rivers_cost`: 4615
+- `per_river[4].own_river_cost`: 4624
+- `per_river[4].all_rivers_cost`: 4501
 - `per_river[4].precision`: 0.582
 - `per_river[4].recall`: 0.598
 - `per_river[4].auc`: 0.935
 - `season.per_river[0].river`: Rio Grande
-- `season.per_river[0].system_cost`: 2324
+- `season.per_river[0].system_cost`: 2328
 - `season.per_river[0].persistence_cost`: 3133
 - `season.per_river[0].best_rule`: D1 now
 - `season.per_river[0].best_rule_cost`: 2382
-- `season.per_river[0].pct_cheaper_than_best_rule`: 2.4
-- `season.per_river[0].own_river_cost`: 2324
+- `season.per_river[0].pct_cheaper_than_best_rule`: 2.3
+- `season.per_river[0].own_river_cost`: 2328
 - `season.per_river[1].river`: Mississippi
-- `season.per_river[1].system_cost`: 13807
+- `season.per_river[1].system_cost`: 13825
 - `season.per_river[1].persistence_cost`: 9208
 - `season.per_river[1].best_rule`: Persistence
 - `season.per_river[1].best_rule_cost`: 9208
-- `season.per_river[1].pct_cheaper_than_best_rule`: -49.9
-- `season.per_river[1].own_river_cost`: 10086
+- `season.per_river[1].pct_cheaper_than_best_rule`: -50.1
+- `season.per_river[1].own_river_cost`: 10109
 - `season.per_river[2].river`: Missouri
-- `season.per_river[2].system_cost`: 8142
+- `season.per_river[2].system_cost`: 8150
 - `season.per_river[2].persistence_cost`: 6220
 - `season.per_river[2].best_rule`: Persistence
 - `season.per_river[2].best_rule_cost`: 6220
-- `season.per_river[2].pct_cheaper_than_best_rule`: -30.9
-- `season.per_river[2].own_river_cost`: 6162
+- `season.per_river[2].pct_cheaper_than_best_rule`: -31.0
+- `season.per_river[2].own_river_cost`: 6161
 - `season.per_river[3].river`: Colorado
-- `season.per_river[3].system_cost`: 1059
+- `season.per_river[3].system_cost`: 1056
 - `season.per_river[3].persistence_cost`: 1215
 - `season.per_river[3].best_rule`: D1 now
 - `season.per_river[3].best_rule_cost`: 1048
-- `season.per_river[3].pct_cheaper_than_best_rule`: -1.0
-- `season.per_river[3].own_river_cost`: 1072
+- `season.per_river[3].pct_cheaper_than_best_rule`: -0.8
+- `season.per_river[3].own_river_cost`: 1073
 - `season.per_river[4].river`: Ohio
-- `season.per_river[4].system_cost`: 5258
+- `season.per_river[4].system_cost`: 5257
 - `season.per_river[4].persistence_cost`: 2488
 - `season.per_river[4].best_rule`: Persistence
 - `season.per_river[4].best_rule_cost`: 2488
 - `season.per_river[4].pct_cheaper_than_best_rule`: -111.3
-- `season.per_river[4].own_river_cost`: 2658
+- `season.per_river[4].own_river_cost`: 2681
 - `year.per_river[0].river`: Rio Grande
 - `year.per_river[0].mae_system`: 14.0
 - `year.per_river[0].best_baseline`: same as now
@@ -328,42 +328,42 @@ Every value below is copied from reports/metrics.json. Nothing is computed here.
 
 - `ablations[0].name`: 4-week forest trained on all five rivers
 - `ablations[0].product`: 4-week alert
-- `ablations[0].result`: Cost 1760 on the Rio Grande, against 1912 for the Rio Grande-trained system.
+- `ablations[0].result`: Cost 1883 on the Rio Grande, against 1912 for the Rio Grande-trained system.
 - `ablations[1].name`: Logistic regression in place of the forest
 - `ablations[1].product`: 4-week alert
 - `ablations[1].result`: Cost 2535 on the Rio Grande, against 1912 for the forest.
 - `ablations[2].name`: 6-month forest without the El Nino inputs
 - `ablations[2].product`: 6-month outlook
-- `ablations[2].result`: Cost 2489 on the Rio Grande, against 2324 with them.
+- `ablations[2].result`: Cost 2485 on the Rio Grande, against 2328 with them.
 - `ablations[3].name`: 6-month forest trained on all five rivers
 - `ablations[3].product`: 6-month outlook
-- `ablations[3].result`: Cost 2708 on the Rio Grande, against 2324 for the Rio Grande-trained system.
+- `ablations[3].result`: Cost 2691 on the Rio Grande, against 2328 for the Rio Grande-trained system.
 - `ablations[4].name`: 12-month forest trained on all five rivers
 - `ablations[4].product`: 12-month outlook
 - `ablations[4].result`: Average error 13.38 weeks on the Rio Grande, against 14.0 for the Rio Grande-trained system.
 - `ablations[5].name`: River flow added as an input
 - `ablations[5].product`: 6-month outlook
-- `ablations[5].result`: Cost 2378 with it, against 2272 without it, on the same 6577 Rio Grande rows.
+- `ablations[5].result`: Cost 2381 with it, against 2276 without it, on the same 6577 Rio Grande rows.
 - `ablations[6].name`: River flow added as an input
 - `ablations[6].product`: 12-month outlook
 - `ablations[6].result`: Average error 14.64 weeks with it, against 14.07 without it, on the same 6577 Rio Grande rows.
 - `ablations[7].name`: Snowpack (snowmelt supply) added as an input
 - `ablations[7].product`: 6-month outlook
-- `ablations[7].result`: Cost 2338 with it, against 2324 without it, on the same 6665 Rio Grande rows.
+- `ablations[7].result`: Cost 2334 with it, against 2328 without it, on the same 6665 Rio Grande rows.
 - `ablations[8].name`: Snowpack (snowmelt supply) added as an input
 - `ablations[8].product`: 12-month outlook
 - `ablations[8].result`: Average error 13.75 weeks with it, against 14.0 without it, on the same 6665 Rio Grande rows.
 - `ablations[9].name`: River flow and snowpack together added as an input
 - `ablations[9].product`: 6-month outlook
-- `ablations[9].result`: Cost 2342 with it, against 2272 without it, on the same 6577 Rio Grande rows.
+- `ablations[9].result`: Cost 2357 with it, against 2276 without it, on the same 6577 Rio Grande rows.
 - `ablations[10].name`: River flow and snowpack together added as an input
 - `ablations[10].product`: 12-month outlook
 - `ablations[10].result`: Average error 14.18 weeks with it, against 14.07 without it, on the same 6577 Rio Grande rows.
 - `shuffled_auc_mean`: 0.44
 - `feature_importance[0].feature`: cls
-- `feature_importance[0].importance`: 0.172
+- `feature_importance[0].importance`: 0.1723
 - `feature_importance[1].feature`: since_d2
-- `feature_importance[1].importance`: 0.1564
+- `feature_importance[1].importance`: 0.1561
 - `feature_importance[2].feature`: l1
 - `feature_importance[2].importance`: 0.1293
 - `feature_importance[3].feature`: nb_d2
@@ -415,7 +415,7 @@ Every value below is copied from reports/metrics.json. Nothing is computed here.
 - `limits[1]`: The 4-week risk score is not a calibrated probability.
 - `limits[2]`: On the Rio Grande the 4-week system (cost 1912) is close to a tie with the best simple rule, Worsening (cost 1971).
 - `limits[3]`: Onset is the hard part. For counties not yet in severe drought, the system caught 36% of the weeks that led to it, with precision 46%. Its cost was 1735, against 1794 for the best simple rule (Worsening) and 2226 for never warning.
-- `limits[4]`: The 6-month outlook costs 2324, against 2382 for the 'D1 or worse now' rule. That is close to a tie.
+- `limits[4]`: The 6-month outlook costs 2328, against 2382 for the 'D1 or worse now' rule. That is close to a tie.
 - `limits[5]`: The 12-month outlook is off by 14.0 weeks on average, against an average of 22.1 weeks. It is a planning range, not a precise forecast.
 - `limits[6]`: Transfer of the Rio Grande-trained 4-week system: it did not beat the best simple rule on: Mississippi, Missouri, Colorado, Ohio. It did not beat persistence on: Ohio.
 - `limits[7]`: Transfer of the Rio Grande-trained 6-month outlook: it did not beat the best simple rule on: Mississippi, Missouri, Colorado, Ohio.
@@ -436,17 +436,17 @@ Every value below is copied from reports/metrics.json. Nothing is computed here.
 - `limits[22]`: An outside review suggested two simple rules that were not in our baseline list. They were scored after the final run. 4-week rule 'D2 now, or D1 and worse than 4 or 8 weeks ago': cost 1840 on the test years, against 1912 for the system. 12-month rule 'average of 'same as now' and 'same as the last 52 weeks'': average error 13.21 weeks, against 14.0 for the system.
 - `limits[23]`: The 6-month outlook uses an El Nino value that NOAA publishes a few days into the month, around the same days the outlook is issued. A real-time forecast might have to use the value from a month earlier.
 - `limits[24]`: Pre-season trigger (outlooks issued January to March): our forecast caught 790 of 852 drought seasons with 271 false alarms. The simple rule 'D1 or worse now' caught 780 with 243. At a cost ratio of 0.25 the forecast is worth 0.3135 per decision against 0.3132 for the rule. That is a tie, not a win.
-- `limits[25]`: Reservoir storage did not help. The 6-month outlook costs 2452 with reservoir inputs, against 2324 without them. As a pre-season trigger the reservoir forecast caught 771 drought seasons with 261 false alarms.
+- `limits[25]`: Reservoir storage did not help. The 6-month outlook costs 2448 with reservoir inputs, against 2328 without them. As a pre-season trigger the reservoir forecast caught 770 drought seasons with 259 false alarms.
 - `limits[26]`: Only 14 of the 31 Rio Grande counties are matched to a reservoir, and that matching is our assumption.
 - `limits[27]`: County drought is not the same as water supply. Water in the canals also depends on reservoir releases and on Mexico's deliveries under the 1944 water treaty, which are not modeled.
 - `limits[28]`: The loss figures are insured crop losses only, not all drought losses, and are not adjusted for inflation.
 - `limits[29]`: The canal map shows where canals and ditches are. It does not say which are irrigation canals, which are lined, how much any canal leaks or which district owns it.
 - `limits[30]`: The canal priority levels are an estimate of where leaks are likely, not measured leaks. They combine the 6-month forecast with a published seepage rate for the soil under each canal. They assume bare-earth canals, because we do not know which canals are lined. No canal was inspected or measured by us.
 - `limits[31]`: Version 2 was built after version 1's test results were known, so its list of candidates is not blind. Only the choice among candidates is protected: it never uses a year it is then scored on.
-- `limits[32]`: Version 2, 4-week alert: cost 1742 against 1912 for version 1 and 1840 for the best simple rule. It won with 5/5 random seeds. The recipe (deep + weather, forest 75% + worsening 4 or 8 weeks) was chosen on only 4 validation years, and it leans on a simple rule that an outside review found after the test.
-- `limits[33]`: Version 2, 6-month outlook: cost 2433 against 2324 for version 1. It did not improve (it won with 3/5 seeds). Version 1 stays.
+- `limits[32]`: Version 2, 4-week alert: cost 1739 against 1912 for version 1 and 1840 for the best simple rule. It won with 5/5 random seeds. The recipe (deep + weather, forest 75% + worsening 4 or 8 weeks) was chosen on only 4 validation years, and it leans on a simple rule that an outside review found after the test.
+- `limits[33]`: Version 2, 6-month outlook: cost 2433 against 2328 for version 1. It did not improve (it won with 2/5 seeds). Version 1 stays.
 - `limits[34]`: Version 2, 12-month outlook: 13.46 weeks off against 14.0 for version 1, but the simple rule alone is 13.21. In most years version 2 simply chose that rule over the forest.
-- `limits[35]`: Weather inputs alone (rain and temperature) did not help: 4-week 2050, 6-month 2559, 12-month 14.12, each worse than version 1.
+- `limits[35]`: Weather inputs alone (rain and temperature) did not help: 4-week 2050, 6-month 2554, 12-month 14.12, each worse than version 1.
 - `limits[36]`: The district map and sealant plan cover Texas districts only. We found no public boundary file for districts in New Mexico or Colorado.
 - `limits[37]`: The sealant plan is a ranking, not a measurement. It assumes every canal is bare earth, has 20 feet of wetted width and carries water for 90 days. We do not know which canals are already lined. The budget is an example figure, and the sealant price is materials only.
 
@@ -466,12 +466,12 @@ Every value below is copied from reports/metrics.json. Nothing is computed here.
 - `trigger.rules[0].recall`: 0.927
 - `trigger.rules[0].precision`: 0.745
 - `trigger.rules[1].name`: Our forecast with reservoirs
-- `trigger.rules[1].fires`: 1032
-- `trigger.rules[1].caught`: 771
-- `trigger.rules[1].missed`: 81
-- `trigger.rules[1].false_alarms`: 261
-- `trigger.rules[1].recall`: 0.905
-- `trigger.rules[1].precision`: 0.747
+- `trigger.rules[1].fires`: 1029
+- `trigger.rules[1].caught`: 770
+- `trigger.rules[1].missed`: 82
+- `trigger.rules[1].false_alarms`: 259
+- `trigger.rules[1].recall`: 0.904
+- `trigger.rules[1].precision`: 0.748
 - `trigger.rules[2].name`: D1 or worse now
 - `trigger.rules[2].fires`: 1023
 - `trigger.rules[2].caught`: 780
@@ -506,20 +506,20 @@ Every value below is copied from reports/metrics.json. Nothing is computed here.
 - `trigger.value_sweep[1].persistence`: 0.3333
 - `trigger.value_sweep[1].seal_every_year`: 0.459
 - `trigger.value_sweep[2].cost_ratio`: 0.1
-- `trigger.value_sweep[2].forecast`: 0.4216
+- `trigger.value_sweep[2].forecast`: 0.421
 - `trigger.value_sweep[2].forecast_reservoir`: 0.4179
 - `trigger.value_sweep[2].d1_rule`: 0.4048
 - `trigger.value_sweep[2].persistence`: 0.3136
 - `trigger.value_sweep[2].seal_every_year`: 0.409
 - `trigger.value_sweep[3].cost_ratio`: 0.18
 - `trigger.value_sweep[3].forecast`: 0.3612
-- `trigger.value_sweep[3].forecast_reservoir`: 0.3599
+- `trigger.value_sweep[3].forecast_reservoir`: 0.36
 - `trigger.value_sweep[3].d1_rule`: 0.3559
 - `trigger.value_sweep[3].persistence`: 0.282
 - `trigger.value_sweep[3].seal_every_year`: 0.329
 - `trigger.value_sweep[4].cost_ratio`: 0.25
 - `trigger.value_sweep[4].forecast`: 0.3135
-- `trigger.value_sweep[4].forecast_reservoir`: 0.3065
+- `trigger.value_sweep[4].forecast_reservoir`: 0.3063
 - `trigger.value_sweep[4].d1_rule`: 0.3132
 - `trigger.value_sweep[4].persistence`: 0.2543
 - `trigger.value_sweep[4].seal_every_year`: 0.259
@@ -542,12 +542,12 @@ Every value below is copied from reports/metrics.json. Nothing is computed here.
 - `trigger.reservoir_counties_only.rules[0].recall`: 0.943
 - `trigger.reservoir_counties_only.rules[0].precision`: 0.769
 - `trigger.reservoir_counties_only.rules[1].name`: Our forecast with reservoirs
-- `trigger.reservoir_counties_only.rules[1].fires`: 513
+- `trigger.reservoir_counties_only.rules[1].fires`: 512
 - `trigger.reservoir_counties_only.rules[1].caught`: 381
 - `trigger.reservoir_counties_only.rules[1].missed`: 21
-- `trigger.reservoir_counties_only.rules[1].false_alarms`: 132
+- `trigger.reservoir_counties_only.rules[1].false_alarms`: 131
 - `trigger.reservoir_counties_only.rules[1].recall`: 0.948
-- `trigger.reservoir_counties_only.rules[1].precision`: 0.743
+- `trigger.reservoir_counties_only.rules[1].precision`: 0.744
 - `trigger.reservoir_counties_only.rules[2].name`: D1 or worse now
 - `trigger.reservoir_counties_only.rules[2].fires`: 477
 - `trigger.reservoir_counties_only.rules[2].caught`: 369
@@ -582,7 +582,7 @@ Every value below is copied from reports/metrics.json. Nothing is computed here.
 - `trigger.reservoir_counties_only.value_sweep[1].persistence`: 0.3566
 - `trigger.reservoir_counties_only.value_sweep[1].seal_every_year`: 0.4817
 - `trigger.reservoir_counties_only.value_sweep[2].cost_ratio`: 0.1
-- `trigger.reservoir_counties_only.value_sweep[2].forecast`: 0.4497
+- `trigger.reservoir_counties_only.value_sweep[2].forecast`: 0.4485
 - `trigger.reservoir_counties_only.value_sweep[2].forecast_reservoir`: 0.4472
 - `trigger.reservoir_counties_only.value_sweep[2].d1_rule`: 0.425
 - `trigger.reservoir_counties_only.value_sweep[2].persistence`: 0.3362
@@ -595,7 +595,7 @@ Every value below is copied from reports/metrics.json. Nothing is computed here.
 - `trigger.reservoir_counties_only.value_sweep[3].seal_every_year`: 0.3517
 - `trigger.reservoir_counties_only.value_sweep[4].cost_ratio`: 0.25
 - `trigger.reservoir_counties_only.value_sweep[4].forecast`: 0.3383
-- `trigger.reservoir_counties_only.value_sweep[4].forecast_reservoir`: 0.3343
+- `trigger.reservoir_counties_only.value_sweep[4].forecast_reservoir`: 0.3347
 - `trigger.reservoir_counties_only.value_sweep[4].d1_rule`: 0.3304
 - `trigger.reservoir_counties_only.value_sweep[4].persistence`: 0.2751
 - `trigger.reservoir_counties_only.value_sweep[4].seal_every_year`: 0.2817
@@ -618,8 +618,8 @@ Every value below is copied from reports/metrics.json. Nothing is computed here.
 - `reservoir.systems[1].last_date`: 2026-11-14
 - `reservoir.counties_without_reservoir`: 17
 - `reservoir.note`: Counties were matched to reservoirs by us, not from a published list. The ten Texas counties from Val Verde to Cameron use Amistad-Falcon (the two lakes added together). Sierra, Dona Ana, El Paso and Hudspeth use Elephant Butte. Counties upstream of a reservoir cannot draw from it, so they get no reservoir input. Storage data: Texas Water Development Board, waterdatafortexas.org.
-- `reservoir.season_cost_without`: 2324
-- `reservoir.season_cost_with`: 2452
+- `reservoir.season_cost_without`: 2328
+- `reservoir.season_cost_with`: 2448
 - `reservoir.helped`: False
 
 ## Measured drought losses
@@ -1544,11 +1544,11 @@ Every value below is copied from reports/metrics.json. Nothing is computed here.
 - `canal_priority.note`: An estimate of where leaks are LIKELY, not measured leaks. It assumes bare-earth canals: we do not know which canals are lined. Real seepage also depends on construction, silt and the water table. The levels change every week with the forecast. Use it to choose canals to inspect, not to claim water savings.
 - `v2.season.rows`: 6665
 - `v2.season.v2`: 2433
-- `v2.season.v1`: 2324
+- `v2.season.v1`: 2328
 - `v2.season.simple_rule`: 2382
 - `v2.season.v2_beats_v1`: False
 - `v2.season.v2_beats_simple_rule`: False
-- `v2.season.weather_alone`: 2559
+- `v2.season.weather_alone`: 2554
 - `v2.season.chosen_each_year.2008`: v1 settings + weather, forest 50%
 - `v2.season.chosen_each_year.2009`: v1 settings + weather, forest 50%
 - `v2.season.chosen_each_year.2010`: more trees, forest 75%
@@ -1567,29 +1567,29 @@ Every value below is copied from reports/metrics.json. Nothing is computed here.
 - `v2.season.chosen_each_year.2023`: v1 settings, forest 100%
 - `v2.season.chosen_each_year.2024`: v1 settings, forest 100%
 - `v2.season.chosen_each_year.2025`: v1 settings, forest 75%
-- `v2.season.every_candidate_on_test.v1 settings, forest 100%`: 2324
+- `v2.season.every_candidate_on_test.v1 settings, forest 100%`: 2328
 - `v2.season.every_candidate_on_test.v1 settings, forest 75%`: 2345
 - `v2.season.every_candidate_on_test.v1 settings, forest 50%`: 2383
-- `v2.season.every_candidate_on_test.v1 settings + weather, forest 100%`: 2559
+- `v2.season.every_candidate_on_test.v1 settings + weather, forest 100%`: 2554
 - `v2.season.every_candidate_on_test.v1 settings + weather, forest 75%`: 2363
 - `v2.season.every_candidate_on_test.v1 settings + weather, forest 50%`: 2380
-- `v2.season.every_candidate_on_test.more trees, forest 100%`: 2374
+- `v2.season.every_candidate_on_test.more trees, forest 100%`: 2375
 - `v2.season.every_candidate_on_test.more trees, forest 75%`: 2354
 - `v2.season.every_candidate_on_test.more trees, forest 50%`: 2383
-- `v2.season.every_candidate_on_test.more trees + weather, forest 100%`: 2535
+- `v2.season.every_candidate_on_test.more trees + weather, forest 100%`: 2544
 - `v2.season.every_candidate_on_test.more trees + weather, forest 75%`: 2380
 - `v2.season.every_candidate_on_test.more trees + weather, forest 50%`: 2379
-- `v2.season.every_candidate_on_test.shallow, forest 100%`: 2451
+- `v2.season.every_candidate_on_test.shallow, forest 100%`: 2452
 - `v2.season.every_candidate_on_test.shallow, forest 75%`: 2372
 - `v2.season.every_candidate_on_test.shallow, forest 50%`: 2383
-- `v2.season.every_candidate_on_test.shallow + weather, forest 100%`: 2492
-- `v2.season.every_candidate_on_test.shallow + weather, forest 75%`: 2391
+- `v2.season.every_candidate_on_test.shallow + weather, forest 100%`: 2494
+- `v2.season.every_candidate_on_test.shallow + weather, forest 75%`: 2392
 - `v2.season.every_candidate_on_test.shallow + weather, forest 50%`: 2383
-- `v2.season.every_candidate_on_test.deep, forest 100%`: 2481
-- `v2.season.every_candidate_on_test.deep, forest 75%`: 2375
+- `v2.season.every_candidate_on_test.deep, forest 100%`: 2473
+- `v2.season.every_candidate_on_test.deep, forest 75%`: 2374
 - `v2.season.every_candidate_on_test.deep, forest 50%`: 2373
-- `v2.season.every_candidate_on_test.deep + weather, forest 100%`: 2563
-- `v2.season.every_candidate_on_test.deep + weather, forest 75%`: 2388
+- `v2.season.every_candidate_on_test.deep + weather, forest 100%`: 2578
+- `v2.season.every_candidate_on_test.deep + weather, forest 75%`: 2390
 - `v2.season.every_candidate_on_test.deep + weather, forest 50%`: 2369
 - `v2.season.every_candidate_on_test.simple rule alone`: 2382
 - `v2.year.rows`: 6665
@@ -1644,9 +1644,9 @@ Every value below is copied from reports/metrics.json. Nothing is computed here.
 - `v2.year.every_candidate_on_test.simple rule alone`: 13.21
 - `v2.alert.rows`: 12617
 - `v2.alert.chosen`: deep + weather, forest 75% + worsening 4 or 8 weeks
-- `v2.alert.chosen_validation_cost`: 593
+- `v2.alert.chosen_validation_cost`: 591
 - `v2.alert.v1_validation_cost`: 636
-- `v2.alert.v2`: 1742
+- `v2.alert.v2`: 1739
 - `v2.alert.v1`: 1912
 - `v2.alert.simple_rule`: 1840
 - `v2.alert.v2_beats_v1`: True
@@ -1683,15 +1683,15 @@ Every value below is copied from reports/metrics.json. Nothing is computed here.
 - `v2.alert.every_candidate_on_validation.shallow + weather, forest 75% + worsening 4 or 8 weeks`: 615
 - `v2.alert.every_candidate_on_validation.shallow + weather, forest 50% + worsening 4 or 8 weeks`: 618
 - `v2.alert.every_candidate_on_validation.deep, forest 100%`: 640
-- `v2.alert.every_candidate_on_validation.deep, forest 75% + worsening`: 612
-- `v2.alert.every_candidate_on_validation.deep, forest 50% + worsening`: 628
-- `v2.alert.every_candidate_on_validation.deep, forest 75% + worsening 4 or 8 weeks`: 599
+- `v2.alert.every_candidate_on_validation.deep, forest 75% + worsening`: 615
+- `v2.alert.every_candidate_on_validation.deep, forest 50% + worsening`: 626
+- `v2.alert.every_candidate_on_validation.deep, forest 75% + worsening 4 or 8 weeks`: 602
 - `v2.alert.every_candidate_on_validation.deep, forest 50% + worsening 4 or 8 weeks`: 601
-- `v2.alert.every_candidate_on_validation.deep + weather, forest 100%`: 618
-- `v2.alert.every_candidate_on_validation.deep + weather, forest 75% + worsening`: 614
+- `v2.alert.every_candidate_on_validation.deep + weather, forest 100%`: 621
+- `v2.alert.every_candidate_on_validation.deep + weather, forest 75% + worsening`: 615
 - `v2.alert.every_candidate_on_validation.deep + weather, forest 50% + worsening`: 615
-- `v2.alert.every_candidate_on_validation.deep + weather, forest 75% + worsening 4 or 8 weeks`: 593
-- `v2.alert.every_candidate_on_validation.deep + weather, forest 50% + worsening 4 or 8 weeks`: 600
+- `v2.alert.every_candidate_on_validation.deep + weather, forest 75% + worsening 4 or 8 weeks`: 591
+- `v2.alert.every_candidate_on_validation.deep + weather, forest 50% + worsening 4 or 8 weeks`: 603
 - `v2.alert.every_candidate_on_validation.worsening alone`: 655
 - `v2.alert.every_candidate_on_validation.worsening 4 or 8 weeks alone`: 622
 - `v2.alert.every_candidate_on_test.v1 settings, forest 100%`: 1912
@@ -1724,55 +1724,55 @@ Every value below is copied from reports/metrics.json. Nothing is computed here.
 - `v2.alert.every_candidate_on_test.shallow + weather, forest 50% + worsening`: 2104
 - `v2.alert.every_candidate_on_test.shallow + weather, forest 75% + worsening 4 or 8 weeks`: 1825
 - `v2.alert.every_candidate_on_test.shallow + weather, forest 50% + worsening 4 or 8 weeks`: 1838
-- `v2.alert.every_candidate_on_test.deep, forest 100%`: 1927
-- `v2.alert.every_candidate_on_test.deep, forest 75% + worsening`: 1874
-- `v2.alert.every_candidate_on_test.deep, forest 50% + worsening`: 2015
-- `v2.alert.every_candidate_on_test.deep, forest 75% + worsening 4 or 8 weeks`: 1781
+- `v2.alert.every_candidate_on_test.deep, forest 100%`: 1918
+- `v2.alert.every_candidate_on_test.deep, forest 75% + worsening`: 1873
+- `v2.alert.every_candidate_on_test.deep, forest 50% + worsening`: 2017
+- `v2.alert.every_candidate_on_test.deep, forest 75% + worsening 4 or 8 weeks`: 1741
 - `v2.alert.every_candidate_on_test.deep, forest 50% + worsening 4 or 8 weeks`: 1797
-- `v2.alert.every_candidate_on_test.deep + weather, forest 100%`: 1923
-- `v2.alert.every_candidate_on_test.deep + weather, forest 75% + worsening`: 2065
-- `v2.alert.every_candidate_on_test.deep + weather, forest 50% + worsening`: 2081
-- `v2.alert.every_candidate_on_test.deep + weather, forest 75% + worsening 4 or 8 weeks`: 1742
-- `v2.alert.every_candidate_on_test.deep + weather, forest 50% + worsening 4 or 8 weeks`: 1723
+- `v2.alert.every_candidate_on_test.deep + weather, forest 100%`: 1963
+- `v2.alert.every_candidate_on_test.deep + weather, forest 75% + worsening`: 2064
+- `v2.alert.every_candidate_on_test.deep + weather, forest 50% + worsening`: 2082
+- `v2.alert.every_candidate_on_test.deep + weather, forest 75% + worsening 4 or 8 weeks`: 1739
+- `v2.alert.every_candidate_on_test.deep + weather, forest 50% + worsening 4 or 8 weeks`: 1719
 - `v2.alert.every_candidate_on_test.worsening alone`: 1971
 - `v2.alert.every_candidate_on_test.worsening 4 or 8 weeks alone`: 1840
 - `v2.seed_check.runs[0].seed`: 0
 - `v2.seed_check.runs[0].alert_v1`: 1912
-- `v2.seed_check.runs[0].alert_v2`: 1742
-- `v2.seed_check.runs[0].season_v1`: 2324
+- `v2.seed_check.runs[0].alert_v2`: 1739
+- `v2.seed_check.runs[0].season_v1`: 2328
 - `v2.seed_check.runs[0].season_v2`: 2433
 - `v2.seed_check.runs[0].year_v1`: 14.0
 - `v2.seed_check.runs[0].year_v2`: 13.46
 - `v2.seed_check.runs[1].seed`: 1
 - `v2.seed_check.runs[1].alert_v1`: 1940
 - `v2.seed_check.runs[1].alert_v2`: 1733
-- `v2.seed_check.runs[1].season_v1`: 2453
-- `v2.seed_check.runs[1].season_v2`: 2388
+- `v2.seed_check.runs[1].season_v1`: 2455
+- `v2.seed_check.runs[1].season_v2`: 2368
 - `v2.seed_check.runs[1].year_v1`: 14.14
 - `v2.seed_check.runs[1].year_v2`: 13.47
 - `v2.seed_check.runs[2].seed`: 2
 - `v2.seed_check.runs[2].alert_v1`: 1899
 - `v2.seed_check.runs[2].alert_v2`: 1739
-- `v2.seed_check.runs[2].season_v1`: 2407
-- `v2.seed_check.runs[2].season_v2`: 2415
+- `v2.seed_check.runs[2].season_v1`: 2412
+- `v2.seed_check.runs[2].season_v2`: 2473
 - `v2.seed_check.runs[2].year_v1`: 13.95
 - `v2.seed_check.runs[2].year_v2`: 13.47
 - `v2.seed_check.runs[3].seed`: 3
 - `v2.seed_check.runs[3].alert_v1`: 1888
 - `v2.seed_check.runs[3].alert_v2`: 1738
-- `v2.seed_check.runs[3].season_v1`: 2429
-- `v2.seed_check.runs[3].season_v2`: 2414
+- `v2.seed_check.runs[3].season_v1`: 2442
+- `v2.seed_check.runs[3].season_v2`: 2419
 - `v2.seed_check.runs[3].year_v1`: 14.02
 - `v2.seed_check.runs[3].year_v2`: 13.46
 - `v2.seed_check.runs[4].seed`: 4
 - `v2.seed_check.runs[4].alert_v1`: 1883
-- `v2.seed_check.runs[4].alert_v2`: 1711
+- `v2.seed_check.runs[4].alert_v2`: 1714
 - `v2.seed_check.runs[4].season_v1`: 2446
-- `v2.seed_check.runs[4].season_v2`: 2410
+- `v2.seed_check.runs[4].season_v2`: 2447
 - `v2.seed_check.runs[4].year_v1`: 13.94
 - `v2.seed_check.runs[4].year_v2`: 13.45
 - `v2.seed_check.seeds_where_v2_beats_v1.alert`: 5/5
-- `v2.seed_check.seeds_where_v2_beats_v1.season`: 3/5
+- `v2.seed_check.seeds_where_v2_beats_v1.season`: 2/5
 - `v2.seed_check.seeds_where_v2_beats_v1.year`: 5/5
 - `districts.source`: Texas Commission on Environmental Quality, Water Districts map service (active districts)
 - `districts.map_file`: data/processed/districts.geojson

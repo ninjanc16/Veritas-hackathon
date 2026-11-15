@@ -37,7 +37,7 @@ A yes-or-no warning a year ahead is nearly always 'yes' on the Rio Grande, so 'a
 The model learned a place where drought is the norm. On the Ohio severe drought is rare, so what it learned does not carry over. On the Ohio our system cost 4592 against 4470 for the best simple rule (Persistence).
 
 ## 12. What are the three weakest points of this project?
-1) Onset: for counties not yet in severe drought our system cost 1735 against 1794 for the best simple rule (Worsening). 2) The 6-month margin: our cost 2324 against 2382 for the 'D1 or worse now' rule, so much of the skill is persistence. 3) Small sample: the 31 Rio Grande counties move together, so the real sample is far smaller than the row count.
+1) Onset: for counties not yet in severe drought our system cost 1735 against 1794 for the best simple rule (Worsening). 2) The 6-month margin: our cost 2328 against 2382 for the 'D1 or worse now' rule, so much of the skill is persistence. 3) Small sample: the 31 Rio Grande counties move together, so the real sample is far smaller than the row count.
 
 ## 13. Which parts did AI tools write, and how did we check them?
 [TEAM: write this yourselves, honestly - which AI tools were used for what, and how each part was checked (tests, reading the code, comparing with the numbers in metrics.json).]

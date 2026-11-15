@@ -1,0 +1,86 @@
+<!doctype html>
+<!--
+  app.html: the platform. One screen: a large map on the left, and on the right three steps
+  that follow the order of a real decision:
+
+      1 Risk profile   what is the drought risk here, and which canals leak
+      2 Budget plan    given a budget and a drought severity, exactly which canals to seal
+      3 Simulation     what doing nothing, waiting, or acting early would have cost
+
+  The first visit asks who you are: a district manager (pick your district) or a state
+  agency (all of Texas). There is no sign-in. All logic is in js/platform.js.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Headgate Platform: Rio Grande Drought and Canal Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@700;900&family=Public+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <link rel="stylesheet" href="css/site.css">
+</head>
+<body class="app">
+  <div class="strip">A student hackathon project (Veritas AI, AI + Climate track). Not a government website. No sign-in. No personal data is collected.</div>
+
+  <header class="topbar">
+    <a class="brand" href="index.html" title="Back to the intro">
+      <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 5v22M26 5v22M6 9h20M11 9v9M16 9v13M21 9v6"/><path d="M3 27c3-2 5 2 8 0s5 2 8 0 5 2 10 0" stroke="#8fd0ff"/></svg>
+      <span>Headgate</span>
+    </a>
+    <button class="scopeBtn" id="scopeBtn" title="Change district or switch to the state view"></button>
+    <span class="spacer"></span>
+    <span class="live saved" id="live"><i></i><span id="liveText"></span></span>
+    <a class="plain" href="index.html">Intro</a>
+  </header>
+
+  <main class="shell" id="shell">
+    <section class="mapPane">
+      <div id="map"></div>
+      <div class="mapCard modeCard" id="modeCard"></div>
+      <div class="mapCard legendCard"><h4 id="legendTitle"></h4><div class="legend" id="legend"></div></div>
+    </section>
+    <aside class="panel">
+      <nav class="stepper" id="stepper">
+        <button data-step="risk"><b>1</b>Risk profile</button>
+        <button data-step="budget"><b>2</b>Budget plan</button>
+        <button data-step="sim"><b>3</b>Simulation</button>
+      </nav>
+      <div class="view" id="view"></div>
+    </aside>
+  </main>
+
+  <!-- The first-visit chooser. -->
+  <div class="onboard" id="onboard">
+    <div class="wrap">
+      <div class="eyebrow">Get started</div>
+      <h1>Who is this for?</h1>
+      <p class="lead">Pick one. You can switch at any time from the button at the top of the platform. Nothing is saved except your choice, in this browser only.</p>
+      <div class="roles">
+        <button class="role" id="roleDistrict">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20h18M5 20V9l7-5 7 5v11M9 20v-6h6v6"/></svg>
+          <b>I manage an irrigation district</b>
+          <span>See your district's canals, its drought risk and a budget plan for your own canals.</span>
+        </button>
+        <button class="role" id="roleState">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.5 5 5.5.8-4 3.9.9 5.5-4.9-2.6-4.9 2.6.9-5.5-4-3.9 5.5-.8z"/></svg>
+          <b>I work at a state agency</b>
+          <span>See drought across all of Texas, compare all thirty districts, and split one budget between them.</span>
+        </button>
+      </div>
+      <div class="pick" id="pick">
+        <input id="pickSearch" type="search" placeholder="Search for your district or county" aria-label="Search districts">
+        <div class="pickList" id="pickList"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script src="data/core.js"></script>
+  <script src="data/sim.js"></script>
+  <script src="sim/engine.js"></script>
+  <script src="js/common.js"></script>
+  <script src="js/platform.js"></script>
+</body>
+</html>

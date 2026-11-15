@@ -59,7 +59,7 @@ Cost = 3 x missed droughts + false alarms. That cost rule is our assumption, not
 
 | Rule | Cost | Precision | Recall |
 |---|---|---|---|
-| Our system | 2324 | 0.733 | 0.868 |
+| Our system | 2328 | 0.733 | 0.868 |
 | Persistence (D2 or worse now) | 3133 | - | - |
 | D1 or worse now | 2382 | - | - |
 | Usual for the county | 3871 | - | - |
@@ -93,7 +93,7 @@ Cost = 3 x missed droughts + false alarms. That cost rule is our assumption, not
 - The 4-week risk score is not a calibrated probability.
 - On the Rio Grande the 4-week system (cost 1912) is close to a tie with the best simple rule, Worsening (cost 1971).
 - Onset is the hard part. For counties not yet in severe drought, the system caught 36% of the weeks that led to it, with precision 46%. Its cost was 1735, against 1794 for the best simple rule (Worsening) and 2226 for never warning.
-- The 6-month outlook costs 2324, against 2382 for the 'D1 or worse now' rule. That is close to a tie.
+- The 6-month outlook costs 2328, against 2382 for the 'D1 or worse now' rule. That is close to a tie.
 - The 12-month outlook is off by 14.0 weeks on average, against an average of 22.1 weeks. It is a planning range, not a precise forecast.
 - Transfer of the Rio Grande-trained 4-week system: it did not beat the best simple rule on: Mississippi, Missouri, Colorado, Ohio. It did not beat persistence on: Ohio.
 - Transfer of the Rio Grande-trained 6-month outlook: it did not beat the best simple rule on: Mississippi, Missouri, Colorado, Ohio.
@@ -114,17 +114,17 @@ Cost = 3 x missed droughts + false alarms. That cost rule is our assumption, not
 - An outside review suggested two simple rules that were not in our baseline list. They were scored after the final run. 4-week rule 'D2 now, or D1 and worse than 4 or 8 weeks ago': cost 1840 on the test years, against 1912 for the system. 12-month rule 'average of 'same as now' and 'same as the last 52 weeks'': average error 13.21 weeks, against 14.0 for the system.
 - The 6-month outlook uses an El Nino value that NOAA publishes a few days into the month, around the same days the outlook is issued. A real-time forecast might have to use the value from a month earlier.
 - Pre-season trigger (outlooks issued January to March): our forecast caught 790 of 852 drought seasons with 271 false alarms. The simple rule 'D1 or worse now' caught 780 with 243. At a cost ratio of 0.25 the forecast is worth 0.3135 per decision against 0.3132 for the rule. That is a tie, not a win.
-- Reservoir storage did not help. The 6-month outlook costs 2452 with reservoir inputs, against 2324 without them. As a pre-season trigger the reservoir forecast caught 771 drought seasons with 261 false alarms.
+- Reservoir storage did not help. The 6-month outlook costs 2448 with reservoir inputs, against 2328 without them. As a pre-season trigger the reservoir forecast caught 770 drought seasons with 259 false alarms.
 - Only 14 of the 31 Rio Grande counties are matched to a reservoir, and that matching is our assumption.
 - County drought is not the same as water supply. Water in the canals also depends on reservoir releases and on Mexico's deliveries under the 1944 water treaty, which are not modeled.
 - The loss figures are insured crop losses only, not all drought losses, and are not adjusted for inflation.
 - The canal map shows where canals and ditches are. It does not say which are irrigation canals, which are lined, how much any canal leaks or which district owns it.
 - The canal priority levels are an estimate of where leaks are likely, not measured leaks. They combine the 6-month forecast with a published seepage rate for the soil under each canal. They assume bare-earth canals, because we do not know which canals are lined. No canal was inspected or measured by us.
 - Version 2 was built after version 1's test results were known, so its list of candidates is not blind. Only the choice among candidates is protected: it never uses a year it is then scored on.
-- Version 2, 4-week alert: cost 1742 against 1912 for version 1 and 1840 for the best simple rule. It won with 5/5 random seeds. The recipe (deep + weather, forest 75% + worsening 4 or 8 weeks) was chosen on only 4 validation years, and it leans on a simple rule that an outside review found after the test.
-- Version 2, 6-month outlook: cost 2433 against 2324 for version 1. It did not improve (it won with 3/5 seeds). Version 1 stays.
+- Version 2, 4-week alert: cost 1739 against 1912 for version 1 and 1840 for the best simple rule. It won with 5/5 random seeds. The recipe (deep + weather, forest 75% + worsening 4 or 8 weeks) was chosen on only 4 validation years, and it leans on a simple rule that an outside review found after the test.
+- Version 2, 6-month outlook: cost 2433 against 2328 for version 1. It did not improve (it won with 2/5 seeds). Version 1 stays.
 - Version 2, 12-month outlook: 13.46 weeks off against 14.0 for version 1, but the simple rule alone is 13.21. In most years version 2 simply chose that rule over the forest.
-- Weather inputs alone (rain and temperature) did not help: 4-week 2050, 6-month 2559, 12-month 14.12, each worse than version 1.
+- Weather inputs alone (rain and temperature) did not help: 4-week 2050, 6-month 2554, 12-month 14.12, each worse than version 1.
 - The district map and sealant plan cover Texas districts only. We found no public boundary file for districts in New Mexico or Colorado.
 - The sealant plan is a ranking, not a measurement. It assumes every canal is bare earth, has 20 feet of wetted width and carries water for 90 days. We do not know which canals are already lined. The budget is an example figure, and the sealant price is materials only.
 
