@@ -17,6 +17,7 @@ from farmdrought.allocation import model_minus_rule, run_allocation
 from farmdrought.config import (ALERT_WEEKS, COUNTY_RESERVOIR, FROZEN, METRICS, OUTLOOK, PREDICTIONS, SCORE_THROUGH,
                                 SEASON_WEEKS, YEAR_WEEKS)
 from farmdrought.drought import build_panel, load_usdm
+from farmdrought.leaks import bed_layer
 from farmdrought.manifest import build_manifest, check_manifest, guard_scored_writer, sha256_of
 from farmdrought.prob_calibration import (brier, calibrate_by_past, calibration_coverage, class_frequency_by_past,
                                           reliability)
@@ -1408,3 +1409,43 @@ def test_machine_note_is_built_from_the_numbers_it_is_given():
     assert "ranges from 2324 to 2453 across 10 random seeds, against a margin of 58" in note
     assert note.endswith("the random seed, more than the computer, is why a margin of that size is not a result.")
     assert "random seeds" not in without_checks and "moved by 123" in without_checks
+
+
+# ---------------------------------------------------------------------------------------------
+# The physical model (package H)
+# ---------------------------------------------------------------------------------------------
+def test_bed_layer_takes_the_main_soil_and_the_layer_at_one_metre_with_its_permeability():
+    # Arrange: map unit 1 has two soils; the main one (70%) has three layers, 0-30, 30-120, 120-200 cm.
+    # Map unit 2 has one shallow soil that ends at 60 cm. Values arrive as text, as the service sends them.
+    layers = pd.DataFrame([
+        {"mukey": "1", "cokey": "a", "comppct_r": "70", "hzdept_r": "0", "hzdepb_r": "30", "texcl": "Loam", "ksat_r": "9"},
+        {"mukey": "1", "cokey": "a", "comppct_r": "70", "hzdept_r": "30", "hzdepb_r": "120", "texcl": "Clay", "ksat_r": "0.9"},
+        {"mukey": "1", "cokey": "a", "comppct_r": "70", "hzdept_r": "120", "hzdepb_r": "200", "texcl": "Sand", "ksat_r": "90"},
+        {"mukey": "1", "cokey": "b", "comppct_r": "30", "hzdept_r": "0", "hzdepb_r": "200", "texcl": "Sand", "ksat_r": "92"},
+        {"mukey": "2", "cokey": "c", "comppct_r": "100", "hzdept_r": "0", "hzdepb_r": "20", "texcl": "Loam", "ksat_r": "9"},
+        {"mukey": "2", "cokey": "c", "comppct_r": "100", "hzdept_r": "20", "hzdepb_r": "60", "texcl": "Silt loam", "ksat_r": "4"},
+        {"mukey": "2", "cokey": "c", "comppct_r": "100", "hzdept_r": "60", "hzdepb_r": "80", "texcl": None, "ksat_r": "1"},
+    ])
+
+    # Act
+    picked = bed_layer(layers).set_index("mukey")
+
+    # Assert: unit 1 -> the 30-120 cm layer of soil a; unit 2 -> its deepest layer that has a texture
+    assert picked.loc["1", ["cokey", "texcl", "ksat_r"]].tolist() == ["a", "Clay", "0.9"]
+    assert picked.loc["2", ["cokey", "texcl", "ksat_r"]].tolist() == ["c", "Silt loam", "4"]
+    assert len(picked) == 2
+
+
+def test_manifest_ignores_files_that_are_not_scored_inputs(tmp_path):
+    # Arrange: a small tree with a manifest, then the round-3 permeability file appears
+    (tmp_path / "data" / "raw" / "canals").mkdir(parents=True)
+    (tmp_path / "data" / "raw" / "canals" / "canal_soil.csv").write_text("id,mukey,soil\n")
+    build_manifest(tmp_path)
+
+    # Act
+    (tmp_path / "data" / "raw" / "canals" / "canal_ksat.csv").write_text("id,mukey,ksat_typ\n")
+    (tmp_path / "data" / "raw" / "canals" / "something_else.csv").write_text("x\n")
+
+    # Assert: the listed file is ignored; any other new file is still reported
+    assert check_manifest(tmp_path) == ["data/raw/canals/something_else.csv (new)"]
+    assert "data/raw/canals/canal_ksat.csv" not in build_manifest(tmp_path)["files"]

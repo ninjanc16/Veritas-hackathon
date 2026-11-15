@@ -175,6 +175,10 @@ CANALS_CSV = CANALS_DIR / "canals_rio_grande.csv"          # one row per mapped 
 # The same segments as map lines. It sits with the handoff files because the App draws it.
 CANALS_GEOJSON = PROCESSED / "canals.geojson"
 CANAL_SOIL_CSV = CANALS_DIR / "canal_soil.csv"             # soil texture under each canal segment
+# ADDED in round 3: permeability and water-table depth for the same soil layer. A separate file,
+# because canal_soil.csv is part of the frozen snapshot and is never rewritten. It is not an
+# input to any version 1 score, so the manifest does not list it (manifest.NOT_SCORED_INPUTS).
+CANAL_KSAT_CSV = CANALS_DIR / "canal_ksat.csv"
 
 # 8e. Canal seepage rate by soil type, in gallons per square foot of wetted canal per day.
 # Source: Fipps (Texas A&M), 1998, "Potential Water Savings in Irrigation Districts ... Lower

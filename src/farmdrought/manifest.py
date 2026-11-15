@@ -17,6 +17,10 @@ from pathlib import Path
 from farmdrought.config import FROZEN, ROOT, SCORE_THROUGH
 
 MANIFEST_PATH = Path("data") / "manifest.json"   # relative to the repo root
+# Files that live under data/raw but are NOT inputs to any version 1 score. They were added after
+# the freeze for the round-3 physical model. The manifest neither lists nor checks them, so
+# adding one does not look like a changed snapshot. Keep this list short and explicit.
+NOT_SCORED_INPUTS = ["data/raw/canals/canal_ksat.csv"]
 
 
 def sha256_of(path):
@@ -31,10 +35,12 @@ def sha256_of(path):
 def input_hashes(root=ROOT):
     """{path relative to root: sha256} for every raw input that exists now.
 
-    Hidden files (a name starting with a dot, like .DS_Store) are not inputs and are skipped.
+    Hidden files (a name starting with a dot, like .DS_Store) are not inputs and are skipped,
+    and so are the files named in NOT_SCORED_INPUTS.
     """
     root = Path(root)
-    files = [p for p in (root / "data" / "raw").rglob("*") if p.is_file() and not p.name.startswith(".")]
+    files = [p for p in (root / "data" / "raw").rglob("*") if p.is_file() and not p.name.startswith(".")
+             and p.relative_to(root).as_posix() not in NOT_SCORED_INPUTS]
     oni = root / "notebooks" / "oni.txt"
     if oni.exists():
         files.append(oni)
