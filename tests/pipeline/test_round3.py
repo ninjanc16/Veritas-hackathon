@@ -1,10 +1,13 @@
-"""Tests for the round 3 evaluation work (ARCHITECTURE.md section 3). So far: uncertainty.py."""
+"""Tests for the round 3 evaluation work (ARCHITECTURE.md section 3).
+
+Every table here is small and made up. Nothing in this file reads the real data."""
 import json
 
 import numpy as np
 import pandas as pd
 import pytest
 
+from farmdrought.prob_calibration import brier, calibrate_by_past, class_frequency_by_past, reliability
 from farmdrought.uncertainty import excludes_zero, resample_years, year_block_bootstrap
 
 YEARS = list(range(2008, 2020))
@@ -151,3 +154,157 @@ def test_mismatched_years_raise_an_error_that_names_them():
     assert "2003" in str(error.value)
     with pytest.raises(ValueError, match="weights"):
         year_block_bootstrap(a, a, weights={2001: 5})
+
+
+# ---------------------------------------------------------------------------------------------
+# prob_calibration.py (section 3.3)
+# ---------------------------------------------------------------------------------------------
+def forecast_table():
+    """Made-up monthly forecasts for 6 counties, 2001 to 2008 (576 rows). No random numbers:
+    the forecast rises with a made-up dryness cycle, and the answer is yes when dryness is high."""
+    rows = []
+    for year in range(2001, 2009):
+        for month in range(1, 13):
+            for county in range(6):
+                dryness = (7 * year + 5 * month + 11 * county) % 20          # 0..19
+                rows.append({"date": pd.Timestamp(year=year, month=month, day=3), "fips": f"990{county:02d}",
+                             "cls": dryness // 4, "p": 0.02 + dryness * 0.045,
+                             "y": float(dryness + (year + month) % 5 >= 14)})
+    return pd.DataFrame(rows)
+
+
+def flip_answers(table, year):
+    """A copy of the table in which every answer of one calendar year is turned round."""
+    changed = table.copy()
+    rows = changed["date"].dt.year == year
+    changed.loc[rows, "y"] = 1 - changed.loc[rows, "y"]
+    return changed
+
+
+def test_calibration_ignores_the_year_it_scores():
+    # Arrange
+    table = forecast_table()
+    in_2006 = table["date"].dt.year == 2006
+
+    # Act
+    original = calibrate_by_past(table, "p", "y", horizon=26)
+    own_year_rewritten = calibrate_by_past(flip_answers(table, 2006), "p", "y", horizon=26)
+    later_year_rewritten = calibrate_by_past(flip_answers(table, 2007), "p", "y", horizon=26)
+    earlier_year_rewritten = calibrate_by_past(flip_answers(table, 2003), "p", "y", horizon=26)
+
+    # Assert: 2006 does not move when 2006 or 2007 answers change, and does when 2003's change
+    assert original[in_2006].equals(own_year_rewritten[in_2006])
+    assert original[in_2006].equals(later_year_rewritten[in_2006])
+    assert not original[in_2006].equals(earlier_year_rewritten[in_2006])
+    assert not original[in_2006].equals(table.loc[in_2006, "p"])     # and it was really adjusted
+
+
+def test_calibration_does_not_use_answers_whose_window_was_still_open_at_new_year():
+    # Arrange: a forecast issued in September 2005 has a 26-week window that ends in 2006
+    table = forecast_table()
+    late_2005 = (table["date"].dt.year == 2005) & (table["date"].dt.month >= 8)
+    changed = table.copy()
+    changed.loc[late_2005, "y"] = 1 - changed.loc[late_2005, "y"]
+    in_2006 = table["date"].dt.year == 2006
+
+    # Act
+    original = calibrate_by_past(table, "p", "y", horizon=26)
+    rewritten = calibrate_by_past(changed, "p", "y", horizon=26)
+
+    # Assert
+    assert original[in_2006].equals(rewritten[in_2006])
+
+
+def test_calibration_keeps_the_order_of_forecasts_within_a_year():
+    # Arrange
+    table = forecast_table()
+
+    # Act
+    calibrated = calibrate_by_past(table, "p", "y", horizon=26)
+
+    # Assert: sorted by the raw forecast, the calibrated values never go down; all within 0..1
+    for _, rows in table.groupby(table["date"].dt.year):
+        in_raw_order = calibrated[rows.sort_values("p").index].to_numpy()
+        assert (np.diff(in_raw_order) >= 0).all()
+    assert calibrated.between(0, 1).all()
+
+
+def test_calibration_leaves_early_years_and_missing_forecasts_alone():
+    # Arrange: one forecast in 2007 is missing
+    table = forecast_table()
+    hole = table.index[table["date"].dt.year == 2007][0]
+    table.loc[hole, "p"] = np.nan
+    early = table["date"].dt.year <= 2003       # at New Year 2003 only 2001 and part of 2002 are known
+
+    # Act
+    calibrated = calibrate_by_past(table, "p", "y", horizon=26, min_years=3)
+
+    # Assert
+    assert calibrated[early].equals(table.loc[early, "p"])
+    assert np.isnan(calibrated[hole]) and calibrated.drop(hole).notna().all()
+    in_2004 = table["date"].dt.year == 2004     # 2001, 2002 and half of 2003: three past years
+    assert not calibrated[in_2004].equals(table.loc[in_2004, "p"])
+
+
+def test_class_frequency_matches_a_hand_computed_example():
+    # Arrange: four forecasts in 2001 with known answers, then three in 2002
+    table = pd.DataFrame({
+        "date": pd.to_datetime(["2001-01-02", "2001-02-06", "2001-03-06", "2001-04-03",
+                                "2002-03-05", "2002-03-05", "2002-03-05"]),
+        "cls": [0, 3, 3, 0, 3, 0, 5],
+        "y": [0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0]})
+
+    # Act
+    frequency = class_frequency_by_past(table, "y", horizon=26)
+
+    # Assert: 2001 has no past. In 2002: class 3 was yes 1 time in 2, class 0 was yes 0 times
+    # in 2, and class 5 was never seen so it gets the overall past rate, 1 in 4.
+    assert frequency[:4].isna().all()
+    assert frequency[4:].tolist() == [0.5, 0.0, 0.25]
+
+
+def test_class_frequency_uses_only_past_years():
+    # Arrange
+    table = forecast_table()
+    in_2006 = table["date"].dt.year == 2006
+
+    # Act
+    original = class_frequency_by_past(table, "y", horizon=26)
+    own_year_rewritten = class_frequency_by_past(flip_answers(table, 2006), "y", horizon=26)
+    later_year_rewritten = class_frequency_by_past(flip_answers(table, 2007), "y", horizon=26)
+    earlier_year_rewritten = class_frequency_by_past(flip_answers(table, 2003), "y", horizon=26)
+
+    # Assert
+    assert original[in_2006].equals(own_year_rewritten[in_2006])
+    assert original[in_2006].equals(later_year_rewritten[in_2006])
+    assert not original[in_2006].equals(earlier_year_rewritten[in_2006])
+
+
+def test_reliability_bins_hold_every_row_and_show_a_calibrated_forecast_as_calibrated():
+    # Arrange: four forecasts of 25% with one yes, four of 75% with three yeses, and one of 100%
+    p = [0.25] * 4 + [0.75] * 4 + [1.0]
+    y = [1, 0, 0, 0] + [1, 1, 1, 0] + [1]
+
+    # Act
+    table = reliability(y, p, bins=10)
+
+    # Assert
+    assert len(table) == 10 and sum(row["n"] for row in table) == 9
+    assert [row["bin_low"] for row in table] == [i / 10 for i in range(10)]
+    filled = {row["bin_low"]: row for row in table if row["n"]}
+    assert sorted(filled) == [0.2, 0.7, 0.9]
+    assert all(row["observed"] == row["mean_p"] for row in filled.values())
+    assert filled[0.9]["n"] == 1                               # 100% sits in the last slice
+    empty = table[0]
+    assert (empty["n"], empty["mean_p"], empty["observed"]) == (0, None, None)
+    assert json.loads(json.dumps(table)) == table
+
+
+def test_brier_is_zero_for_a_perfect_forecast_and_a_quarter_for_always_half():
+    # Arrange
+    y = [1, 0, 0, 1, 1]
+
+    # Act / Assert
+    assert brier(y, [1.0, 0.0, 0.0, 1.0, 1.0]) == 0.0
+    assert brier(y, [0.5] * 5) == 0.25
+    assert brier(y, [0.0, 1.0, 1.0, 0.0, 0.0]) == 1.0          # as wrong as it can be
