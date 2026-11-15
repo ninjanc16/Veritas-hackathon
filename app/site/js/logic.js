@@ -216,6 +216,14 @@
   const REPLAY_MIN_YEARS_APART = 3;
   /* and no single year supplies more than this share of the gap between them. */
   const REPLAY_ONE_YEAR_SHARE = 0.5;
+  /* The held-out test of the leak model, as the team reported it (reports/frozen/round3/seepage_calibration.json
+     in the pipeline). Fixed wording: nothing here is computed, and the site does not read that file. */
+  const HELD_OUT_SENTENCE = "We tested the leak model by hiding one district at a time and predicting its published water loss. " +
+    "Across 14 districts its typical error was 32.7%, against 36.5% for canal length alone, and the two could not be told apart. " +
+    "So the volumes and dollar figures here are not reliable; treat the order of canals as the result, and the amounts as an illustration.";
+  /* The caption on the simulation's picture. The picture shows single figures for one run; they
+     are allowed only because this caption is shown with them. */
+  const TWIN_CAPTION = "One illustrative run, with each unknown at the middle of its range. Not a prediction.";
   /* The scored test's result, as the team reported it. Fixed wording: it is not computed here. */
   const SCORED_TEST_SENTENCE = "In the scored test on all 31 Rio Grande counties (558 county-years), the forecast and the 'already in moderate drought' rule could not be told apart.";
   /*
@@ -444,9 +452,10 @@
       return { recall: t.recall, falseAlarm: t.falseAlarms / Math.max(1, t.rows - t.droughtSeasons) };
     }
 
-    /* What to hand the engine's samplePhysics. If the pipeline has put a calibration spread into
-       the data (HG.calibration.seepSd, a number), it is passed through and the runs use the
-       calibrated regime. Today the data has none, so this is empty and the runs are uncalibrated. */
+    /* What to hand the engine's samplePhysics. If the data ever carries a calibration spread
+       (HG.calibration.seepSd, a number), it is passed through and the runs use the calibrated
+       regime. Nothing writes it: the held-out test did not show the calibrated model predicting a
+       hidden district better than canal length alone, so the runs stay uncalibrated. */
     function physicsOptions() {
       const c = HG.calibration;
       return c && typeof c.seepSd === "number" && isFinite(c.seepSd) && c.seepSd >= 0 ? { seepSd: c.seepSd } : {};
@@ -458,5 +467,5 @@
   return { usd, num, pct, niceDate, esc, safeUrl, safeDecode, cssClass, TIER_CLASSES, SEVERITY_CLASSES, finiteOrNull, percentOrNull, csvText, csvNumber,
            workTime, gal, money, usesElephantButte, REPLAY_POLICIES, replay,
            band, rangeText, rangeCell, thousandAf, replayBands, replayBandsSentence, replayBandsLines, replayBandsTable,
-           sharedForecastSentence, SCORED_TEST_SENTENCE, makeLogic };
+           sharedForecastSentence, SCORED_TEST_SENTENCE, HELD_OUT_SENTENCE, TWIN_CAPTION, makeLogic };
 });

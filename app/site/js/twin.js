@@ -80,7 +80,8 @@
       W = r.width; H = r.height; dpr = Math.min(window.devicePixelRatio || 1, 2);
       canvas.width = W * dpr; canvas.height = H * dpr;
       if (!shape) return;
-      const narrow = W < 620, top = narrow ? 104 : 118, bottom = 58, gap = 12, side = 14;
+      // bottom: room for the play bar and, above it, the caption the page puts on the picture (two lines on a phone).
+      const narrow = W < 620, top = narrow ? 104 : 118, bottom = narrow ? 100 : 82, gap = 12, side = 14;
       const boxes = narrow
         ? [0, 1].map((k) => ({ x: side, y: top + k * ((H - top - bottom + gap) / 2), w: W - 2 * side, h: (H - top - bottom - gap) / 2 }))
         : [0, 1].map((k) => ({ x: side + k * ((W - 2 * side + gap) / 2), y: top, w: (W - 2 * side - gap) / 2, h: H - top - bottom }));

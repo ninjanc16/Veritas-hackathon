@@ -301,6 +301,8 @@ dl.key { margin: 0; font-size: .84rem; } dl.key dt { font-weight: 600; color: va
 table.t input[type=checkbox] { accent-color: var(--blue); pointer-events: none; }
 #simBar { position: absolute; left: 14px; right: 14px; bottom: 10px; display: flex; gap: 10px; align-items: center; z-index: 3; }
 #simBar input[type=range] { flex: 1; min-width: 0; }
+/* The caption on the simulation picture: it sits just above the play bar, in the room js/twin.js leaves for it. */
+#twinCaption { position: absolute; left: 14px; right: 14px; bottom: 52px; margin: 0; z-index: 3; text-align: center; font-size: 12.5px; line-height: 1.35; color: var(--ink); pointer-events: none; }
 #simDate { font-size: 15px; min-width: 118px; text-align: right; color: var(--ink); }
 .shocks { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
 .shocks span { color: var(--muted); font-size: .82rem; width: 100%; }

@@ -905,6 +905,12 @@ test("replayBandsLines state the counts as they are, including zero", () => {
   "No bare dollar": on the simulation step every dollar figure must be part of a range, or be the
   sealant budget, which is an input and is labelled as one. This strips the allowed forms out of
   a piece of HTML or text and returns whatever dollar figures are left.
+
+  ONE EXEMPTION, and only because of its caption: the picture on the left of the step (js/twin.js
+  draws it on a canvas, so it is not in this HTML). It shows single figures for one run: crops lost
+  and saved, gallons leaked and saved, and a closing "Sealing early saves ...". They are allowed
+  because the caption TWIN_CAPTION is shown on the picture whenever the picture is shown. The
+  test "the picture's caption..." below checks that tie.
 */
 function bareDollars(html) {
   const left = html
@@ -1003,4 +1009,46 @@ test("the simulation's own scope is unchanged by the replay: it still reads the 
   assert.deepStrictEqual(Object.keys(sim), ["weeks", "canals", "canalsUnranked", "demandAf", "revenueAtStake", "share", "system", "pNow", "ids", "outsideValley", "members", "counties"]);
   assert.ok(sim.weeks.filter((w) => w.year < 2020).every((w) => w.forecast === null));   // the frozen model starts in 2020
   assert.ok(lg.replayScope([d]).weeks.filter((w) => w.year < 2020).every((w) => w.forecast !== null));
+});
+
+/* ---------- Fixed sentences ---------- */
+test("the held-out test sentence is fixed wording and carries exactly the reported numbers", () => {
+  assert.strictEqual(L.HELD_OUT_SENTENCE, "We tested the leak model by hiding one district at a time and predicting its published water loss. " +
+    "Across 14 districts its typical error was 32.7%, against 36.5% for canal length alone, and the two could not be told apart. " +
+    "So the volumes and dollar figures here are not reliable; treat the order of canals as the result, and the amounts as an illustration.");
+  assert.deepStrictEqual(L.HELD_OUT_SENTENCE.match(/\d+(?:\.\d+)?/g), ["14", "32.7", "36.5"]);
+  assert.strictEqual(L.esc(L.HELD_OUT_SENTENCE), L.HELD_OUT_SENTENCE);     // nothing in it needs escaping
+});
+
+test("the held-out sentence is placed on the Simulation step above the replay table, on the Budget plan above the ranked list, and on the Sources step", () => {
+  const page = fs.readFileSync(path.join(__dirname, "platform.js"), "utf8");
+  const body = (name) => { const a = page.indexOf("function " + name + "("); assert.ok(a >= 0, name); return page.slice(a, page.indexOf("\n  }\n", a)); };
+  const before = (text, first, second, where) => { const i = text.indexOf(first), j = text.indexOf(second); assert.ok(i >= 0 && j >= 0 && i < j, where + ": " + first + " must come before " + second); };
+  before(body("replayHtml"), "heldOutNote()", "bandsBlock(result", "Simulation step");
+  before(body("bandsBlock"), "replayBandsTable(result)", "replayBandsSentence(result)", "the table is the first thing in the block");
+  before(body("renderBudgetResult"), "heldOutNote() + rows", "Simulate this plan", "Budget plan");
+  assert.ok(body("renderSources").indexOf("heldOutNote()") >= 0, "Sources step");
+  assert.ok(/const heldOutNote = \(\) => '<p class="note">' \+ U\.esc\(window\.HGLogic\.HELD_OUT_SENTENCE\) \+ "<\/p>";/.test(page));
+  // The site does not load the pipeline's result file or a calibration: the engine stays uncalibrated.
+  assert.ok(page.indexOf("seepage_calibration") < 0 && page.indexOf("HG.calibration") < 0);
+});
+
+test("the picture's caption is fixed wording and is shown whenever the picture is: both are switched by the same style rule", () => {
+  assert.strictEqual(L.TWIN_CAPTION, "One illustrative run, with each unknown at the middle of its range. Not a prediction.");
+  const page = fs.readFileSync(path.join(__dirname, "platform.js"), "utf8");
+  const css = fs.readFileSync(path.join(__dirname, "..", "css", "site.css"), "utf8");
+  const twin = fs.readFileSync(path.join(__dirname, "twin.js"), "utf8");
+  // The page makes the caption once, at start-up, with the class that follows the picture, and puts it on the stage.
+  assert.ok(page.indexOf('const twinCaption = U.el("p", { id: "twinCaption", class: "simOnly" });') >= 0);
+  assert.ok(page.indexOf("twinCaption.textContent = window.HGLogic.TWIN_CAPTION;") >= 0);
+  assert.ok(page.indexOf('$("stage").appendChild(twinCaption);') >= 0);
+  assert.ok(page.indexOf("twinCaption") < page.indexOf("window.HGTwin.create("), "made before the picture is");
+  // One rule hides the picture's canvas (#twin) and everything with class simOnly unless the stage is in picture mode.
+  assert.ok(/\.stage:not\(\.sim\) #twin, \.stage:not\(\.sim\) \.simOnly \{ display: none !important; \}/.test(css));
+  // Nothing else hides the caption, and it has its own place above the play bar.
+  assert.ok(/#twinCaption \{ position: absolute;[^}]*bottom: 52px;/.test(css));
+  assert.strictEqual((css.match(/#twinCaption/g) || []).length, 1);
+  // These are the single figures the caption covers; if the picture gains another, this list must be looked at again.
+  for (const label of ["Crops lost so far", "Crops saved so far", "Water saved from leaking", "Water leaked out of canals", "Sealing early "]) assert.ok(twin.indexOf(label) >= 0, label);
+  assert.strictEqual((twin.match(/money\(/g) || []).length, 3, "three dollar figures are drawn on the picture: crops lost, crops saved, the closing line");
 });

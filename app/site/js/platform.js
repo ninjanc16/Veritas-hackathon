@@ -329,7 +329,7 @@
         ["Sealant cost per million gallons kept", perAf(total.afHigh) + " to " + perAf(total.afLow), "a million gallons is worth about $" + U.num(U.USD_PER_AF * 1e6 / E.GALLONS_PER_ACRE_FOOT) + " to farms in a shortage"],
       ]) +
       '<p class="rec ' + act.key + '"><b>' + act.title + ".</b> At a " + U.pct(p) + " chance of a drought season" + (state.severity != null ? " (your setting)." : " (the forecast).") + "</p>" +
-      (piped ? '<p class="fn warn">' + piped + " funded segments are mapped as piped in OpenStreetMap. Check them first: a pipe does not seep.</p>" : "") + rows +
+      (piped ? '<p class="fn warn">' + piped + " funded segments are mapped as piped in OpenStreetMap. Check them first: a pipe does not seep.</p>" : "") + heldOutNote() + rows +
       '<div class="rowBtns"><button class="btn" data-act="go" data-step="sim">Simulate this plan &rarr;</button><button class="btn ghost" data-act="csv">Download CSV</button></div>';
     $("budgetExtra").innerHTML =
       more("Field checklist", "<ol class=\"todo\">" +
@@ -468,6 +468,11 @@
 
     });
   }
+  // The picture shows single figures for one run. This caption sits on it whenever it is shown
+  // (class simOnly: css/site.css shows and hides it together with the picture's canvas).
+  const twinCaption = U.el("p", { id: "twinCaption", class: "simOnly" });
+  twinCaption.textContent = window.HGLogic.TWIN_CAPTION;
+  $("stage").appendChild(twinCaption);
   const twin = window.HGTwin.create({ canvas: $("twin"), stage: $("stage"), onTick(i, playing) {
     const w = twinWeeks[i]; if (!w) return;
     $("simSeek").value = i; $("simPlay").textContent = playing ? "Pause" : (i >= twinWeeks.length - 1 ? "Run again" : "Play");
@@ -515,7 +520,9 @@
   /* Which of the two regimes the runs are in (see samplePhysics in sim/engine.js), in a sentence. */
   const regimeSentence = (calibrated) => (calibrated
     ? "Leak rates are calibrated to each district's published loss, so the share of that loss that is seepage is drawn too."
-    : "Leak rates are the published rates for each soil; they are not yet calibrated to district losses.");
+    : "Leak rates are the published rates for each soil; calibrating them to district losses did not predict a hidden district better than canal length alone.");
+  /* What the held-out test of the leak model found. Shown wherever volumes and dollars are. */
+  const heldOutNote = () => '<p class="note">' + U.esc(window.HGLogic.HELD_OUT_SENTENCE) + "</p>";
   /* The unknowns every run draws, with their ranges. Shown next to the sliders. */
   function unknownsHtml(P, calibrated) {
     const D = E.DEFAULTS, item = (text, tag, label) => "<li>" + text + ' <span class="tag ' + tag + '">' + label + "</span></li>";
@@ -561,6 +568,7 @@
     return '<section class="replay"><h3>Replay of the real record, ' + U.esc(result.firstYear) + " to " + U.esc(result.lastYear) + TAG_MODELLED + "</h3>" +
       '<p class="fn">What each policy would have done in the years that really happened: the real weekly drought record, the real reservoir levels, and each year\'s forecast as it was really made, by a model trained only on earlier years. ' +
       "The weather is fixed, so the ranges come only from what is not known about the canals: how well the sealant works, how wide the canals are and how much of them is already lined. " + regimeSentence(result.calibrated) + "</p>" +
+      heldOutNote() +
       bandsBlock(result, true) +
       '<p class="fn">Modelled, not measured: none of these savings happened. Modelled saving is the crop loss avoided minus the sealant spent, against doing nothing. ' +
       "Water kept counts every week the sealant was working; it lowers the crop loss only in weeks with a shortage. " +
@@ -612,10 +620,9 @@
       const policyRows = POLICIES.map((pol, i) => "<tr><td>" + U.esc(pol.name) + "</td>" + cell(run.policies[i].summary.cost) +
         (i ? cell(gain(run.policies, i)) + cell(gain(run.fixedPhysics.policies, i)) + '<td class="r">' + U.esc(run.policies[i].losesToNothing) + " of " + DRAWS + "</td>"
            : '<td class="r"></td><td class="r"></td><td class="r"></td>') + "</tr>").join("");
-      const keptYear = E.savedAcreFeet(plan.gallonsPerDay * (central.calibrated ? central.seepMult : central.widthMult * (1 - central.linedShare)), Math.min(273, P.daysLast * P.applications), central.cut);
       simFacts = {
         start: U.niceDate(TODAY), system: scope.system, pct: res.pct, live: res.live, pNow: scope.pNow, library: run.libraryYears, dry: run.dryYears,
-        recall: hit.recall, falseAlarm: hit.falseAlarm, shocks: on.map((x) => x.label + " (" + x.note + ")"), keptYear, wrongWarning: plan.spent * P.applications,
+        recall: hit.recall, falseAlarm: hit.falseAlarm, shocks: on.map((x) => x.label + " (" + x.note + ")"),
         cases: state.simStep > 1 ? CASES.filter((c) => c.key !== "check").map((c) => c.name + ": " + run.cases[c.key].sourceYears.join(", ")) : [], share: scope.share,
         outsideValley: scope.outsideValley, who, P,
       };
@@ -692,6 +699,7 @@
     const tag = (k) => ' <span class="tag ' + k + '">' + k + "</span>";
     $("view").innerHTML =
       "<h2>Data and sources</h2><div class=\"sub\">Every dataset, what it is used for and where it comes from. Data as of " + U.niceDate(HG.week) + ".</div>" +
+      heldOutNote() +
       "<h3>1. Drought forecast model</h3>" + table([
         ["Drought class each week, each county (the model's main input and its answer)", "U.S. Drought Monitor, weekly, 2000 on", link("droughtmonitor.unl.edu", "https://droughtmonitor.unl.edu/")],
         ["El Ni&ntilde;o signal", "Oceanic Ni&ntilde;o Index, monthly", link("NOAA Climate Prediction Center", "https://www.cpc.ncep.noaa.gov/data/indices/oni.ascii.txt")],
@@ -711,7 +719,7 @@
         ["Leak rate by soil, unlined canals", Object.keys(HG.seepage).filter((k) => !/sand$/i.test(k) || k === "Sand").map((k) => U.esc(k + " " + HG.seepage[k])).join(" · ") + " gallons per sq ft per day", link("Fipps, Texas A&M, 1998, Tables 6 to 8", "https://gfipps.tamu.edu/files/2019/12/RGV-Potential-Water-Savings.pdf") + " (Table 7 quotes the Texas Board of Water Engineers, 1946)"],
         ["Canal size", U.esc(a.wetted_width_ft) + " ft wetted width for every canal", "Ours" + tag("assumption")],
         ["Units", "Water agencies count in acre-feet. One acre-foot is 325,851 gallons, about half an Olympic pool. The platform shows gallons.", "Conversion"],
-        ["Scale check", "Published potential saving in 28 Valley districts: 54,000 to 223,000 acre-feet a year." + (F.keptYear ? " This simulation keeps " + U.num(F.keptYear) + " in a year it acts, for " + F.who + "." : ""), link("Fipps, 1998", "https://gfipps.tamu.edu/files/2019/12/RGV-Potential-Water-Savings.pdf")],
+        ["Scale check", "Published potential saving in 28 Valley districts: 54,000 to 223,000 acre-feet a year. The simulation's own water figures are ranges, on the Simulation step.", link("Fipps, 1998", "https://gfipps.tamu.edu/files/2019/12/RGV-Potential-Water-Savings.pdf")],
       ]) +
       '<p class="fn">Leakage counts only weeks when water is released, and never more than was released. It assumes every ranked canal is unlined, because no source records lining. Treat it as an upper estimate.</p>' +
       "<h3>4. Sealant</h3>" + table([
@@ -735,7 +743,7 @@
         ["Start", F.start + "; " + F.system + " at " + (finiteOrNull(F.pct) == null ? "n/a" : F.pct + "%") + " (" + (F.live ? "live" : "saved") + " reading)", "Texas Water Development Board"],
         ["Chance the first season is dry", U.pct(F.pNow), "Frozen forecast model, this week's data"],
         ["Weather the futures are built from", F.library.length + " real years, " + F.library[0] + " to " + F.library[F.library.length - 1] + "; " + F.dry.length + " had a drought season (" + F.dry.join(", ") + ")", "U.S. Drought Monitor, Texas Water Development Board"],
-        ["Forecast accuracy inside the simulation", "Warns before " + Math.round(F.recall * 100) + "% of dry seasons and " + Math.round(F.falseAlarm * 100) + "% of wet ones. A wrong warning costs " + U.usd(F.wrongWarning) + ".", "Test above"],
+        ["Forecast accuracy inside the simulation", "Warns before " + Math.round(F.recall * 100) + "% of dry seasons and " + Math.round(F.falseAlarm * 100) + "% of wet ones. A wrong warning costs the sealant for that year and keeps no water that was needed.", "Test above"],
         ["Futures", "300 draws, fixed seed, so every visit shows the same result", "Ours"],
       ].concat((F.cases || []).map((c) => ["Scenario weather", c, "Real years, replayed from today's storage"]))
        .concat(F.shocks && F.shocks.length ? [["Stress tests switched on", F.shocks.join("; "), "Ours" + tag("assumption")]] : [])) : "") +
