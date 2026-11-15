@@ -1814,3 +1814,65 @@ def test_calibration_counts_cover_only_the_districts_that_are_fitted():
     assert item["km_in_matched_districts_with_no_loss"] == 9.0
     assert sum(item["class_counts_in_the_set"].values()) == 6
     assert item["districts_without_a_loss"] == ["Z"]
+
+
+# ---------------------------------------------------------------------------------------------
+# Tests added after review, each aimed at one way the code could be wrong without the earlier
+# tests noticing
+# ---------------------------------------------------------------------------------------------
+def test_water_table_factor_is_one_from_300_cm_down_and_below_one_just_above_it():
+    # Act / Assert: 300 cm and anything deeper has no effect; 299 cm already has a little
+    assert water_table_factor(300) == 1.0
+    assert water_table_factor(300.01) == 1.0
+    assert water_table_factor(301) == 1.0
+    assert water_table_factor(1000) == 1.0
+    assert water_table_factor(299) == pytest.approx(0.1 + 0.9 * 199 / 200)
+    assert water_table_factor(299) < 1.0
+    assert water_table_factor(100.01) > 0.1 and water_table_factor(99.99) == 0.1
+
+
+def test_held_out_error_is_summarised_by_the_median_not_the_mean():
+    # Arrange: one district is predicted very badly, so the mean and the median differ a lot
+    loss = pd.Series({"A": 100.0, "B": 200.0, "C": 400.0, "D": 800.0, "E": 1600.0})
+    table = pd.DataFrame({"loss_af": loss, "M1": loss * [1.0, 1.0, 1.0, 1.0, 40.0], "length": loss * 1.0})
+
+    # Act
+    result = seepage.leave_one_out(table, draws=500)
+    errors = list(result["models"]["M1"]["abs_pct_error"].values())
+
+    # Assert
+    assert result["models"]["M1"]["median_abs_pct_error"] == pytest.approx(np.median(errors))
+    assert np.mean(errors) > 2 * np.median(errors)                 # so a mean would have been caught
+    # the gap is a difference of medians too: a rival with one huge error and three perfect ones
+    # has median 0, the model has median 1, so the gap is -1 (the means would say +1.5)
+    gap = seepage.median_error_gap([0.0, 0.0, 0.0, 10.0], [1.0, 1.0, 1.0, 1.0], draws=500)
+    assert gap["gap"] == -1.0
+
+
+def test_an_interval_with_only_its_upper_end_above_zero_does_not_pass():
+    # Arrange: the model is better in some districts and worse in others
+    rival = [0.50, 0.10, 0.90, 0.20, 0.80, 0.30, 0.60, 0.15]
+    model = [0.40, 0.30, 0.50, 0.35, 0.45, 0.38, 0.42, 0.33]
+
+    # Act
+    gap = seepage.median_error_gap(rival, model, draws=2000)
+
+    # Assert: the interval reaches above zero but also below it, so it is not a pass
+    assert gap["lo"] < 0 < gap["hi"]
+    assert gap["passes"] is False
+    # and it passes only when the lower end itself is above zero
+    clear = seepage.median_error_gap([e + 1 for e in model], model, draws=2000)
+    assert clear["lo"] > 0 and clear["passes"] is True
+
+
+def test_crosswalk_refuses_a_name_that_fits_two_map_districts():
+    # Arrange: two map districts both start with "Donna Irrigation District"
+    map_names = ["Donna Irrigation District Hidalgo County 1", "Donna Irrigation District 2",
+                 "Delta Lake Irrigation District"]
+
+    # Act
+    crosswalk = seepage.build_crosswalk(["Donna", "Delta Lake"], map_names).set_index("district")
+
+    # Assert: the ambiguous one is left unmatched, not given the first candidate
+    assert crosswalk.loc["Donna"].tolist() == ["", "none"]
+    assert crosswalk.loc["Delta Lake"].tolist() == ["Delta Lake Irrigation District", "normalised"]
