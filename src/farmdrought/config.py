@@ -224,6 +224,25 @@ WATER_TABLE_DEEP_CM = 300
 WATER_TABLE_SHALLOW_CM = 100
 WATER_TABLE_MIN_FACTOR = 0.1
 
+# 8e-3. ADDED in round 3: canal classes (canal_class.py). Fixed in reports/decision.md on
+# Nov 15, 2026, before any fit. The sealant plan below does not use them yet.
+# A segment whose name says it carries water AWAY is not an irrigation canal (used by leaks.py
+# for its "Drain" level, and by canal_class.fundable).
+NOT_IRRIGATION_NAMES = "Drain|Wasteway|Floodway"
+# Wetted width in feet as (low, middle, high) for each class. ALL ASSUMPTIONS: the repo holds no
+# measured width for any canal. "unknown" is the class of a segment whose name and map kind say
+# nothing (about 93% of district segments); its middle, 20 ft, is the width the project used
+# for every canal before. A fit uses the middle of the range.
+CANAL_WIDTH_FT = {"main": (20, 30, 40), "lateral": (8, 14, 20), "ditch": (3, 5.5, 8), "unknown": (8, 20, 40)}
+# Share of a district's canal length that is lined, as (low, middle, high). ASSUMPTION: nobody
+# publishes which canals are lined. The same middle value is used for every district.
+LINED_SHARE = (0.0, 0.3, 0.7)
+# Days a canal carries water in a season. ASSUMPTION.
+SEEPAGE_SEASON_DAYS = 273
+# A segment is not fundable when this share or more of its length is tagged as running
+# underground on OpenStreetMap. That tag marks tunnels and culverts; it does not mean "lined".
+PIPED_SHARE_NOT_FUNDABLE = 0.5
+
 # 8f. Irrigation districts and the sealant plan (districts.py)
 DISTRICTS_RAW = RAW / "districts" / "tx_districts.geojson"   # district boundaries as downloaded
 DISTRICTS_GEOJSON = PROCESSED / "districts.geojson"          # boundaries + risk + sealant plan, for the App

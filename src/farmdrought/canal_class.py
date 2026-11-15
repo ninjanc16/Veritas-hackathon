@@ -17,7 +17,10 @@ WHAT "PIPED" MEANS HERE: only that OpenStreetMap tags the line as a tunnel. Many
 short road culverts. So it is carried as a SHARE of the segment's length (piped_share) and is
 never a statement that a canal is lined.
 """
+import re
 from collections import Counter
+
+from farmdrought.config import NOT_IRRIGATION_NAMES, PIPED_SHARE_NOT_FUNDABLE
 
 CELL = 0.0005        # grid cell in degrees, about 50 metres
 STEP = 0.0004        # put a point on a line at least every ~40 metres, so straight canals still match
@@ -97,3 +100,67 @@ def match_segments(lines, ways):
     """match_line for every segment. lines: one [[lon, lat], ...] per segment. Returns a list of dicts."""
     grid = point_grid([w["line"] for w in ways])
     return [match_line(site_line(line), grid, ways) for line in lines]
+
+
+# ---------------------------------------------------------------------------------------------
+# Class and fundability of one segment
+# ---------------------------------------------------------------------------------------------
+CLASSES = ["main", "lateral", "ditch", "unknown"]
+
+
+def segment_name(usgs_name, match):
+    """The name a segment is judged by: its USGS name, or when it has none the OpenStreetMap
+    name, but only if that name covers at least half of the segment. "" if neither."""
+    if usgs_name:
+        return usgs_name
+    return match["name"] if match["name_hits"] >= MATCHED_SHARE * match["points"] else ""
+
+
+def _class_and_source(name, kind):
+    """The rule fixed in reports/decision.md (Nov 15, 2026). First match wins."""
+    name = (name or "").lower()
+    if re.search("lateral|branch|feeder", name):
+        return "lateral", "name"
+    if "main" in name or name.endswith("canal"):
+        return "main", "name"
+    if "ditch" in name or "acequia" in name:
+        return "ditch", "name"
+    if kind == "ditch":
+        return "ditch", "kind"
+    return "unknown", "none"
+
+
+def classify(row):
+    """"main", "lateral", "ditch" or "unknown", from the segment's name and its OpenStreetMap kind.
+
+    row : anything with "name" (see segment_name) and "kind" ("canal", "ditch", "drain" or None).
+      1. the name has Lateral, Branch or Feeder -> lateral
+      2. the name has Main, or ends in Canal    -> main
+      3. the name has Ditch or Acequia, or the map kind is ditch -> ditch
+      4. everything else                        -> unknown
+    Names and map kinds cannot tell a main canal from a lateral for most segments (93% of
+    district segments have no name), so "unknown" is the honest answer for them, not a guess.
+    The class only sets an ASSUMED width range (config.CANAL_WIDTH_FT).
+    """
+    return _class_and_source(row["name"], row["kind"])[0]
+
+
+def class_source(row):
+    """What the class rests on: "name", "kind" (the map kind alone) or "none" (class unknown)."""
+    return _class_and_source(row["name"], row["kind"])[1]
+
+
+def fundable(row):
+    """False for a segment that should never be sealed, True otherwise.
+
+    row : anything with "name", "kind" and "piped_share" (a number from 0 to 1).
+    Not fundable when the map kind is drain, when the name says it carries water away (Drain,
+    Wasteway, Floodway), or when half or more of its length is tagged as running underground.
+    piped_share is ONLY the OpenStreetMap tunnel tag, often a road culvert. It is a length share
+    and is never a statement that the canal is lined.
+    """
+    if row["kind"] == "drain":
+        return False
+    if re.search(NOT_IRRIGATION_NAMES, row["name"] or "", flags=re.IGNORECASE):
+        return False
+    return not row["piped_share"] >= PIPED_SHARE_NOT_FUNDABLE

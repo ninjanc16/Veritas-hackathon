@@ -14,7 +14,8 @@ import inspect
 from farmdrought import alert as alert_module
 from farmdrought import config, export, refresh, robustness, round3, v2
 from farmdrought.allocation import model_minus_rule, run_allocation
-from farmdrought.canal_class import match_line, match_segments, point_grid, site_line
+from farmdrought.canal_class import (class_source, classify, fundable, match_line, match_segments, point_grid,
+                                     segment_name, site_line)
 from farmdrought.config import (ALERT_WEEKS, COUNTY_RESERVOIR, FROZEN, METRICS, OUTLOOK, PREDICTIONS, SCORE_THROUGH,
                                 SEASON_WEEKS, YEAR_WEEKS)
 from farmdrought.drought import build_panel, load_usdm
@@ -1520,3 +1521,64 @@ def test_a_segment_takes_the_kind_and_piped_share_of_the_map_lines_it_lies_on():
     both = match_segments([[[-97.998, 26.0], [-97.992, 26.0]], [[-97.998, 26.05], [-97.990, 26.05]]], ways)
     assert [m["kind"] for m in both] == ["canal", None]
     assert site_line([[-98.00001, 26.00001], [-98.00002, 26.00002], [-97.9, 26.1]]) == [[-98.0, 26.0], [-97.9, 26.1]]
+
+
+def test_classify_follows_the_declared_rule_in_order():
+    # Arrange: (name, map kind) -> (class, what it rests on), each case from the rule in reports/decision.md
+    cases = {
+        ("Santa Maria Lateral", "canal"): ("lateral", "name"),
+        ("Main Lateral", "canal"): ("lateral", "name"),            # rule 1 comes before rule 2
+        ("Lateral Canal", None): ("lateral", "name"),
+        ("North Branch", "ditch"): ("lateral", "name"),
+        ("Feeder Canal", "canal"): ("lateral", "name"),
+        ("East Main Canal", "canal"): ("main", "name"),
+        ("Franklin Canal", None): ("main", "name"),                # ends in Canal
+        ("Main Ditch", "ditch"): ("main", "name"),                 # Main comes before Ditch
+        ("Canal Street Outfall", "canal"): ("unknown", "none"),    # has Canal but does not end in it
+        ("Seamans Ditch", None): ("ditch", "name"),
+        ("Acequia Monte", "canal"): ("ditch", "name"),
+        ("", "ditch"): ("ditch", "kind"),
+        ("Rio Grande Number 2", "ditch"): ("ditch", "kind"),
+        ("", "canal"): ("unknown", "none"),                        # no evidence: never guessed
+        ("", None): ("unknown", "none"),
+        ("", "drain"): ("unknown", "none"),
+        ("Pilot Channel", "canal"): ("unknown", "none"),
+    }
+
+    # Act / Assert
+    for (name, kind), expected in cases.items():
+        row = {"name": name, "kind": kind}
+        assert (classify(row), class_source(row)) == expected, f"{name!r}, {kind!r}"
+
+
+def test_fundable_excludes_drains_and_mostly_underground_segments_only():
+    # Arrange / Act / Assert
+    assert fundable({"name": "", "kind": "canal", "piped_share": 0.0}) is True
+    assert fundable({"name": "East Main Canal", "kind": None, "piped_share": 0.49}) is True
+    assert fundable({"name": "", "kind": "drain", "piped_share": 0.0}) is False              # the map says drain
+    assert fundable({"name": "Riverside Drain", "kind": "canal", "piped_share": 0.0}) is False   # the name says so
+    assert fundable({"name": "north floodway", "kind": None, "piped_share": 0.0}) is False
+    assert fundable({"name": "Wasteway Number 2", "kind": "ditch", "piped_share": 0.0}) is False
+    assert fundable({"name": "", "kind": "canal", "piped_share": 0.5}) is False              # half underground
+    assert fundable({"name": "", "kind": "canal", "piped_share": 1.0}) is False
+    # the drain pattern is the one leaks.py has always used
+    from farmdrought import leaks
+    assert leaks.NOT_IRRIGATION == config.NOT_IRRIGATION_NAMES == "Drain|Wasteway|Floodway"
+
+
+def test_segment_name_prefers_the_usgs_name_and_needs_half_the_segment_for_a_map_name():
+    # Arrange
+    half = {"name": "Mercedes Main Canal", "name_hits": 5, "points": 10}
+    less = {"name": "Mercedes Main Canal", "name_hits": 4, "points": 10}
+
+    # Act / Assert
+    assert segment_name("Franklin Canal", half) == "Franklin Canal"
+    assert segment_name("", half) == "Mercedes Main Canal"
+    assert segment_name("", less) == ""
+
+
+def test_widths_and_the_lined_share_are_the_declared_assumptions():
+    assert config.CANAL_WIDTH_FT == {"main": (20, 30, 40), "lateral": (8, 14, 20), "ditch": (3, 5.5, 8),
+                                     "unknown": (8, 20, 40)}
+    assert config.LINED_SHARE == (0.0, 0.3, 0.7) and config.SEEPAGE_SEASON_DAYS == 273
+    assert config.CANAL_WIDTH_FT["unknown"][1] == config.WETTED_WIDTH_FT        # the old single width

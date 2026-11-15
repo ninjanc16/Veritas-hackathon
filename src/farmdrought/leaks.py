@@ -36,6 +36,7 @@ import sys
 import pandas as pd
 import requests
 
+from farmdrought.config import NOT_IRRIGATION_NAMES
 from farmdrought.config import (CANAL_KSAT_CSV, CANAL_SOIL_CSV, CANALS_CSV, CANALS_GEOJSON, KSAT_TO_GAL_SQFT_DAY, LATEST,
                                 LEAKY_SOIL_RATE, SEASON_THRESHOLD, SEEPAGE_GAL_SQFT_DAY, WATER_TABLE_DEEP_CM,
                                 WATER_TABLE_MIN_FACTOR, WATER_TABLE_SHALLOW_CM)
@@ -46,7 +47,7 @@ RATE_SOURCE = ("Fipps (Texas A&M), 1998: Table 7 (quoting the Texas Board of Wat
                "Table 6 for sands, and one measured canal in Table 8 for sandy clay loam")
 BED_DEPTH_CM = 100  # we read the soil about 1 meter down
 # Segments whose name says they carry water AWAY (drains) are not irrigation canals.
-NOT_IRRIGATION = "Drain|Wasteway|Floodway"
+NOT_IRRIGATION = NOT_IRRIGATION_NAMES   # "Drain|Wasteway|Floodway", now kept in config.py and shared
 LEVELS = ["Inspect first", "Watch", "Low", "Unknown soil", "Drain"]
 
 
