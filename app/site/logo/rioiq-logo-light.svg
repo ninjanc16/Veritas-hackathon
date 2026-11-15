@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 376 150" role="img" aria-labelledby="t">
+  <title id="t">RioIQ</title>
+  <clipPath id="bowl"><circle cx="170" cy="89" r="17.6"/></clipPath>
+  <g clip-path="url(#bowl)">
+    <g transform="translate(0 86)">
+      <path d="M96 0q6 -3.2 12 0t12 0q6 -3.2 12 0t12 0q6 -3.2 12 0t12 0q6 -3.2 12 0t12 0q6 -3.2 12 0t12 0q6 -3.2 12 0t12 0q6 -3.2 12 0t12 0V70H96Z" fill="#0a7fb4"/>
+    </g>
+  </g>
+  <circle cx="170" cy="89" r="24" fill="none" stroke="#0a0807" stroke-width="14"/>
+  <g fill="none" stroke="#0a0807" stroke-width="14" stroke-linejoin="round">
+    <path d="M30 20V120M30 27H61a26 26 0 0 1 0 52H30M57 79L89 120"/>
+    <path d="M118 60V120"/>
+    <path d="M226 20V120"/>
+    <circle cx="298" cy="70" r="43"/>
+    <path d="M316 94L346 126" stroke-linecap="round"/>
+  </g>
+  <circle class="dot" cx="118" cy="36" r="9" fill="#0a0807"/>
+</svg>

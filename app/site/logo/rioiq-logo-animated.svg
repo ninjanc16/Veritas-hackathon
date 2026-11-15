@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 376 150" role="img" aria-labelledby="t">
+  <title id="t">RioIQ</title>
+  <style>
+    /* One loop is 7 seconds: the dot of the i hops into the o, the level jumps, then it
+       slowly drains away down the tail of the Q, and a new dot grows back. */
+    .level  { animation: level 7s infinite; transform: translateY(98px); }
+    .wave   { animation: wave 1.6s linear infinite; }
+    .dot    { animation: dot 7s infinite; transform-box: fill-box; transform-origin: center; }
+    .hopx   { animation: hopx 7s infinite linear; }
+    .hopy   { animation: hopy 7s infinite; }
+    .ripple { animation: ripple 7s infinite; transform-box: fill-box; transform-origin: center; opacity: 0; }
+    .leak   { animation: leak 7s infinite, flow .9s linear infinite; opacity: 0; }
+    .drip   { animation: drip 7s infinite; opacity: 0; }
+    @keyframes wave   { to { transform: translateX(-24px); } }
+    @keyframes level  { 0%, 15% { transform: translateY(98px); animation-timing-function: cubic-bezier(.2, 1.6, .4, 1); }
+                        27% { transform: translateY(76px); animation-timing-function: cubic-bezier(.4, 0, .7, 1); }
+                        88%, 100% { transform: translateY(98px); } }
+    @keyframes dot    { 0%, 6% { transform: scale(1); opacity: 1; } 7% { transform: scale(1.25, .8); opacity: 1; } 8%, 34% { transform: scale(0); opacity: 0; }
+                        46% { transform: scale(1.18); opacity: 1; } 52%, 100% { transform: scale(1); opacity: 1; } }
+    @keyframes hopx   { 0%, 7% { transform: translateX(0); } 15%, 100% { transform: translateX(52px); } }
+    @keyframes hopy   { 0%, 7% { transform: translateY(0); opacity: 0; animation-timing-function: cubic-bezier(.2, .7, .5, 1); }
+                        7.5% { opacity: 1; } 10.5% { transform: translateY(-24px); opacity: 1; animation-timing-function: cubic-bezier(.5, 0, .9, .5); }
+                        15% { transform: translateY(50px); opacity: 1; } 15.5%, 100% { transform: translateY(50px); opacity: 0; } }
+    @keyframes ripple { 0%, 15% { transform: scale(1); opacity: 0; } 16% { opacity: .9; } 30% { transform: scale(4.2, 2.4); opacity: 0; } 100% { opacity: 0; } }
+    @keyframes leak   { 0%, 24% { opacity: 0; } 32%, 80% { opacity: 1; } 90%, 100% { opacity: 0; } }
+    @keyframes flow   { to { stroke-dashoffset: -22; } }
+    @keyframes drip   { 0%, 34% { transform: translate(0, 0); opacity: 0; } 36% { opacity: 1; } 44% { transform: translate(5px, 16px); opacity: 0; }
+                        50% { transform: translate(0, 0); opacity: 0; } 52% { opacity: 1; } 60% { transform: translate(5px, 16px); opacity: 0; }
+                        66% { transform: translate(0, 0); opacity: 0; } 68% { opacity: 1; } 76%, 100% { transform: translate(5px, 16px); opacity: 0; } }
+    /* For anyone who has asked their device for less motion: show the still logo. */
+    @media (prefers-reduced-motion: reduce) {
+      .level, .wave, .dot, .hopx, .hopy, .ripple, .leak, .drip { animation: none; }
+      .level { transform: translateY(86px); }
+    }
+  </style>
+  <clipPath id="bowl"><circle cx="170" cy="89" r="17.6"/></clipPath>
+  <g clip-path="url(#bowl)">
+    <g class="level" transform="translate(0 0)">
+      <path class="wave" d="M96 0q6 -3.2 12 0t12 0q6 -3.2 12 0t12 0q6 -3.2 12 0t12 0q6 -3.2 12 0t12 0q6 -3.2 12 0t12 0q6 -3.2 12 0t12 0q6 -3.2 12 0t12 0V70H96Z" fill="#38c8f5"/>
+      <ellipse class="ripple" cx="170" cy="0" rx="4" ry="1.2" fill="none" stroke="#fff" stroke-width="1.4"/>
+    </g>
+  </g>
+  <circle cx="170" cy="89" r="24" fill="none" stroke="#fff7e4" stroke-width="14"/>
+  <g fill="none" stroke="#fff7e4" stroke-width="14" stroke-linejoin="round">
+    <path d="M30 20V120M30 27H61a26 26 0 0 1 0 52H30M57 79L89 120"/>
+    <path d="M118 60V120"/>
+    <path d="M226 20V120"/>
+    <circle cx="298" cy="70" r="43"/>
+    <path d="M316 94L346 126" stroke-linecap="round"/>
+  </g>
+  <circle class="dot" cx="118" cy="36" r="9" fill="#fff7e4"/>
+  <g class="hopx"><circle class="hopy" cx="118" cy="36" r="8" fill="#38c8f5"/></g>
+  <path class="leak" d="M316 94L346 126" fill="none" stroke="#38c8f5" stroke-width="5" stroke-linecap="round" stroke-dasharray="7 15"/>
+  <circle class="drip" cx="349" cy="130" r="3.4" fill="#38c8f5"/>
+</svg>
