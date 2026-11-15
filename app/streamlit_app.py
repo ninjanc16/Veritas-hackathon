@@ -106,8 +106,8 @@ focus = metrics["focus_river"]
 others = sorted(r for r in latest["river"].unique() if r != focus)
 # Links can open the app on one river, county and tab (?river=Ohio&fips=39900&view=Replay).
 # We read the address ONCE per visit, validate it, and use it as the starting choice.
-TAB_NAMES = ["This week", "Replay", "Outlook check", "Farm brief",
-             "Other rivers and misses", "How good is it", "Canal action"]
+TAB_NAMES = ["This week", "Canal action", "Replay", "Outlook check", "Farm brief",
+             "Other rivers and misses", "How good is it"]
 if "url_read" not in st.session_state:
     st.session_state["url_read"] = True
     q = st.query_params
@@ -139,6 +139,13 @@ is_transfer = river != focus
 
 # Sidebar "Data checks": re-count the alarms in the app and compare with metrics.json.
 # If they disagree, the files are suspect. We never patch them - we tell the Pipeline owner.
+with st.sidebar.expander("What do these words mean?"):
+    st.markdown(
+        "- **Severe drought (D2 or worse):** a level on the U.S. Drought Monitor map, drawn weekly.\n"
+        "- **Low / Watch / Warning:** how worried to be. Warning means the forecast has crossed its tested threshold.\n"
+        "- **6-month chance:** the chance of 8 straight weeks of severe drought in the next 6 months.\n"
+        "- **Inspect first:** a canal on leaky soil in a county the forecast warns about.\n"
+        "- **Estimate:** worked out from published figures. Not a prediction, not a measurement.")
 st.sidebar.markdown("#### Data checks")
 mismatches = reconcile(pred, metrics)
 if mismatches:
@@ -170,6 +177,10 @@ def tab_this_week():
     transfer_note()
     row = latest[latest["fips"] == fips].iloc[0]
     st.subheader(f"{md_escape(county_label)} - week of {row['date']:%B %d, %Y}")
+
+    # The answer first, in plain words: what to do, from the 6-month chance (same rule as the Canal action tab).
+    tier, why = canal.action_tier(canal.county_probability(row)[0])
+    theme.callout(f"What to do now: {tier}. {why} Open the Canal action tab for your canals and the sealant plan.")
 
     # Three cards: the 4-week alert, the 6-month outlook, the 12-month outlook.
     theme.card_grid([
@@ -203,6 +214,7 @@ def tab_this_week():
         ])
         # The pipeline's own sentence, with its column name swapped for plain words.
         tested = mf["tested"].replace("risk_level", "the overall level")
+        tested = tested[0].upper() + tested[1:]            # the pipeline's sentence now starts a line
         st.caption(md_escape(f"{tested} Feed price: {mf['feed_cost_source']}. This is not a prediction "
                              "of losses, not a payment, and not financial advice."))
 
@@ -250,6 +262,7 @@ def step_week(key, delta, last):
 
 def tab_replay():
     transfer_note()
+    st.caption("Pick a past week and see what our alert said then, and what really happened in the next 4 weeks.")
     hist = pred[pred["fips"] == fips]
     if hist.empty:
         st.info("No replay data for this county.")
@@ -348,6 +361,7 @@ def colored(df, good):
 
 def tab_how_good():
     transfer_note()
+    st.caption("How well the forecasts did on years they had not seen, next to simple rules. Weak results are shown too.")
     m = metrics
 
     # 1) The 4-week alert.
@@ -555,6 +569,7 @@ def tab_outlook_check():
 # ---------------------------------------------------------------------------
 def tab_farm_brief():
     transfer_note()
+    st.caption("A short plain-English summary for this county that you can read or download.")
     status = "DEMO" if source == "demo" else ("FINAL" if metrics["is_final"] else "PROVISIONAL")
     row = latest[latest["fips"] == fips].iloc[0]
     brief = build_brief(row, pred[pred["fips"] == fips], metrics, status)
@@ -581,6 +596,7 @@ def heat(matrix, title, scale, zmax, ticks):
 
 def tab_other_rivers():
     transfer_note()
+    st.caption("The same method tried on other rivers, with the misses and false alarms. This is a test, not a product.")
     mine = pred[pred["river"] == river]
     years = sorted(mine["date"].dt.year.unique())
     worst = mine.groupby(mine["date"].dt.year)["y"].sum().idxmax()      # year with the most droughts
@@ -622,96 +638,163 @@ def tab_other_rivers():
 
 def show_canal_map(fips):
     """Canal lines for the chosen county, colored by the pipeline's level. Needs the pipeline's file."""
-    st.markdown("#### Where leaks are likely")
     prio = metrics.get("canal_priority")
     canals = get_canals() if isinstance(prio, dict) else {}
     if not canals:
         st.write("Canal map: not available yet.")
         return
     segs = canals.get(fips, [])
-    if segs:
-        st.plotly_chart(theme.canal_map(segs), width="stretch", key="canal_map")
-        km = {lvl: sum(x["length_km"] or 0 for x in segs if x["level"] == lvl) for lvl in theme.CANAL_COLOR}
-        st.caption(md_escape("In this county: " + ", ".join(f"{lvl} {v:,.0f} km" for lvl, v in km.items() if v)
-                             + ". Click a level in the legend to hide or show it."))
-    else:
+    if not segs:
         st.info("No canal lines for this county in the pipeline's file.")
-    st.caption(md_escape("How the levels are set: " + prio["rule"]) if "rule" in prio else "")
+        return
+    km = {lvl: sum(x["length_km"] or 0 for x in segs if x["level"] == lvl) for lvl in theme.CANAL_COLOR}
+    # One plain sentence first, so the manager knows what to look for on the map.
+    inspect = km["Inspect first"]
+    st.markdown(f"**{inspect:,.0f} km of the {sum(km.values()):,.0f} km of canal in this county are marked "
+                "'Inspect first'** (red). Those sit on leaky soil in a county the forecast warns about.")
+    st.plotly_chart(theme.canal_map(segs), width="stretch", key="canal_map")
+    st.caption(md_escape("Kilometres by level: " + ", ".join(f"{lvl} {v:,.0f}" for lvl, v in km.items() if v)
+                         + ". Click a level in the legend to hide or show it; scroll to zoom."))
     # Named canals to inspect first: this county's, or the top few across all counties.
     named = pd.DataFrame(prio["named"])
-    if not named.empty:
-        mine = named[named["county"] == names[fips].split(",")[0]]
-        shown = mine if not mine.empty else named
-        st.markdown("**Named canals with the most 'Inspect first' length**"
-                    + ("" if not mine.empty else " (all counties, none named here)"))
-        st.dataframe(shown.head(10).rename(columns={
+    mine = named[named["county"] == names[fips].split(",")[0]] if not named.empty else named
+    if not mine.empty:
+        st.markdown("**Named canals to inspect first in this county**")
+        st.dataframe(mine.head(10).rename(columns={
             "name": "Canal", "county": "County", "state": "State", "inspect_first_km": "Inspect-first km",
             "seepage_rate": "Seepage (gal/sq ft/day)", "p_season": "6-month chance"}),
             hide_index=True, width="stretch")
+    with st.expander("How the levels are set"):
+        st.write(md_escape(prio["rule"]) if "rule" in prio else "")
     st.caption(md_escape(prio["note"]))
     st.caption(canal.ESTIMATE_LABEL)
 
 
+def show_district_plan(fips):
+    """The pipeline's sealant plan: which Texas districts get the budget, and how much water it might save."""
+    plan = metrics.get("districts")
+    if not isinstance(plan, dict):
+        st.write("District plan: not available yet.")
+        return
+    county = names[fips].split(",")[0]
+    mine = canal.districts_in_county(plan, county) if row_state(fips) == "Texas" else []
+    if row_state(fips) != "Texas":
+        st.info("The district plan covers Texas districts only: no public boundary file was found for "
+                "New Mexico or Colorado districts.")
+    elif not mine:
+        st.info(f"No irrigation district in the plan covers {county} County.")
+    else:
+        st.markdown(f"**Districts that cover {county} County**")
+        st.dataframe(pd.DataFrame({
+            "District": [d["district"] for d in mine],
+            "Risk": [d["risk"] for d in mine],
+            "Canal km": [d["canal_km"] for d in mine],
+            "Km sealed in the plan": [d["sealed_km"] for d in mine],
+            "Sealant cost": [canal.usd(d["sealant_usd"]) for d in mine],
+            "Water saved (acre-ft, a range)": [f"{d['saved_af_low']:,} to {d['saved_af_high']:,}" for d in mine],
+            "First canals": [", ".join(d["first_canals"]) for d in mine],
+        }), hide_index=True, width="stretch")
+
+    # The whole picture: where the example budget goes, biggest first, colored by risk.
+    top = sorted(plan["districts"], key=lambda d: d["sealant_usd"], reverse=True)[:10]
+    fig = go.Figure(go.Bar(
+        x=[d["sealant_usd"] for d in top][::-1], y=[d["district"] for d in top][::-1], orientation="h",
+        marker_color=[TIER_COLOR[d["risk"]] for d in top][::-1],
+        hovertemplate="%{y}<br>%{x:$,.0f}<extra></extra>"))
+    fig.update_layout(xaxis_title=f"Sealant spend in the plan (US dollars, example budget {canal.usd(plan['budget_usd'])})",
+                      margin=dict(l=10, r=10, t=10, b=10))
+    st.markdown("**Where the example budget goes (top 10 districts)**")
+    st.plotly_chart(theme.style_fig(fig, 380), width="stretch")
+    st.caption(f"Bar color = the district's risk: green Low, ochre Watch, red Warning. In total the plan seals "
+               f"{plan['sealed_km']:,.0f} km for {canal.usd(plan['spent_usd'])} and might save "
+               f"{plan['saved_af_low']:,} to {plan['saved_af_high']:,} acre-feet. Sealing everything would cost "
+               f"{canal.usd(plan['cost_to_treat_everything_usd'])}.")
+    with st.expander("How the plan works"):
+        st.write(md_escape(plan["rule"]))
+    st.caption(md_escape(plan["note"]))
+    st.caption(canal.ESTIMATE_LABEL)
+
+
+def row_state(fips):
+    """The state name of a county code (used to tell Texas counties from the others)."""
+    return latest.loc[latest["fips"] == fips, "state"].iloc[0]
+
+
 def tab_canal():
     """
-    The "Canal action" tab. The forecast above is the AI part. Everything on THIS tab is plain
-    arithmetic on published figures (see app/canal.py), so every output carries the estimate label.
+    The "Canal action" tab, written for an irrigation district manager:
+    1) what to do now, 2) which canals, 3) which districts get the budget, 4) size your own canal.
+    The forecast is the AI part. Everything else is arithmetic on published figures (app/canal.py)
+    or the pipeline's plan, so every output carries the estimate label.
     """
-    st.subheader(f"Canal action - {md_escape(county_label)}")
-    theme.callout("Our AI forecasts drought. This tab turns that forecast into a canal plan "
-                  "using published figures. Estimates, not results.")
+    st.subheader(f"Canal plan - {md_escape(county_label)}")
     districts, costs = get_reference()
     row = latest[latest["fips"] == fips].iloc[0]
+    p, has_res = canal.county_probability(row)
 
-    # 1) Forecast card. Use the reservoir-aware score when the pipeline provides it.
-    has_res = "p_season_res" in latest.columns
-    p = float(row["p_season_res"] if has_res else row["p_season"])
-    source_note = ("score from the forest that also sees reservoir storage" if has_res
-                   else "score without reservoir data (the reservoir version is not available yet)")
-    card_rows = [source_note]
-    trig = metrics.get("trigger")
-    if has_res and isinstance(trig, dict) and trig.get("value_sweep"):
-        card_rows.append(canal.trigger_verdict(trig)[1])      # e.g. "Adding reservoir storage did not help ..."
-    cards = [dict(label="Next 6 months", value=f"{round(p * 100)}%", accent=theme.CHART_COLORS[0],
-                  caption="chance of 8 straight weeks of severe drought", rows=card_rows)]
+    # 1) The answer first: one verdict, then the few facts behind it.
+    tier, why = canal.action_tier(p)
+    theme.callout(f"{tier}. {why}")
+    st.caption("This is a proposal built from the forecast, not a tested result. "
+               "Our AI forecasts drought; everything below turns that forecast into a canal plan with published figures.")
+    cards = [dict(label="Chance of a severe drought season", value=f"{round(p * 100)}%", accent=theme.CHART_COLORS[0],
+                  caption="8 straight weeks of severe drought in the next 6 months",
+                  rows=["Same number as the This week tab" + (" (reservoir storage did not improve it)" if has_res else "")])]
     if "res_name" in latest.columns and row["res_name"] != "none":
         cards.append(dict(label="Reservoir", value=f"{round(row['res_pct_full'])}% full",
                           accent=theme.CHART_COLORS[0], caption=str(row["res_name"]),
                           rows=["Storage on the latest date"]))
     if "d2_share_history" in latest.columns:
         cards.append(dict(label="History since 2000", value=f"{round(row['d2_share_history'] * 100)}%",
-                          accent=TIER_COLOR["Watch"], caption="of weeks in severe drought (D2 or worse)"))
+                          accent=TIER_COLOR["Watch"], caption="of weeks in severe drought here"))
     theme.card_grid(cards)
 
-    # 2) The action tier and one sentence on why.
-    tier, why = canal.action_tier(p)
-    theme.callout(f"{tier}. {why}")
-    st.caption("The tier is a proposal built from the forecast, not a tested result.")
-
-    # 3) District ranking - only for the three Valley counties.
-    st.markdown("#### Which irrigation districts matter most")
-    valley_p = canal.valley_probability(latest)
-    if fips in canal.VALLEY_FIPS and valley_p is not None:
-        ranked = canal.district_priority(districts, valley_p)
-        table = ranked.rename(columns={
-            "district": "District", "efficiency_pct": "Efficiency %",
-            "save80_low": "Recoverable at 80%, low (acre-ft)", "save80_high": "Recoverable at 80%, high (acre-ft)",
-            "priority_low": "Priority, low", "priority_high": "Priority, high"})
-        st.dataframe(table.round(0), hide_index=True, width="stretch")
-        st.caption(f"Priority = the highest 6-month probability among Cameron, Hidalgo and Willacy "
-                   f"({round(valley_p * 100)}%) times the water a district could recover by reaching 80% "
-                   "efficiency. The source report puts these districts in Cameron, Hidalgo and Willacy "
-                   "counties together but does not say which district is in which county, so the list is "
-                   "shown for all three. The figures are from 1998 (Texas A&M, Fipps), 28 years old.")
-        st.caption(canal.ESTIMATE_LABEL)
-    else:
-        st.info("No public district table for this county. Use the calculator below.")
-
-    # 3b) Where leaks are likely: the pipeline's canal lines, colored by level.
+    # 2) Which canals? The map is what a district manager acts on.
+    st.markdown("#### 1. Which canals to look at")
     show_canal_map(fips)
 
-    # 4) Calculator.
-    st.markdown("#### Canal calculator")
+    # 3) Which districts get the money?
+    st.markdown("#### 2. Where the sealant budget goes")
+    show_district_plan(fips)
+
+    # 4) The fixed "Read this first" box (the five lines the plan requires), always visible.
+    trig = metrics.get("trigger")
+    if isinstance(trig, dict) and trig.get("value_sweep"):
+        d1 = " ".join(canal.trigger_verdict(trig))
+    else:
+        d1 = "How the forecast compared with the simple 'D1 or worse now' rule: not available yet."
+    st.markdown("#### Read this first")
+    st.markdown("\n".join(f"{i}. {line}" for i, line in enumerate([
+        "The forecast is tested. The canal plan is a proposal built from published figures.",
+        d1,
+        "The sealant has not been field-tested on the Rio Grande. Results elsewhere ranged from no effect to a full stop of seepage.",
+        "District figures are from 1998. Some canals have been lined since.",
+        "Valley canals also carry city water. Any sealant would need the district's and regulators' approval.",
+    ], start=1)))
+
+    # 5) Extra detail, folded away so the page stays short.
+    with st.expander("Older published figures: Texas A&M efficiency by district (1998)"):
+        valley_p = canal.valley_probability(latest)
+        if fips in canal.VALLEY_FIPS and valley_p is not None:
+            ranked = canal.district_priority(districts, valley_p)
+            st.dataframe(ranked.rename(columns={
+                "district": "District", "efficiency_pct": "Efficiency %",
+                "save80_low": "Recoverable at 80%, low (acre-ft)", "save80_high": "Recoverable at 80%, high (acre-ft)",
+                "priority_low": "Priority, low", "priority_high": "Priority, high"}).round(0),
+                hide_index=True, width="stretch")
+            st.caption(f"Priority = the highest 6-month probability among Cameron, Hidalgo and Willacy "
+                       f"({round(valley_p * 100)}%) times the water a district could recover by reaching 80% "
+                       "efficiency. The report puts these districts in the three counties together without saying "
+                       "which is in which, so the list is shown for all three. The figures are 28 years old.")
+            st.caption(canal.ESTIMATE_LABEL)
+        else:
+            st.write("No public 1998 district table for this county. Use the calculator below.")
+    with st.expander("Size a canal of your own (calculator)"):
+        show_calculator(costs)
+
+
+def show_calculator(costs):
+    """Inputs for one canal -> seepage, sealant cost, water saved, and a cost-per-acre-foot comparison."""
     c1, c2, c3, c4 = st.columns(4)
     miles = c1.number_input("Miles of earthen canal", min_value=0.1, max_value=500.0, value=1.0, step=0.5)
     width = c2.number_input("Wetted width (feet)", min_value=1.0, max_value=200.0, value=20.0, step=1.0)
@@ -735,58 +818,34 @@ def tab_canal():
     ])
     st.caption(canal.ESTIMATE_LABEL)
 
-    # 5) Compare the three options per acre-foot, on a log axis (they differ by orders of magnitude).
     fallow_low, fallow_high = (v / costs["fallow_af_per_acre"] for v in
                                (costs["fallow_usd_per_acre_low"], costs["fallow_usd_per_acre_high"]))
     lin_low, lin_high = canal.lining_cost_per_af_range(miles, width, seep, costs)
-    options = [("Sealant", cpa_low, cpa_high), ("Fallowing", fallow_low, fallow_high),
-               ("Concrete lining", lin_low, lin_high)]
     fig = go.Figure()
-    for name, lo, hi in options:
+    for name, lo, hi in [("Sealant", cpa_low, cpa_high), ("Fallowing", fallow_low, fallow_high),
+                         ("Concrete lining", lin_low, lin_high)]:
         fig.add_trace(go.Scatter(x=[lo, hi], y=[name, name], mode="lines+markers", name=name,
                                  line=dict(width=8), marker=dict(size=12),
                                  hovertemplate=f"{name}: $%{{x:,.0f}} per acre-foot<extra></extra>"))
     fig.update_xaxes(type="log", title="Cost per acre-foot (US dollars, log scale)")
     fig.update_layout(showlegend=False)
-    st.plotly_chart(theme.style_fig(fig, height=260), width="stretch")
+    st.plotly_chart(theme.style_fig(fig, 260), width="stretch")
     st.caption("Each bar runs from the low to the high estimate. Lining assumes it stops all seepage and "
                "lasts 50 years. Fallowing = paying for 3 acre-feet per acre left dry at $425 to $700 an acre. "
                + canal.ESTIMATE_LABEL)
-
-    # 6) The fixed "Read this first" box (the five lines the plan requires).
-    trig = metrics.get("trigger")
-    if isinstance(trig, dict) and trig.get("value_sweep"):
-        d1 = " ".join(canal.trigger_verdict(trig))
-    else:
-        d1 = "How the forecast compared with the simple 'D1 or worse now' rule: not available yet."
-    st.markdown("#### Read this first")
-    st.markdown("\n".join(f"{i}. {line}" for i, line in enumerate([
-        "The forecast is tested. The canal plan is a proposal built from published figures.",
-        d1,
-        "The sealant has not been field-tested on the Rio Grande. Results elsewhere ranged from no effect to a full stop of seepage.",
-        "District figures are from 1998. Some canals have been lined since.",
-        "Valley canals also carry city water. Any sealant would need the district's and regulators' approval.",
-    ], start=1)))
 
 
 # ---------------------------------------------------------------------------
 # Put the tabs on the page
 # ---------------------------------------------------------------------------
+# The canal plan is second, because it is what an irrigation district manager acts on.
+TAB_FUNCTIONS = {"This week": tab_this_week, "Canal action": tab_canal, "Replay": tab_replay,
+                 "Outlook check": tab_outlook_check, "Farm brief": tab_farm_brief,
+                 "Other rivers and misses": tab_other_rivers, "How good is it": tab_how_good}
 tabs = st.tabs(TAB_NAMES, key="view", on_change="rerun", default=st.session_state["start_tab"])
-with tabs[0]:
-    tab_this_week()
-with tabs[1]:
-    tab_replay()
-with tabs[2]:
-    tab_outlook_check()
-with tabs[3]:
-    tab_farm_brief()
-with tabs[4]:
-    tab_other_rivers()
-with tabs[5]:
-    tab_how_good()
-with tabs[6]:
-    tab_canal()
+for tab, name in zip(tabs, TAB_NAMES):
+    with tab:
+        TAB_FUNCTIONS[name]()
 
 theme.footer("Drought data: U.S. Drought Monitor (NDMC, USDA, NOAA), county archive by the Montana "
              "Climate Office. ENSO index: NOAA Climate Prediction Center. River lines: Natural Earth. "

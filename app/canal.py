@@ -135,3 +135,21 @@ def trigger_verdict(trig):
         res = (f"Adding reservoir storage helped a little (score {row['forecast_reservoir']:.3f} with it, "
                f"{row['forecast']:.3f} without).")
     return vs_d1, res
+
+
+def county_probability(row):
+    """The 6-month probability for a county row. We use the plain forecast score on every tab, so a
+    county shows ONE number everywhere. The reservoir-aware score (p_season_res) exists but did not
+    beat the plain one in testing, so it is not used for decisions. Returns (probability, has_res_score)."""
+    return float(row["p_season"]), "p_season_res" in row.index
+
+
+def districts_in_county(plan, county):
+    """The pipeline's irrigation districts that cover a county (Texas only), biggest sealant spend first."""
+    found = [d for d in plan["districts"] if county in d["counties"]]
+    return sorted(found, key=lambda d: d["sealant_usd"], reverse=True)
+
+
+def usd(x):
+    """Dollars for people: 31117 -> '$31,117'."""
+    return f"${x:,.0f}"

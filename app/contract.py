@@ -85,6 +85,8 @@ OPTIONAL_METRICS_KEYS = {
     # Canal map (the lines themselves are in data/processed/canals.geojson, read by app/mapdata.py).
     "canals": ["source", "total_km", "segments", "by_county", "note"],
     "canal_priority": ["levels", "by_level", "by_soil", "by_county", "named", "note"],
+    # The pipeline's sealant plan for Texas irrigation districts (budget shared by seepage and forecast).
+    "districts": ["source", "budget_usd", "assumptions", "rule", "n_districts", "districts", "note"],
 }
 
 # ---------------------------------------------------------------------------

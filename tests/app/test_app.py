@@ -106,7 +106,7 @@ def test_canal_tab_opens_for_a_valley_county():
     at = _run_with_link(fips="48215", view="Canal action")
     assert not at.exception
     text = _all_text(at)
-    assert "Which irrigation districts matter most" in text
+    assert "Where the sealant budget goes" in text
     assert "CCID#2 (San Benito)" in " ".join(str(d.value.to_string()) for d in at.dataframe)
     assert "Estimate from published figures" in text
     assert "Read this first" in text
@@ -121,8 +121,8 @@ def test_canal_tab_works_without_and_with_the_new_columns(monkeypatch):
     at = _run_with_link(view="Canal action")
     assert not at.exception
     text = _all_text(at)
-    assert "No public district table for this county" in text
-    assert "score from the forest that also sees reservoir storage" in text   # new column was used
+    assert "No public 1998 district table for this county" in text
+    assert "reservoir storage did not improve it" in text   # new column present, plain score used
     # Without them: strip the optional columns and keys.
     def stripped():
         pred, outlook, latest, metrics = contract.load_demo()
@@ -135,7 +135,8 @@ def test_canal_tab_works_without_and_with_the_new_columns(monkeypatch):
     at = _run_with_link(view="Canal action")
     assert not at.exception
     text = _all_text(at)
-    assert "reservoir version is not available yet" in text
+    assert "Same number as the This week tab" in text
+    assert "reservoir storage did not improve it" not in text   # no reservoir column
     assert "not available yet" in text
     st.cache_data.clear()                # don't leave the fake data cached for other tests
 
@@ -171,7 +172,7 @@ def test_canal_map_shows_for_a_valley_county_and_a_county_without_canals():
         return
     at = _run_with_link(fips="48215", view="Canal action")
     assert not at.exception
-    assert "Where leaks are likely" in _all_text(at)
+    assert "Which canals to look at" in _all_text(at)
     assert not any("Canal map: not available yet" in str(e.value) for e in at.markdown)
     # Every Rio Grande county opens without a crash, with or without canal lines.
     for fips in latest[latest["river"] == "Rio Grande"]["fips"]:
