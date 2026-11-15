@@ -67,3 +67,26 @@ def test_the_general_model_never_trains_on_a_holdout_row(monkeypatch):
 def test_holdout_rivers_are_not_development_rivers_and_inputs_are_47():
     assert not set(holdout.HOLDOUT_RIVERS) & set(RIVERS)
     assert len(holdout.FEATURES_G) == 47 and len(set(holdout.FEATURES_G)) == 47
+
+
+# ---------------------------------------------------------------------------------------------
+# The measured canal tests (ponding.py)
+# ---------------------------------------------------------------------------------------------
+from farmdrought import ponding
+
+
+def test_textures_are_matched_by_name_and_two_textures_are_averaged():
+    rates = {"clay": 1.0, "clay loam": 3.0, "sandy clay loam": 5.0}
+    assert ponding.textures_in("Clay, clay loam") == ["clay", "clay loam"]
+    assert ponding.textures_in("silty clay loam (from a summary table)") == ["silty clay loam"]
+    assert ponding.model_rate("fine sandy clay loam", rates) == 5.0      # read as sandy clay loam
+    assert ponding.model_rate("clay, clay loam", rates) == 2.0           # the two rates averaged
+    assert ponding.model_rate("clay, silty clay", rates) == 1.0          # only the one that has a rate
+    assert pd.isna(ponding.model_rate("silty clay", rates))              # no rate: the test is not used
+
+
+def test_rank_agreement_passes_on_a_perfect_order_and_not_on_a_reversed_one():
+    model = [1, 2, 3, 4, 5, 6, 7, 8]
+    assert ponding.rank_agreement(model, [2, 3, 5, 8, 9, 12, 20, 30])["passes"]
+    reversed_order = ponding.rank_agreement(model, [30, 20, 12, 9, 8, 5, 3, 2])
+    assert reversed_order["spearman"] == -1.0 and not reversed_order["passes"]
