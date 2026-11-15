@@ -36,8 +36,9 @@ import sys
 import pandas as pd
 import requests
 
-from farmdrought.config import (CANAL_KSAT_CSV, CANAL_SOIL_CSV, CANALS_CSV, CANALS_GEOJSON, LATEST, LEAKY_SOIL_RATE,
-                                SEASON_THRESHOLD, SEEPAGE_GAL_SQFT_DAY)
+from farmdrought.config import (CANAL_KSAT_CSV, CANAL_SOIL_CSV, CANALS_CSV, CANALS_GEOJSON, KSAT_TO_GAL_SQFT_DAY, LATEST,
+                                LEAKY_SOIL_RATE, SEASON_THRESHOLD, SEEPAGE_GAL_SQFT_DAY, WATER_TABLE_DEEP_CM,
+                                WATER_TABLE_MIN_FACTOR, WATER_TABLE_SHALLOW_CM)
 
 SOIL_SERVICE = "https://sdmdataaccess.sc.egov.usda.gov/Tabular/post.rest"
 SOIL_SOURCE = "USDA NRCS Soil Survey (SSURGO), through the Soil Data Access service"
@@ -142,6 +143,38 @@ def download_ksat(batch=200):
     out["wt_cm"] = pd.to_numeric(out["mukey"].map(water))
     out.to_csv(CANAL_KSAT_CSV, index=False)
     return out, layer["texcl"]
+
+
+def water_table_factor(wt_cm):
+    """g: how much a shallow water table holds seepage back. ASSUMPTION (see config.py).
+
+    1 when the depth is unknown or more than 300 cm; a straight line from 1 at 300 cm down to
+    0.1 at 100 cm; 0.1 for anything shallower.
+    """
+    if wt_cm is None or pd.isna(wt_cm) or wt_cm >= WATER_TABLE_DEEP_CM:
+        return 1.0
+    if wt_cm <= WATER_TABLE_SHALLOW_CM:
+        return WATER_TABLE_MIN_FACTOR
+    share = (wt_cm - WATER_TABLE_SHALLOW_CM) / (WATER_TABLE_DEEP_CM - WATER_TABLE_SHALLOW_CM)
+    return WATER_TABLE_MIN_FACTOR + (1 - WATER_TABLE_MIN_FACTOR) * share
+
+
+def seepage_rate(ksat, wt_cm, c=1.0):
+    """ADDED in round 3. Seepage rate in gallons per square foot of wetted canal per day, from
+    the soil's permeability:  q = ksat x 2.1205 x g x c.
+
+    ksat  : saturated hydraulic conductivity of the soil at canal-bed depth, micrometres per second
+    wt_cm : depth to the water table in centimetres (None or NaN if unknown)
+    c     : the calibration factor (1.0 = not calibrated)
+    A missing ksat gives NaN: no permeability, no rate.
+
+    ASSUMPTION: this treats the hydraulic gradient as 1 and ignores any silt layer on the canal
+    bed. It is a modelled rate, not a measured one. Nothing uses it for ranking or pricing yet;
+    the texture-table rate stays beside it for comparison.
+    """
+    if ksat is None or pd.isna(ksat):
+        return float("nan")
+    return float(ksat) * KSAT_TO_GAL_SQFT_DAY * water_table_factor(wt_cm) * c
 
 
 def rate_canals(latest):

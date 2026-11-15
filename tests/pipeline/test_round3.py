@@ -17,7 +17,7 @@ from farmdrought.allocation import model_minus_rule, run_allocation
 from farmdrought.config import (ALERT_WEEKS, COUNTY_RESERVOIR, FROZEN, METRICS, OUTLOOK, PREDICTIONS, SCORE_THROUGH,
                                 SEASON_WEEKS, YEAR_WEEKS)
 from farmdrought.drought import build_panel, load_usdm
-from farmdrought.leaks import bed_layer
+from farmdrought.leaks import bed_layer, seepage_rate, water_table_factor
 from farmdrought.manifest import build_manifest, check_manifest, guard_scored_writer, sha256_of
 from farmdrought.prob_calibration import (brier, calibrate_by_past, calibration_coverage, class_frequency_by_past,
                                           reliability)
@@ -1449,3 +1449,46 @@ def test_manifest_ignores_files_that_are_not_scored_inputs(tmp_path):
     # Assert: the listed file is ignored; any other new file is still reported
     assert check_manifest(tmp_path) == ["data/raw/canals/something_else.csv (new)"]
     assert "data/raw/canals/canal_ksat.csv" not in build_manifest(tmp_path)["files"]
+
+
+def test_seepage_rate_converts_one_micrometre_per_second_to_2_1205_gallons():
+    # Arrange: by hand, 1 micrometre per second = 0.000001 m x 86,400 s = 0.0864 m per day
+    feet_per_day = 0.0864 / 0.3048
+    gallons_per_cubic_foot = 7.48052
+
+    # Act
+    rate = seepage_rate(1.0, None)
+
+    # Assert
+    assert rate == 2.1205
+    assert rate == pytest.approx(feet_per_day * gallons_per_cubic_foot, abs=5e-5)
+    assert seepage_rate(1.0, None, c=0.5) == pytest.approx(1.06025)       # the calibration factor scales it
+
+
+def test_water_table_factor_at_the_depths_that_define_it():
+    # Act / Assert: no effect when deep or unknown, a straight line between 300 and 100 cm, 0.1 below
+    assert water_table_factor(400) == 1.0
+    assert water_table_factor(300) == 1.0
+    assert water_table_factor(200) == pytest.approx(0.55)                # halfway between 1 and 0.1
+    assert water_table_factor(100) == pytest.approx(0.1)
+    assert water_table_factor(50) == 0.1
+    assert water_table_factor(0) == 0.1
+    assert water_table_factor(None) == 1.0 and water_table_factor(float("nan")) == 1.0
+    # and the rate carries it
+    assert seepage_rate(10.0, 200) == pytest.approx(10 * 2.1205 * 0.55)
+    assert seepage_rate(10.0, 50) == pytest.approx(10 * 2.1205 * 0.1)
+
+
+def test_seepage_rate_rises_with_permeability_and_is_missing_without_it():
+    # Arrange: permeabilities from the tightest clay to the coarsest sand in the canal file
+    permeabilities = [0.21, 1.0, 9.0, 28.0, 141.14, 423.07]
+
+    # Act
+    deep = [seepage_rate(k, None) for k in permeabilities]
+    shallow = [seepage_rate(k, 120) for k in permeabilities]
+
+    # Assert: strictly rising at any water-table depth, and a shallow table always lowers it
+    assert all(a < b for a, b in zip(deep, deep[1:])) and all(a < b for a, b in zip(shallow, shallow[1:]))
+    assert all(s < d for s, d in zip(shallow, deep))
+    assert np.isnan(seepage_rate(None, 200)) and np.isnan(seepage_rate(float("nan"), None))
+    assert seepage_rate(0.0, None) == 0.0

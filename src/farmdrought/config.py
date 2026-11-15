@@ -206,6 +206,24 @@ SEEPAGE_GAL_SQFT_DAY = {
 # summary table (Table 6), clay soils top out at 2.99 and loam starts at 4.49 to 7.48.
 LEAKY_SOIL_RATE = 7.48
 
+# 8e-2. ADDED in round 3: seepage from the soil's measured permeability (leaks.seepage_rate).
+# The old texture table above stays, as a comparison only.
+#   rate (gal / sq ft / day) = Ksat (micrometres per second) x KSAT_TO_GAL_SQFT_DAY x g x c
+# Unit conversion, not an assumption: 1 micrometre per second = 0.0864 m/day = 0.2835 ft/day,
+# and one cubic foot holds 7.48052 gallons, so 0.2835 x 7.48052 = 2.1205.
+KSAT_TO_GAL_SQFT_DAY = 2.1205
+# ASSUMPTION: using Ksat as the seepage rate treats the hydraulic gradient as 1 (water sinking
+# straight down under its own weight) and ignores any layer of silt on the canal bed, which
+# slows real seepage. So the raw rate is an upper-end figure until it is calibrated (factor c).
+# ASSUMPTION (g, the water-table factor): a canal whose bed is close to the water table leaks
+# less, because the ground below is already full. g is 1 when the water table is deeper than
+# WATER_TABLE_DEEP_CM or unknown, falls in a straight line to WATER_TABLE_MIN_FACTOR at
+# WATER_TABLE_SHALLOW_CM, and stays there for anything shallower. These three numbers are our
+# own choice, not measurements; they carry the same unit-gradient and no-silt-layer caveat.
+WATER_TABLE_DEEP_CM = 300
+WATER_TABLE_SHALLOW_CM = 100
+WATER_TABLE_MIN_FACTOR = 0.1
+
 # 8f. Irrigation districts and the sealant plan (districts.py)
 DISTRICTS_RAW = RAW / "districts" / "tx_districts.geojson"   # district boundaries as downloaded
 DISTRICTS_GEOJSON = PROCESSED / "districts.geojson"          # boundaries + risk + sealant plan, for the App
