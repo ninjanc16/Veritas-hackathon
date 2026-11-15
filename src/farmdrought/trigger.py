@@ -24,6 +24,8 @@ import pandas as pd
 
 from farmdrought.config import (COST_RATIOS, COUNTY_RESERVOIR, D2_CLASS, FOCUS_RIVER, SEASON_THRESHOLD,
                                 TRIGGER_MONTHS)
+from farmdrought.config import SEASON_WEEKS
+from farmdrought.prob_calibration import class_frequency_by_past
 
 
 def score(name, y, fires):
@@ -103,6 +105,67 @@ def run_trigger(scored):
             "drought_seasons": int(with_reservoir["y_season"].sum()),
             "rules": rules_table(with_reservoir), "value_sweep": value_sweep(with_reservoir),
         },
+    }
+
+
+def run_trigger_annual(scored, month=3, history=None):
+    """ADDED in round 3 (ARCHITECTURE.md section 3.2): the trigger test with ONE decision per
+    county per year. run_trigger above is not changed and stays the reported table.
+
+    run_trigger counts the January, February and March outlooks, so each county-year is counted
+    three times and those three rows are not independent. Here only the outlooks issued in
+    `month` (March by default) are kept: one row per county per year.
+
+    The rule table and the value sweep are the same as run_trigger's, plus two ADDED rules,
+    each marked "added": True:
+      D0 or worse now             : fire when the county is abnormally dry or worse today
+      Class-conditional frequency : fire when, in past years, a county in today's drought class
+                                    went on to a drought season at least `threshold` of the time
+                                    (prob_calibration.class_frequency_by_past). In the value
+                                    sweep it fires at the cost ratio, like the forecasts.
+
+    history : the rows the class frequency may learn from (it keeps the Rio Grande ones and
+              uses only those whose answer was known before each New Year). When None, the
+              scored rows themselves are used. Those start in the first test year, so its rows
+              have no past and the rule cannot fire there; "class_frequency_rows_without_past"
+              counts them. Pass the full table of issue rows to give the rule the earlier years.
+    """
+    focus = scored[scored["river"] == FOCUS_RIVER]
+    rows = focus[focus["date"].dt.month == month]
+    county_years = int(pd.MultiIndex.from_arrays([rows["fips"], rows["date"].dt.year]).nunique())
+    assert len(rows) == county_years, f"{len(rows)} rows but {county_years} county-years"
+
+    past = focus if history is None else history[history["river"] == FOCUS_RIVER]
+    keys = pd.MultiIndex.from_arrays([past["fips"], past["date"]])
+    assert keys.is_unique, "the history holds a county and date twice"
+    frequency_all = pd.Series(class_frequency_by_past(past, "y_season", SEASON_WEEKS).to_numpy(), index=keys)
+    frequency = frequency_all.reindex(pd.MultiIndex.from_arrays([rows["fips"], rows["date"]])).to_numpy()
+    # A missing frequency (no past rows) compares as False, so the rule does not fire there.
+
+    y = rows["y_season"]
+    d0 = (rows["cls"] >= D2_CLASS - 2).to_numpy()
+    rules = rules_table(rows) + [
+        {**score("D0 or worse now", y, d0), "added": True},
+        {**score("Class-conditional frequency", y, frequency >= SEASON_THRESHOLD), "added": True},
+    ]
+    sweep = [{**line,
+              "d0_rule": value(y, d0, line["cost_ratio"]),
+              "class_frequency": value(y, frequency >= max(line["cost_ratio"], 0.02), line["cost_ratio"])}
+             for line in value_sweep(rows)]
+    at_threshold = next(line for line in sweep if line["cost_ratio"] == SEASON_THRESHOLD)
+    return {
+        "issue_month": month,
+        "threshold": SEASON_THRESHOLD,
+        "rows": len(rows),
+        "county_years": county_years,
+        "years": int(rows["date"].dt.year.nunique()),
+        "drought_seasons": int(y.sum()),
+        "rules": rules,
+        "value_sweep": sweep,
+        "added_sweep_keys": ["d0_rule", "class_frequency"],
+        "class_frequency_rows_without_past": int(np.isnan(frequency).sum()),
+        "forecast_beats_d1_rule": bool(at_threshold["forecast"] > at_threshold["d1_rule"]),
+        "reservoir_forecast_beats_d1_rule": bool(at_threshold["forecast_reservoir"] > at_threshold["d1_rule"]),
     }
 
 

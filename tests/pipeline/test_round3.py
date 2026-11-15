@@ -1,13 +1,16 @@
 """Tests for the round 3 evaluation work (ARCHITECTURE.md section 3).
 
 Every table here is small and made up. Nothing in this file reads the real data."""
+import hashlib
 import json
 
 import numpy as np
 import pandas as pd
 import pytest
 
+from farmdrought.config import COUNTY_RESERVOIR
 from farmdrought.prob_calibration import brier, calibrate_by_past, class_frequency_by_past, reliability
+from farmdrought.trigger import run_trigger, run_trigger_annual
 from farmdrought.uncertainty import excludes_zero, resample_years, year_block_bootstrap
 
 YEARS = list(range(2008, 2020))
@@ -308,3 +311,99 @@ def test_brier_is_zero_for_a_perfect_forecast_and_a_quarter_for_always_half():
     assert brier(y, [1.0, 0.0, 0.0, 1.0, 1.0]) == 0.0
     assert brier(y, [0.5] * 5) == 0.25
     assert brier(y, [0.0, 1.0, 1.0, 0.0, 0.0]) == 1.0          # as wrong as it can be
+
+
+# ---------------------------------------------------------------------------------------------
+# A made-up scored outlook table, shared by the trigger and allocation tests
+# ---------------------------------------------------------------------------------------------
+def scored_table(years=range(2008, 2014), months=(1, 2, 3)):
+    """Made-up scored outlook rows: 31 Rio Grande counties (6 of them matched to a reservoir)
+    and 2 Ohio counties, one row per county per issue month. No random numbers."""
+    fips = sorted(COUNTY_RESERVOIR)[:6] + [f"99{i:03d}" for i in range(27)]
+    rows = []
+    for year in years:
+        for month in months:
+            for i, code in enumerate(fips):
+                dryness = (3 * year + 7 * month + 5 * i) % 24                 # 0..23
+                rows.append({"date": pd.Timestamp(year=year, month=month, day=4), "fips": code,
+                             "river": "Rio Grande" if i < 31 else "Ohio", "cls": dryness // 4,
+                             "d2_streak": float(max(dryness - 11, 0)), "mean12": dryness / 5,
+                             "p_season": round(dryness / 24, 4),
+                             "p_season_res": round(((dryness + 2) % 24) / 24, 4),
+                             "y_season": float(dryness + (year + i) % 7 >= 16)})
+    return pd.DataFrame(rows)
+
+
+# ---------------------------------------------------------------------------------------------
+# trigger.run_trigger_annual (section 3.2)
+# ---------------------------------------------------------------------------------------------
+def test_trigger_annual_has_one_row_per_county_year():
+    # Arrange: 31 Rio Grande counties, 6 years, issued in January, February and March
+    scored = scored_table()
+
+    # Act
+    annual = run_trigger_annual(scored)
+    three_months = run_trigger(scored)
+
+    # Assert: 31 x 6 county-years, a third of the three-month table, Ohio rows left out
+    assert annual["rows"] == annual["county_years"] == 31 * 6
+    assert three_months["rows"] == 3 * annual["rows"]
+    assert annual["issue_month"] == 3 and annual["years"] == 6
+    march = scored[(scored["river"] == "Rio Grande") & (scored["date"].dt.month == 3)]
+    assert annual["drought_seasons"] == int(march["y_season"].sum())
+
+
+def test_trigger_annual_refuses_two_rows_for_one_county_year():
+    # Arrange: the same county issued twice in March 2008
+    scored = scored_table()
+    doubled = pd.concat([scored, scored[scored["date"] == "2008-03-04"].head(1)], ignore_index=True)
+
+    # Act / Assert
+    with pytest.raises(AssertionError, match="county-years"):
+        run_trigger_annual(doubled)
+
+
+def test_trigger_annual_marks_only_the_two_new_rules_as_added():
+    # Arrange
+    scored = scored_table()
+    march = scored[(scored["river"] == "Rio Grande") & (scored["date"].dt.month == 3)]
+
+    # Act
+    annual = run_trigger_annual(scored)
+    added = [rule for rule in annual["rules"] if rule.get("added")]
+
+    # Assert: the five old rules come first, unmarked, then the two new ones
+    assert [rule["name"] for rule in annual["rules"][:5]] == [rule["name"] for rule in run_trigger(scored)["rules"]]
+    assert [rule["name"] for rule in added] == ["D0 or worse now", "Class-conditional frequency"]
+    assert added[0]["fires"] == int((march["cls"] >= 1).sum())            # D0 is class 1
+    assert all(set(annual["added_sweep_keys"]) <= set(line) for line in annual["value_sweep"])
+
+
+def test_trigger_annual_class_frequency_needs_a_past():
+    # Arrange: the scored rows start in 2008; a history that starts in 2005 knows the years before
+    scored = scored_table()
+    history = scored_table(years=range(2005, 2014))
+
+    # Act
+    alone = run_trigger_annual(scored)
+    with_history = run_trigger_annual(scored, history=history)
+
+    # Assert: with no earlier years the 31 rows of March 2008 have no frequency and cannot fire
+    assert alone["class_frequency_rows_without_past"] == 31
+    assert with_history["class_frequency_rows_without_past"] == 0
+    assert with_history["rules"][-1]["fires"] > alone["rules"][-1]["fires"]
+    assert with_history["rules"][:6] == alone["rules"][:6]                # nothing else moves
+
+
+def test_run_trigger_output_is_unchanged_by_the_annual_addition():
+    # Arrange: this fingerprint of run_trigger's output on the made-up table was taken from
+    # trigger.py as it stood BEFORE run_trigger_annual was added (commit 7196200).
+    before = "27a2c44564445ce2db69282940a16cfbb19a802e3ce6a7a8492d79571d2d234f"
+
+    # Act
+    result = run_trigger(scored_table())
+    after = hashlib.sha256(json.dumps(result, sort_keys=True).encode()).hexdigest()
+
+    # Assert
+    assert after == before
+    assert result["issue_months"] == [1, 2, 3] and "county_years" not in result
