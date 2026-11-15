@@ -3,20 +3,34 @@ Tests for app/contract.py: do the fake files pass, do broken files fail, are ext
 Run: pytest tests/app -q
 """
 import copy
+import json
 
+import pandas as pd
 import pytest
 
-from app.contract import (OPTIONAL_LATEST_COLUMNS, OPTIONAL_METRICS_KEYS, REAL_DIR, REAL_METRICS,
-                          load, load_demo, load_reference, validate_all,
+from app import contract, make_demo_data
+from app.contract import (OPTIONAL_LATEST_COLUMNS, OPTIONAL_METRICS_KEYS, REAL_DIR,
+                          load, load_reference, validate_all,
                           validate_latest, validate_metrics, validate_outlook,
                           validate_predictions)
 
 
+@pytest.fixture(scope="session")
+def demo_dir(tmp_path_factory):
+    """The four fake files, built once into pytest's temporary folder by app/make_demo_data.py."""
+    folder = tmp_path_factory.mktemp("demo_data")
+    make_demo_data.main(folder)
+    return folder
+
+
 @pytest.fixture
-def demo():
+def demo(demo_dir):
     """Fresh copies of the four fake files for each test (so one test can't break another)."""
-    pred, outlook, latest, metrics = load_demo()
-    return pred.copy(), outlook.copy(), latest.copy(), copy.deepcopy(metrics)
+    pred, outlook, latest = (pd.read_parquet(demo_dir / f"{name}.parquet")
+                             for name in ("predictions", "outlook", "latest"))
+    metrics = json.loads((demo_dir / "metrics.json").read_text(encoding="utf-8"))
+    tables = (df.assign(date=pd.to_datetime(df["date"])) for df in (pred, outlook, latest))
+    return (*tables, copy.deepcopy(metrics))
 
 
 def test_demo_files_are_valid(demo):
@@ -78,12 +92,13 @@ def test_n_rows_must_match(demo):
     assert validate_metrics(metrics, n_rows=len(pred)) != []
 
 
-def test_load_falls_back_to_demo_when_no_real_files():
-    # No real handoff files in this branch yet, so load() must return demo data.
-    if REAL_DIR.exists() or REAL_METRICS.exists():
-        pytest.skip("real files are present")
-    *_, source, problems = load()
-    assert source == "demo" and problems == []
+def test_load_returns_no_data_and_a_problem_when_no_real_files(tmp_path, monkeypatch):
+    # There is no demo fallback any more: missing real files give no tables and say what is missing.
+    monkeypatch.setattr(contract, "REAL_DIR", tmp_path)
+    monkeypatch.setattr(contract, "REAL_METRICS", tmp_path / "metrics.json")
+    pred, outlook, latest, metrics, source, problems = load()
+    assert (pred, outlook, latest, metrics) == (None, None, None, None)
+    assert source == "none" and any("predictions.parquet" in p for p in problems)
 
 
 @pytest.mark.skipif(not (REAL_DIR / "predictions.parquet").exists(), reason="no real files yet")

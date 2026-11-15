@@ -5,7 +5,7 @@ What it does (plain English, for the judges):
   The pipeline team hands us 4 files (3 tables + 1 JSON of results). This module
   1) lists exactly what columns/keys those files must have (the "contract"),
   2) checks a file against that list and reports problems in plain English,
-  3) loads the real files if they exist and are valid, otherwise loads FAKE demo files.
+  3) loads the real files if they exist and are valid.
 
 The app never computes results itself - it only shows what is in these files.
 """
@@ -22,7 +22,7 @@ import pandas as pd
 REPO_ROOT = Path(__file__).resolve().parents[1]
 REAL_DIR = REPO_ROOT / "data" / "processed"        # real handoff tables (read only!)
 REAL_METRICS = REPO_ROOT / "reports" / "metrics.json"  # real handoff results (read only!)
-DEMO_DIR = REPO_ROOT / "app" / "demo_data"         # our fake files, owned by the app
+DEMO_DIR = REPO_ROOT / "app" / "demo_data"         # default folder for app/make_demo_data.py (a test helper)
 
 CONTRACT_VERSION = 2
 
@@ -362,12 +362,6 @@ def _datetime_dates(pred, outlook, latest):
     return tuple(df.assign(date=pd.to_datetime(df["date"])) for df in (pred, outlook, latest))
 
 
-def load_demo():
-    """Read the four FAKE files from app/demo_data/."""
-    pred, outlook, latest, metrics = _read(*_paths(DEMO_DIR, DEMO_DIR / "metrics.json"))
-    return (*_datetime_dates(pred, outlook, latest), metrics)
-
-
 def validate_all(pred, outlook, latest, metrics):
     """Run all four validators and return one combined list of problems."""
     problems = (validate_predictions(pred) + validate_outlook(outlook)
@@ -386,17 +380,18 @@ def load():
     """
     Returns (predictions, outlook, latest, metrics, source, problems).
 
-      source   = "real" when all four real files exist AND are valid, otherwise "demo".
-      problems = [] normally. If real files exist but are broken, it lists what is wrong
-                 and we fall back to demo data (we never edit or patch the real files).
+      source   = "real" when all four real files exist AND are valid, otherwise "none".
+      problems = [] normally. If real files are missing or broken, it lists what is wrong
+                 and the four tables are None (we never edit or patch the real files).
 
     This function never writes any file.
     """
     real_paths = _paths(REAL_DIR, REAL_METRICS)
 
-    # No real files yet -> just use the fake demo data.
-    if not all(p.exists() for p in real_paths):
-        return (*load_demo(), "demo", [])
+    # No real files -> nothing to show, and say which ones are missing.
+    missing = [p for p in real_paths if not p.exists()]
+    if missing:
+        return (None, None, None, None, "none", [f"missing real file: {p}" for p in missing])
 
     # Real files exist -> read and check them.
     try:
@@ -408,7 +403,7 @@ def load():
     if not problems:
         # Validated as-is first; only then convert the date columns for the app's use.
         return (*_datetime_dates(*real[:3]), real[3], "real", [])
-    return (*load_demo(), "demo", problems)  # broken real files: show demo + the problem list
+    return (None, None, None, None, "none", problems)  # broken real files: no data + the problem list
 
 
 # ---------------------------------------------------------------------------
