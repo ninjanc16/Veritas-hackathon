@@ -110,3 +110,48 @@ The project now asks a decision question: before the irrigation season, should a
 **Canal map (added later on Nov 14).** Canal and ditch lines for the 31 counties from the U.S. Geological Survey's National Hydrography Dataset (feature type 336). It is a map and a count of km per county. It is not a model input and no result depends on it.
 
 **Canal priority (added later on Nov 14).** A rule, not a trained model: a canal segment is "Inspect first" when the 6-month forecast warns for its county (0.25 or more) and the soil under it is loam or sandier (a published seepage rate of 7.48 gallons per square foot per day or more). Soil comes from the USDA soil survey at the segment's middle point, about 1 meter down. Seepage rates come from Fipps (Texas A&M, 1998). The two cut-offs (0.25 and 7.48) were fixed before the first run. After the first run showed that 6,400 km of canal sat on sandy soils missing from the main table, we added the report's own figures for sand (the low end of its range, 9.34) and for sandy clay loam (one measured canal, 1.69). That raised "Inspect first" from 551 km to 1,421 km. The rule was not tested against measured leaks, because we have none.
+
+## Version 2 (written Nov 14, 2026, before the first run of `v2.py`)
+
+Version 1 above stays as it is and stays the reported system. Version 2 is a second forecast for the Rio Grande that tries to improve on it. It is reported whichever way it falls.
+
+**Why this is not blind.** We have already seen version 1's test-year results. The ideas below came from them: the outside review showed that a simple rule matched the 4-week alert and that an average of two baselines beat the 12-month outlook. So the list of candidates is informed by the test years. What is protected is the choice among them: no candidate is ever chosen using a year it is then scored on.
+
+**Candidates** (the same list for all three products):
+
+- Forest settings: version 1's own, the same with 300 trees, a shallower forest, and a deeper forest.
+- Inputs: version 1's own, or the same plus five weather inputs (rain over the last 3, 6 and 12 months against normal, and temperature over the last 3 and 12 months against normal, from NOAA's county record, lagged two months for publication).
+- Blend: the forest alone, or 75% or 50% forest with the rest given to a simple rule, or the simple rule alone. The simple rules are "D1 or worse now" (6-month), the average of "same as now" and "same as the last 52 weeks" (12-month), and "Worsening" over 4 weeks or over 4 or 8 weeks (4-week).
+
+**How one is chosen.**
+
+- Outlooks: for each test year from 2008 to 2025, every candidate is scored on the earlier years whose answers were fully known before January 1, and the cheapest is used for that year. Candidates are forecast from 2005 (the first year the 12-month forest has any training rows), only to give the early years some past to judge on. Ties go to version 1.
+- 4-week alert: each candidate's threshold is picked on the validation years 2015 to 2018, and the candidate with the lowest validation cost is used. The test years are scored once.
+- The 6-month threshold stays 0.25. Cost stays 3 x missed + false alarms.
+
+**What will be reported:** version 2 against version 1 and against the best simple rule for each product, which candidate was chosen each year, the weather inputs on their own, and the result across 5 random seeds. If version 2 is worse, that is what we report.
+
+**Version 2 results (added after the run; nothing above was edited except the start year, 2004 to 2005, fixed before any result existed because the 12-month forest has no training rows for 2004).** All numbers are in `reports/v2.json`.
+
+| Product | Version 1 | Version 2 | Best simple rule | Seeds where v2 beat v1 |
+|---|---|---|---|---|
+| 4-week alert (cost) | 1,912 | 1,742 | 1,840 | 5 of 5 |
+| 6-month outlook (cost) | 2,324 | 2,433 | 2,382 | 3 of 5 |
+| 12-month outlook (weeks off) | 14.00 | 13.46 | 13.21 | 5 of 5 |
+
+- **4-week alert: improved.** The validation years chose a deeper forest with weather inputs, blended 75% forest and 25% the "worsening over 4 or 8 weeks" rule. It beats version 1 and the best simple rule. Two cautions: the choice rests on 4 validation years, and that simple rule came from a review made after the test results were known.
+- **6-month outlook: not improved.** Choosing by past years did worse than version 1. Version 1 stays, and it still only ties the "D1 or worse now" rule.
+- **12-month outlook: better than version 1, but not better than the simple rule.** In 14 of 18 years the past chose the simple rule alone over any forest. The honest reading is that the average of two baselines is the better 12-month forecast.
+- **Weather inputs alone did not help** any product (4-week 2,050; 6-month 2,559; 12-month 14.12).
+
+Nothing was changed after seeing these results.
+
+## Districts and the sealant plan (added Nov 14, 2026)
+
+A rule, not a trained model. It adds two links to the canal chain: which irrigation district each canal lies inside, and how an example sealant budget is shared out.
+
+- **Boundaries:** active Irrigation, Water Control & Improvement and Water Improvement districts from the Texas Commission on Environmental Quality, for the Texas Rio Grande counties. A district is listed if it holds at least 5 km of mapped canal (30 districts). We found no public boundary file for New Mexico or Colorado districts, so those states are not covered.
+- **District risk:** the 6-month forecast of the district's counties, weighted by canal km. Warning at 0.25, Watch at half of that.
+- **Sealant rule:** canals inside a district are ranked by seepage rate x chance of a drought season. The budget pays for canals from the top down. Drains and canals on soil with no published rate are left out.
+- **Assumptions, none measured:** every canal is bare earth, has 20 feet of wetted width and carries water for 90 days. The budget ($100,000) is an example. The sealant price ($0.004 per square foot, materials only), its effect (28% to 87% less seepage) and its life (about 3 months) are the same published figures the app's calculator uses.
+- **Not tested:** there are no measured leaks or lining records to check the plan against. The rule and its figures were fixed before the first run and not changed after it.
