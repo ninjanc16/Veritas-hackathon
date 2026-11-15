@@ -215,8 +215,9 @@ def test_budget_slider_changes_the_allocation():
     if "districts" not in metrics:
         return                                            # demo data has no district plan
     at = _run_app()
-    slider = [s for s in at.slider if s.key == "budget"][0]
+    slider = [s for s in at.select_slider if s.key == "budget"][0]
     assert slider.value == metrics["districts"]["budget_usd"]
-    slider.set_value(slider.max).run()
+    everything = -(-metrics["districts"]["cost_to_treat_everything_usd"] // 10_000) * 10_000   # rounded up
+    slider.set_value(everything).run()                    # the largest budget: seal everything
     assert not at.exception
     assert f"{metrics['districts']['n_districts']} of {metrics['districts']['n_districts']}" in _all_text(at)

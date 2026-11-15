@@ -1001,8 +1001,11 @@ def tab_budget():
     everything = math.ceil(sum(seg["seal_usd"] for seg in ranked) / 10_000) * 10_000
     st.write("Set a sealing budget. Canals are funded from the top of the ranking down "
              "(leakiest soil x highest chance of a drought season first) until the money runs out.")
-    budget = st.slider("Sealing budget (US dollars)", min_value=10_000, max_value=everything,
-                       value=int(plan["budget_usd"]), step=10_000, format="$%d", key="budget")
+    # A slider over fixed steps of $10,000, so the label can show a properly written amount ($100,000).
+    steps = list(range(10_000, everything + 1, 10_000))
+    start = min(steps, key=lambda v: abs(v - plan["budget_usd"]))          # the plan's own example budget
+    budget = st.select_slider("Sealing budget (US dollars)", options=steps, value=start,
+                              format_func=canal.usd, key="budget")
     funded, table, totals = canal.fund_canals(ranked, budget, plan["assumptions"], costs["gallons_per_af"])
 
     theme.card_grid([
@@ -1045,8 +1048,18 @@ def tab_budget():
     if unfunded:
         st.caption(f"{unfunded} districts get nothing at this budget: their canals rank lower. Raise the budget to reach them.")
 
+    # The funded canals are spread along the whole Texas reach, so the map opens on ONE district
+    # (the one with the biggest share) where the lines are readable. The viewer can switch district.
     st.markdown("#### The canals this budget seals")
-    st.plotly_chart(theme.canal_map(funded), width="stretch", key="budget_map", config={"scrollZoom": True})
+    if not funded:
+        st.write("This budget is too small to seal the first canal in the ranking.")
+        return
+    ALL = "All funded districts (zoomed out)"
+    zoom_to = st.selectbox("Show district", [r["district"] for r in table] + [ALL], key="budget_district")
+    shown = funded if zoom_to == ALL else [seg for seg in funded if seg["district"] == zoom_to]
+    st.plotly_chart(theme.canal_map(shown), width="stretch", key="budget_map", config={"scrollZoom": True})
+    st.caption(f"{len(shown):,} funded canal segments shown, {sum(seg['length_km'] for seg in shown):,.0f} km. "
+               "Line color = the canal's level. Scroll to zoom.")
     named = sorted((seg for seg in funded if seg["name"]), key=lambda seg: seg["seal_rank"])[:15]
     if named:
         st.markdown("**First named canals in the ranking**")

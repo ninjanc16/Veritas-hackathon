@@ -84,8 +84,9 @@ h2 { border-bottom: 1px solid $line; padding-bottom: .35rem; margin-top: 2rem !i
 [data-testid="stTab"][aria-selected="true"] p { color: $heading; }
 .react-aria-SelectionIndicator { background-color: $forest !important; height: 3px !important; }
 
-/* slider and toggle: Streamlit draws them in its default red, so we rotate that red to green */
+/* slider, toggle and radio dots: Streamlit draws them in its default red, so we rotate that red to blue */
 [data-testid="stSlider"] [style*="position: relative"][style*="touch-action: none"],
+[data-testid="stRadioOption"] > div > div:not([data-testid]),
 label:has(input[role="switch"]) > div { filter: hue-rotate(205deg) saturate(1.1) brightness(.9); }
 
 /* sidebar: light grey panel with a rule. (".stApp" in front makes these win over the general text color) */
