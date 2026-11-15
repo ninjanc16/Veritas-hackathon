@@ -9,7 +9,7 @@ import pandas as pd
 import pytest
 
 from farmdrought.config import LATEST, METRICS, OUTLOOK, PREDICTIONS, RIVERS
-from farmdrought.export import (LATEST_COLUMNS, OUTLOOK_COLUMNS, PIVOT_LATEST_COLUMNS, PIVOT_OUTLOOK_COLUMNS,
+from farmdrought.export import (LATEST_COLUMNS, OUTLOOK_COLUMNS, PIVOT_LATEST_COLUMNS, PIVOT_OUTLOOK_COLUMNS, V2_COLUMNS,
                                 PREDICTION_COLUMNS)
 from farmdrought.mapfields import MAP_COLUMNS
 
@@ -32,7 +32,7 @@ def check_common(table, columns):
 
 def test_predictions_file(files):
     predictions, _, _, metrics = files
-    check_common(predictions, PREDICTION_COLUMNS)
+    check_common(predictions, PREDICTION_COLUMNS + V2_COLUMNS)  # version 2 alarm at the end
     assert predictions[["date", "fips"]].equals(predictions[["date", "fips"]].sort_values(["date", "fips"]).reset_index(drop=True))
     assert set(predictions["y"]) == {0, 1} and predictions["cls"].between(0, 5).all()
     assert predictions["p_model"].between(0, 1).all() and set(predictions["tier"]) <= TIERS
@@ -64,7 +64,7 @@ def test_outlook_file(files):
 def test_latest_file(files):
     _, _, latest, metrics = files
     # The contract columns come first, then the map columns, then the pivot columns
-    assert list(latest.columns) == LATEST_COLUMNS + MAP_COLUMNS + PIVOT_LATEST_COLUMNS
+    assert list(latest.columns) == LATEST_COLUMNS + MAP_COLUMNS + PIVOT_LATEST_COLUMNS + V2_COLUMNS
     assert not latest.isna().any().any()
     assert len(latest) == 436 and latest["fips"].is_unique and latest["fips"].is_monotonic_increasing
     assert {str(d) for d in latest["date"]} == {metrics["latest_week"]}  # one week only
@@ -121,7 +121,7 @@ def test_pivot_columns_and_keys(files):
     assert (latest.loc[latest["res_name"] == "none", "res_pct_full"] == -1).all()
     assert latest.loc[latest["res_name"] != "none", "res_pct_full"].between(0, 100).all()
 
-    assert list(metrics)[-5:] == ["trigger", "reservoir", "losses", "canals", "canal_priority"]   # new keys at the end
+    assert list(metrics)[-7:] == ["trigger", "reservoir", "losses", "canals", "canal_priority", "v2", "districts"]   # new keys at the end
     trigger = metrics["trigger"]
     assert [r["name"] for r in trigger["rules"]] == ["Our forecast", "Our forecast with reservoirs",
                                                      "D1 or worse now", "D2 or worse now", "Seal every year"]
@@ -153,3 +153,23 @@ def test_pivot_columns_and_keys(files):
         assert entry["inspect_first_km"] <= entry["leaky_soil_km"] <= entry["canal_km"]
         if entry["p_season"] < priority["forecast_threshold"]:
             assert entry["inspect_first_km"] == 0      # no forecast warning, so nothing is "inspect first"
+
+
+def test_version_2_alarm_and_key(files):
+    predictions, _, latest, metrics = files
+    # the version 2 alarm is the last column of both files, and is True/False everywhere
+    assert predictions.columns[-1] == latest.columns[-1] == "alarm_v2"
+    assert predictions["alarm_v2"].dtype == bool and latest["alarm_v2"].dtype == bool
+    # version 2 exists for the Rio Grande only: elsewhere it repeats version 1's alarm
+    other = predictions[predictions["river"] != "Rio Grande"]
+    assert (other["alarm_v2"] == other["alarm_system"]).all()
+    # the reported version 2 cost can be recomputed from the file: 3 x missed + false alarms
+    rio = predictions[predictions["river"] == "Rio Grande"]
+    missed = ((rio["y"] == 1) & ~rio["alarm_v2"]).sum()
+    false_alarms = ((rio["y"] == 0) & rio["alarm_v2"]).sum()
+    v2 = metrics["v2"]
+    assert 3 * missed + false_alarms == v2["alert"]["v2"]
+    # version 1's numbers inside the v2 report match the main report
+    assert v2["alert"]["v1"] == metrics["headline"]["system_cost"]
+    assert v2["season"]["v1"] == metrics["season"]["focus"]["system_cost"]
+    assert v2["year"]["v1"] == metrics["year"]["focus"]["mae_system"]

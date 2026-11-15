@@ -73,3 +73,50 @@ def test_canal_levels_follow_the_rule():
     assert (known.loc[~warns & ~leaky, "level"] == "Low").all()
     assert canals.loc[canals["level"] == "Unknown soil", "seepage_rate"].isna().all()
     assert (canals.loc[canals["level"].isin(["Unknown soil", "Drain"]), "score"] == 0).all()
+
+
+# ================================ districts and the sealant plan ================================
+
+def toy_canals():
+    """Four canals inside a district and one outside. Each is 1 km long."""
+    return pd.DataFrame({
+        "id": ["a", "b", "c", "d", "e"], "length_km": 1.0,
+        "district": ["D", "D", "D", "D", ""],
+        "score": [5.0, 9.0, 0.0, 2.0, 99.0],          # c is a drain or unknown soil (score 0)
+        "seepage_rate": [7.48, 11.22, None, 2.99, 11.22]})
+
+
+def test_sealant_goes_to_the_highest_score_first_and_stays_inside_the_budget():
+    from farmdrought.config import FEET_PER_KM, SEALANT_USD_PER_SQFT, WETTED_WIDTH_FT
+    from farmdrought.districts import sealant_plan
+    one_km = FEET_PER_KM * WETTED_WIDTH_FT * SEALANT_USD_PER_SQFT   # cost of sealing 1 km
+    plan = sealant_plan(toy_canals(), budget=2.5 * one_km).set_index("id")
+    # ranked by score: b (9), a (5), d (2). The budget pays for two of them.
+    assert list(plan.loc[["b", "a", "d"], "seal_rank"]) == [1, 2, 3]
+    assert list(plan.loc[["b", "a", "d"], "funded"]) == [True, True, False]
+    assert plan.loc[plan["funded"], "seal_usd"].sum() <= 2.5 * one_km
+    # a canal with score 0, and a canal outside every district, are never ranked or funded
+    assert plan.loc[["c", "e"], "seal_rank"].isna().all() and not plan.loc[["c", "e"], "funded"].any()
+
+
+def test_canal_is_given_the_district_it_lies_inside():
+    from farmdrought.districts import assign_districts
+    square = [[[[0, 0], [2, 0], [2, 2], [0, 2], [0, 0]]]]            # one polygon, one ring
+    districts = {"Square District": ({}, square)}
+    canals = pd.DataFrame({"fips": ["48061", "48061", "35013"], "lon": [1.0, 5.0, 1.0], "lat": [1.0, 5.0, 1.0]})
+    # inside the square; outside it; inside but not a Texas county (boundaries are Texas only)
+    assert assign_districts(canals, districts) == ["Square District", "", ""]
+
+
+def test_districts_block_adds_up():
+    from farmdrought.config import DISTRICTS_GEOJSON, METRICS
+    with open(METRICS) as f:
+        block = json.load(f)["districts"]
+    rows = block["districts"]
+    assert len(rows) == block["n_districts"] > 0
+    assert sum(r["sealant_usd"] for r in rows) <= block["budget_usd"]          # never over budget
+    assert abs(sum(r["sealant_usd"] for r in rows) - block["spent_usd"]) <= len(rows)  # rounding only
+    assert all(r["risk"] in {"Low", "Watch", "Warning"} and 0 <= r["p_season"] <= 1 for r in rows)
+    assert all(r["sealed_km"] <= r["treatable_km"] <= r["canal_km"] for r in rows)
+    with open(DISTRICTS_GEOJSON) as f:
+        assert len(json.load(f)["features"]) == len(rows)                      # one shape per listed district

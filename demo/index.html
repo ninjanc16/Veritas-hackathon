@@ -1,0 +1,986 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Headgate demo</title>
+<style>
+  :root {
+    --ground: #0F1B1E; --panel: #18282C; --panel2: #1F3338; --rule: #2B4349;
+    --text: #EAF0EC; --muted: #9DB0AC;
+    --river: #4FB6D8; --low: #3FA796; --watch: #E3B23C; --inspect: #F07F2E; --drain: #E5484D; --unknown: #7C8A90;
+    --sans: "Inter", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; background: var(--ground); color: var(--text); font: 16px/1.55 var(--sans); }
+  h1, h2, h3 { margin: 0; line-height: 1.12; font-weight: 650; letter-spacing: -0.015em; text-wrap: balance; }
+  h1 { font-size: clamp(34px, 5.2vw, 68px); }
+  h2 { font-size: clamp(26px, 3.2vw, 40px); }
+  h3 { font-size: 18px; }
+  p { margin: 0; }
+  a { color: var(--river); }
+  button, input { font: inherit; color: inherit; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 0 24px; }
+  .muted { color: var(--muted); }
+  .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .btn { background: var(--river); color: #06222B; border: 0; border-radius: 10px; padding: 12px 20px; font-weight: 650; cursor: pointer; transition: transform .15s, filter .15s; }
+  .btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
+  .btn.ghost { background: transparent; color: var(--text); border: 1px solid var(--rule); }
+  .btn.small { padding: 7px 12px; border-radius: 8px; font-size: 14px; font-weight: 550; }
+  .tag { display: inline-block; font-size: 12.5px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--rule); color: var(--muted); white-space: nowrap; }
+  .tag.warn { border-color: var(--watch); color: var(--watch); }
+
+  /* ---------- sign in ---------- */
+  #login { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; background: var(--ground); transition: opacity .6s, visibility .6s; }
+  #login.gone { opacity: 0; visibility: hidden; }
+  #login canvas { position: absolute; inset: 0; width: 100%; height: 100%; opacity: .5; }
+  .card { position: relative; width: min(420px, calc(100vw - 32px)); background: var(--panel); border: 1px solid var(--rule); border-radius: 18px; padding: 32px; }
+  .card h1 { font-size: 40px; }
+  .card label { display: block; font-size: 14px; color: var(--muted); margin: 18px 0 6px; }
+  .card input { width: 100%; background: var(--ground); border: 1px solid var(--rule); border-radius: 10px; padding: 11px 12px; }
+  .card input:focus, .btn:focus-visible, .chip:focus-visible { outline: 2px solid var(--river); outline-offset: 2px; }
+  .card .btn { width: 100%; margin-top: 22px; }
+
+  /* ---------- top bar ---------- */
+  header { position: sticky; top: 0; z-index: 20; background: rgba(15, 27, 30, .88); backdrop-filter: blur(10px); border-bottom: 1px solid var(--rule); }
+  header .wrap { display: flex; align-items: center; gap: 22px; height: 58px; }
+  .brand { font-weight: 700; font-size: 19px; letter-spacing: -0.02em; }
+  .brand span { color: var(--river); }
+  nav { display: flex; gap: 18px; margin-left: auto; font-size: 14.5px; }
+  nav a { color: var(--muted); text-decoration: none; }
+  nav a:hover { color: var(--text); }
+  @media (max-width: 760px) { nav { display: none; } }
+
+  section { padding: 84px 0; scroll-margin-top: 58px; }
+  .lede { font-size: 19px; color: var(--muted); max-width: 62ch; margin-top: 16px; }
+
+  /* ---------- situation ---------- */
+  #situation { padding-top: 64px; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; margin-top: 36px; }
+  .tile { background: var(--panel); border: 1px solid var(--rule); border-radius: 14px; padding: 20px; }
+  .tile .big { font-size: 38px; font-weight: 650; letter-spacing: -0.02em; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .tile .what { font-size: 14.5px; color: var(--muted); margin-top: 6px; }
+  .riskrow { display: flex; height: 10px; border-radius: 6px; overflow: hidden; margin-top: 14px; gap: 2px; }
+  .riskrow i { display: block; height: 100%; }
+
+  /* ---------- how to ---------- */
+  .how { display: grid; grid-template-columns: 1fr 1.15fr; gap: 40px; margin-top: 36px; align-items: start; }
+  @media (max-width: 900px) { .how { grid-template-columns: 1fr; } }
+  .steps { display: grid; gap: 14px; }
+  .step { background: var(--panel); border: 1px solid var(--rule); border-radius: 14px; padding: 18px 20px; }
+  .step p { color: var(--muted); font-size: 15px; margin-top: 4px; }
+  .video { aspect-ratio: 16 / 9; background: var(--panel); border: 1px solid var(--rule); border-radius: 14px; overflow: hidden; display: grid; place-items: center; text-align: center; padding: 24px; }
+  .video video { width: 100%; height: 100%; object-fit: cover; }
+
+  /* ---------- scan stage ---------- */
+  #scan { padding: 40px 0 0; }
+  .stagehead { display: flex; flex-wrap: wrap; align-items: end; gap: 20px; justify-content: space-between; margin-bottom: 20px; }
+  #stage { position: relative; height: min(82vh, 820px); min-height: 520px; background: #0B1517; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); overflow: hidden; touch-action: none; }
+  #map { position: absolute; inset: 0; width: 100%; height: 100%; cursor: grab; }
+  #map.drag { cursor: grabbing; }
+  #log { position: absolute; left: 20px; bottom: 20px; width: min(520px, calc(100% - 40px)); max-height: 46%; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; font: 13px/1.5 var(--mono); color: var(--muted); pointer-events: none; }
+  #log div { padding: 2px 10px; background: rgba(11, 21, 23, .78); border-left: 2px solid var(--rule); margin-top: 3px; transition: opacity .8s; }
+  #log div.live { color: var(--text); border-left-color: var(--river); }
+  #log b { color: var(--river); font-weight: 500; }
+  #hud { position: absolute; right: 20px; top: 20px; font: 13px/1.5 var(--mono); color: var(--muted); text-align: right; pointer-events: none; opacity: 0; transition: opacity .4s; }
+  #hud.on { opacity: 1; }
+  #hud .phase { color: var(--text); font-size: 15px; }
+  #bar { position: absolute; left: 0; top: 0; height: 3px; width: 0; background: var(--river); }
+  #controls { position: absolute; left: 20px; top: 20px; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; transition: opacity .4s; }
+  #controls.off { opacity: 0; pointer-events: none; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; max-width: 520px; }
+  .chip { display: inline-flex; align-items: center; gap: 7px; background: rgba(24, 40, 44, .92); border: 1px solid var(--rule); border-radius: 999px; padding: 5px 11px; font-size: 13.5px; cursor: pointer; }
+  .chip i { width: 14px; height: 3px; border-radius: 2px; }
+  .chip.off { opacity: .4; }
+  .chip .num { color: var(--muted); font-size: 12.5px; }
+  #zoom { position: absolute; right: 20px; bottom: 20px; display: flex; flex-direction: column; gap: 6px; }
+  #zoom button { width: 36px; height: 36px; border-radius: 8px; background: rgba(24, 40, 44, .92); border: 1px solid var(--rule); cursor: pointer; font-size: 18px; }
+  #tip { position: absolute; z-index: 5; pointer-events: none; background: var(--panel); border: 1px solid var(--rule); border-radius: 12px; padding: 12px 14px; font-size: 14px; width: 270px; opacity: 0; transition: opacity .12s; box-shadow: 0 10px 30px rgba(0,0,0,.4); }
+  #tip.on { opacity: 1; }
+  #tip h3 { font-size: 15.5px; margin-bottom: 6px; }
+  #tip dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; margin: 0; }
+  #tip dt { color: var(--muted); } #tip dd { margin: 0; text-align: right; font-family: var(--mono); font-size: 13px; }
+  #tip .note { color: var(--muted); font-size: 12.5px; margin-top: 8px; }
+  #ranked { position: absolute; right: 20px; top: 20px; width: 250px; background: rgba(24, 40, 44, .94); border: 1px solid var(--rule); border-radius: 12px; padding: 12px; font-size: 13.5px; opacity: 0; pointer-events: none; transition: opacity .5s; }
+  #ranked.on { opacity: 1; pointer-events: auto; }
+  #ranked h3 { font-size: 14.5px; margin-bottom: 8px; }
+  #ranked button { display: flex; width: 100%; justify-content: space-between; gap: 8px; background: none; border: 0; border-top: 1px solid var(--rule); padding: 6px 2px; cursor: pointer; text-align: left; }
+  #ranked button:hover { color: var(--inspect); }
+  #ranked .num { white-space: nowrap; }
+  @media (max-width: 900px) { #ranked { display: none; } }
+  #cta { position: absolute; left: 50%; top: 20px; transform: translateX(-50%); display: flex; gap: 10px; }
+  #skip { display: none; }
+  .scanning #skip { display: inline-block; }
+  .scanning #run { display: none; }
+
+  /* ---------- infographic ---------- */
+  #results { display: none; }
+  .scanned #results { display: block; }
+  .reveal { opacity: 0; transform: translateY(26px); transition: opacity .8s cubic-bezier(.2,.7,.2,1), transform .8s cubic-bezier(.2,.7,.2,1); }
+  .reveal.in { opacity: 1; transform: none; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin-top: 32px; }
+  @media (max-width: 900px) { .grid2 { grid-template-columns: 1fr; } }
+  .box { background: var(--panel); border: 1px solid var(--rule); border-radius: 14px; padding: 22px; }
+  .box h3 { margin-bottom: 4px; }
+  .box .sub { color: var(--muted); font-size: 14px; margin-bottom: 16px; }
+  .hbar { display: grid; grid-template-columns: 130px 1fr 78px; gap: 10px; align-items: center; font-size: 14px; padding: 4px 0; }
+  .hbar .track { height: 12px; background: var(--ground); border-radius: 4px; overflow: hidden; }
+  .hbar .fill { height: 100%; width: 0; border-radius: 4px; transition: width 1.1s cubic-bezier(.2,.7,.2,1); }
+  .hbar .v { text-align: right; font-family: var(--mono); font-size: 13px; color: var(--muted); }
+  button.hbar { width: 100%; background: none; border: 0; cursor: pointer; text-align: left; border-radius: 6px; }
+  button.hbar:hover { background: var(--panel2); }
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  th { text-align: left; color: var(--muted); font-weight: 500; font-size: 13px; padding: 6px 8px; border-bottom: 1px solid var(--rule); }
+  td { padding: 8px; border-bottom: 1px solid var(--rule); vertical-align: middle; }
+  tbody tr { cursor: pointer; } tbody tr:hover { background: var(--panel2); }
+  td.r, th.r { text-align: right; }
+  .pill { display: inline-block; padding: 1px 9px; border-radius: 999px; font-size: 13px; font-weight: 600; color: #0B1517; }
+  .range { position: relative; height: 10px; background: var(--ground); border-radius: 5px; min-width: 120px; }
+  .range i { position: absolute; top: 0; height: 100%; border-radius: 5px; background: var(--river); opacity: .8; }
+  .range b { position: absolute; top: -3px; width: 2px; height: 16px; background: var(--text); }
+  .scrollx { overflow-x: auto; }
+  .cols { display: flex; align-items: flex-end; gap: 3px; height: 190px; }
+  .cols div { flex: 1; background: var(--inspect); border-radius: 3px 3px 0 0; height: 0; transition: height 1s cubic-bezier(.2,.7,.2,1); position: relative; min-width: 4px; }
+  .cols div:hover { filter: brightness(1.25); }
+  .axis { display: flex; justify-content: space-between; font: 12.5px var(--mono); color: var(--muted); margin-top: 6px; }
+  .readout { font: 13.5px var(--mono); color: var(--text); min-height: 22px; margin-bottom: 8px; }
+  .calc { display: grid; gap: 14px; }
+  .calc label { display: grid; gap: 6px; font-size: 14.5px; }
+  .calc .row { display: flex; justify-content: space-between; gap: 10px; }
+  input[type=range] { width: 100%; accent-color: var(--river); }
+  select { font: inherit; color: var(--text); background: var(--ground); border: 1px solid var(--rule); border-radius: 8px; padding: 6px 8px; }
+  .total { font-size: 34px; font-weight: 650; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+  .list { display: grid; gap: 10px; margin-top: 28px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+  .item { background: var(--panel); border: 1px solid var(--rule); border-radius: 14px; padding: 18px 20px; }
+  .item p { color: var(--muted); font-size: 14.5px; margin: 6px 0 10px; }
+  .skill { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-top: 28px; }
+  ul.limits { margin: 18px 0 0; padding-left: 20px; color: var(--muted); font-size: 14.5px; display: grid; gap: 6px; max-width: 90ch; }
+  footer { padding: 40px 0 70px; color: var(--muted); font-size: 13.5px; border-top: 1px solid var(--rule); }
+  @media (prefers-reduced-motion: reduce) { .reveal, .hbar .fill, .cols div { transition: none; } html { scroll-behavior: auto; } }
+</style>
+</head>
+<body>
+
+<div id="login">
+  <canvas id="loginmap" aria-hidden="true"></canvas>
+  <form class="card" id="loginform">
+    <h1 class="brand">Head<span>gate</span></h1>
+    <p class="muted" style="margin-top:8px">Drought outlook and canal seepage priority for the Texas reach of the Rio Grande.</p>
+    <label for="who">Email</label>
+    <input id="who" type="text" placeholder="you@district.org" autocomplete="off">
+    <label for="code">Access code</label>
+    <input id="code" type="password" placeholder="any value works in the demo">
+    <button class="btn" type="submit">Sign in</button>
+    <p class="muted" style="font-size:13px;margin-top:14px">Demo build. Nothing is checked or sent, and no model runs. Every number comes from saved pipeline output.</p>
+  </form>
+</div>
+
+<header>
+  <div class="wrap">
+    <div class="brand">Head<span>gate</span></div>
+    <span class="tag" id="weektag"></span>
+    <nav>
+      <a href="#situation">Situation</a><a href="#how">How to use</a><a href="#scan">Map and scan</a>
+      <a href="#plan">Sealant plan</a><a href="#costs">Costs</a><a href="#contacts">Contacts</a>
+    </nav>
+  </div>
+</header>
+
+<section id="situation">
+  <div class="wrap">
+    <h1 id="headline"></h1>
+    <p class="lede" id="sublede"></p>
+    <div class="tiles" id="tiles"></div>
+  </div>
+</section>
+
+<section id="how">
+  <div class="wrap">
+    <h2>How to use it</h2>
+    <div class="how">
+      <div class="steps">
+        <div class="step"><h3>Read the situation</h3><p>The tiles above give this week's drought state for the 14 Texas counties within 50 km of the river, and current storage in the Amistad-Falcon system.</p></div>
+        <div class="step"><h3>Explore the map</h3><p>Drag to pan. Use the buttons, or Ctrl and scroll, to zoom. Hover any canal, county or reservoir for its record.</p></div>
+        <div class="step"><h3>Run the basin scan</h3><p>The scan assembles hydrography, the conveyance network, soil texture, drought class and the forecast, then ranks canal segments by inspection priority and assigns each one to its irrigation district.</p></div>
+        <div class="step"><h3>Act on it</h3><p>Set a budget in the sealant plan to see which district would treat which canals. Use the cost section to size the losses and the contacts section to reach the bodies that decide on canal work and aid.</p></div>
+      </div>
+      <div class="video" id="videobox">
+        <video src="demo.mp4" controls preload="metadata" id="video"></video>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="scan">
+  <div class="wrap stagehead">
+    <div>
+      <h2>Rio Grande and its canals in Texas</h2>
+      <p class="lede" id="maplede"></p>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn ghost small" data-view="texas">Whole state</button>
+      <button class="btn ghost small" data-view="valley">Lower Valley</button>
+      <button class="btn ghost small" data-view="maverick">Eagle Pass</button>
+      <button class="btn ghost small" data-view="elpaso">El Paso</button>
+    </div>
+  </div>
+  <div id="stage">
+    <canvas id="map"></canvas>
+    <div id="bar"></div>
+    <div id="controls">
+      <div class="chips" id="chips"></div>
+    </div>
+    <div id="hud"><div class="phase" id="phase"></div><div id="hud1"></div><div id="hud2"></div></div>
+    <div id="ranked"><h3>Inspect first, longest segments</h3><div id="rankedlist"></div></div>
+    <div id="log" aria-live="polite"></div>
+    <div id="zoom"><button id="zin" aria-label="Zoom in">+</button><button id="zout" aria-label="Zoom out">&minus;</button></div>
+    <div id="cta">
+      <button class="btn" id="run">Run basin scan</button>
+      <button class="btn ghost" id="skip">Skip animation</button>
+    </div>
+    <div id="tip"></div>
+  </div>
+</section>
+
+<div id="results">
+  <section id="findings">
+    <div class="wrap">
+      <h2 class="reveal">What the scan assembled</h2>
+      <p class="lede reveal" id="findlede"></p>
+      <div class="grid2">
+        <div class="box reveal">
+          <h3>Conveyance network by inspection priority</h3>
+          <p class="sub">Kilometres of canal and ditch in the Texas counties. Select a class to isolate it on the map.</p>
+          <div id="levelbars"></div>
+        </div>
+        <div class="box reveal">
+          <h3>Seepage flux by soil texture class</h3>
+          <p class="sub">Published rate for an unlined canal, in gallons per square foot per day, with kilometres of Texas canal on that soil.</p>
+          <div id="soilbars"></div>
+        </div>
+      </div>
+      <div class="box reveal" style="margin-top:28px">
+        <h3>County outlook, upstream to downstream</h3>
+        <p class="sub">Select a row to move the map there. The range is the 12-month estimate of weeks at D2 or worse, plus and minus its measured mean error. The white tick is the median length of that county's past severe droughts.</p>
+        <div class="scrollx"><table id="countytable"></table></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="plan">
+    <div class="wrap">
+      <h2 class="reveal">Sealant plan by irrigation district</h2>
+      <p class="lede reveal" id="planlede"></p>
+      <div class="grid2">
+        <div class="box reveal">
+          <h3>Set a budget</h3>
+          <p class="sub">One application of polymer sealant, shared out by the rule on the right. <span class="tag warn">assumes 20 ft wetted width</span> <span class="tag warn">materials only</span></p>
+          <div class="calc">
+            <label><span class="row"><span>Sealant budget</span><span class="num" id="budgetv"></span></span><input type="range" id="budget" min="10000" step="5000"></label>
+            <div><div class="total" id="plantotal"></div><div class="muted" style="font-size:14px" id="plannote"></div></div>
+          </div>
+        </div>
+        <div class="box reveal">
+          <h3>How the budget is shared</h3>
+          <p class="sub" id="planrule"></p>
+          <p class="muted" style="font-size:14px" id="planlimit"></p>
+        </div>
+      </div>
+      <div class="box reveal" style="margin-top:28px">
+        <h3>Districts, largest share first</h3>
+        <p class="sub">Select a row to move the map there. Level is the 6-month outlook of the district's counties, weighted by canal length. Treatable leaves out drains and canals on soil with no published seepage rate.</p>
+        <div class="scrollx"><table id="districttable"></table></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="costs">
+    <div class="wrap">
+      <h2 class="reveal">What drought costs, and where the money comes from</h2>
+      <p class="lede reveal" id="costlede"></p>
+      <div class="grid2">
+        <div class="box reveal">
+          <h3>Insured drought losses by year</h3>
+          <p class="sub" id="losssub"></p>
+          <div class="readout" id="lossread"></div>
+          <div class="cols" id="losscols"></div>
+          <div class="axis"><span id="lossfirst"></span><span id="losslast"></span></div>
+        </div>
+        <div class="box reveal">
+          <h3>Losses by county</h3>
+          <p class="sub">Same records, summed over the whole period.</p>
+          <div id="countyloss"></div>
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="box reveal">
+          <h3>Feed cost for one herd</h3>
+          <p class="sub">Months of bought feed implied by the 12-month estimate, priced at USDA's 2026 monthly feed cost for an adult beef cow. <span class="tag warn">untested estimate</span></p>
+          <div class="calc">
+            <label><span class="row"><span>County</span><select id="feedcounty"></select></span></label>
+            <label><span class="row"><span>Herd size</span><span class="num" id="herdv"></span></span><input type="range" id="herd" min="25" max="2000" step="25" value="200"></label>
+            <div><div class="total" id="feedtotal"></div><div class="muted" style="font-size:14px" id="feednote"></div></div>
+          </div>
+        </div>
+        <div class="box reveal">
+          <h3>Sizing permanent lining</h3>
+          <p class="sub">Sealant is the cheap option and lasts about three months. Lining or piping lasts decades and costs far more. Length comes from the scan. The unit cost is yours to set. <span class="tag warn">your assumption</span></p>
+          <div class="calc">
+            <label><span class="row"><span>Segments to treat</span><select id="worklevel"></select></span></label>
+            <label><span class="row"><span>Cost per kilometre</span><span class="num" id="unitv"></span></span><input type="range" id="unit" min="50000" max="1000000" step="10000" value="300000"></label>
+            <div><div class="total" id="worktotal"></div><div class="muted" style="font-size:14px" id="worknote"></div></div>
+          </div>
+        </div>
+      </div>
+      <h3 class="reveal" style="margin-top:44px">Where the money comes from</h3>
+      <div class="list" id="funding"></div>
+    </div>
+  </section>
+
+  <section id="contacts">
+    <div class="wrap">
+      <h2 class="reveal">Who decides</h2>
+      <p class="lede reveal">The bodies that control water releases, canal work and drought aid on this reach. Contact details are left blank until someone on the team verifies them.</p>
+      <div class="list" id="contactlist"></div>
+    </div>
+  </section>
+
+  <section id="method">
+    <div class="wrap">
+      <h2 class="reveal">How far to trust it</h2>
+      <p class="lede reveal">Test results on years the models did not train on, and the limits the team wrote down before the final run.</p>
+      <div class="skill" id="skill"></div>
+      <ul class="limits reveal" id="limits"></ul>
+    </div>
+  </section>
+</div>
+
+<footer><div class="wrap" id="foot"></div></footer>
+
+<script src="data.js"></script>
+<script>
+"use strict";
+const D = window.DEMO;
+const $ = (s) => document.querySelector(s);
+const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
+const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+const COLORS = { river: css("--river"), Low: css("--low"), Watch: css("--watch"), "Inspect first": css("--inspect"), Drain: css("--drain"), "Unknown soil": css("--unknown"), Warning: css("--drain"), text: css("--text"), muted: css("--muted"), rule: css("--rule") };
+const LEVEL_WIDTH = [0.7, 0.9, 1.9, 1.1, 0.7];
+const LABELLED = new Set(["Rio Grande", "Pecos", "Conchos", "Red", "Brazos", "Canadian", "Sabine"]);
+const DROUGHT_CLASS = ["none", "D0 abnormally dry", "D1 moderate", "D2 severe", "D3 extreme", "D4 exceptional"];
+const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const fmt = (n, d = 0) => Number(n).toLocaleString("en-US", { maximumFractionDigits: d, minimumFractionDigits: d });
+const usd = (n) => n >= 1e6 ? "$" + fmt(n / 1e6, 1) + "M" : "$" + fmt(n);
+
+/* ---------- projection: Albers equal-area conic, output in kilometres ---------- */
+const RAD = Math.PI / 180, P1 = 29.5 * RAD, P2 = 45.5 * RAD, L0 = -96 * RAD, P0 = 37.5 * RAD;
+const AN = (Math.sin(P1) + Math.sin(P2)) / 2, AC = Math.cos(P1) ** 2 + 2 * AN * Math.sin(P1), R0 = Math.sqrt(AC - 2 * AN * Math.sin(P0)) / AN;
+function project(lon, lat) {
+  const rho = Math.sqrt(AC - 2 * AN * Math.sin(lat * RAD)) / AN, th = AN * (lon * RAD - L0);
+  return [6371 * rho * Math.sin(th), -6371 * (R0 - rho * Math.cos(th))];
+}
+function unpack(a, scale) {   // delta-coded lon/lat integers to projected x/y
+  const out = new Float32Array(a.length); let x = 0, y = 0;
+  for (let i = 0; i < a.length; i += 2) { x += a[i]; y += a[i + 1]; const p = project(x / scale, y / scale); out[i] = p[0]; out[i + 1] = p[1]; }
+  return out;
+}
+function boxOf(lines) {
+  let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+  for (const l of lines) for (let i = 0; i < l.length; i += 2) { if (l[i] < x0) x0 = l[i]; if (l[i] > x1) x1 = l[i]; if (l[i + 1] < y0) y0 = l[i + 1]; if (l[i + 1] > y1) y1 = l[i + 1]; }
+  return [x0, y0, x1, y1];
+}
+const lonlatBox = (w, s, e, n) => boxOf([Float32Array.from([...project(w, s), ...project(e, n), ...project(w, n), ...project(e, s)])]);
+
+/* ---------- decode the data ---------- */
+const G = {
+  states: D.states.map((l) => unpack(l, 1000)),
+  texas: D.texas.map((l) => unpack(l, 10000)),
+  mesh: D.txCounties.map((l) => unpack(l, 1000)),
+  dots: (() => { const o = new Float32Array(D.dots.length); for (let i = 0; i < o.length; i += 2) { const p = project(D.dots[i] / 100, D.dots[i + 1] / 100); o[i] = p[0]; o[i + 1] = p[1]; } return o; })(),
+  rivers: D.rivers.map((r) => ({ name: r.name, main: r.name === "Rio Grande", pts: unpack(r.line, 10000) })),
+  counties: D.counties.map((c) => ({ ...c, rings: c.rings.map((r) => unpack(r, 10000)), xy: project(c.lon, c.lat) })),
+  lakes: D.reservoirs.map((r) => ({ ...r, xy: project(r.lon, r.lat) })),
+};
+const countyByFips = Object.fromEntries(G.counties.map((c) => [c.fips, c]));
+G.canals = D.canals.map((s, i) => {
+  const pts = unpack(s[7], 10000), b = boxOf([pts]);
+  return { id: i, level: s[0], soil: D.soils[s[1]], name: D.canalNames[s[2]], fips: s[3], km: s[4], rate: s[5], score: s[6], pts, box: b, district: D.districtNames[s[8]], rank: s[9], usd: s[10], funded: false };
+}).sort((a, b) => a.box[0] - b.box[0]);
+G.canals.forEach((s, i) => { s.order = i / G.canals.length; });
+// Irrigation districts, and the sealant plan. The plan uses the pipeline's own rule: pay for
+// canals in rank order (rank 1 first) while the running total still fits inside the budget.
+G.districts = D.districts.map((d) => { const rings = d.rings.map((r) => unpack(r, 10000)); return { ...d, rings, box: boxOf(rings), plan: { km: 0, usd: 0 } }; });
+const districtByName = Object.fromEntries(G.districts.map((d) => [d.name, d]));
+const rankedCanals = G.canals.filter((s) => s.rank > 0).sort((a, b) => a.rank - b.rank);
+const PLAN = { budget: D.sealant.budget, on: false, km: 0, usd: 0, afLow: 0, afHigh: 0, n: 0, funded: [] };
+function applyBudget(budget) {
+  const T = D.sealant; let open = true, lost = 0;
+  Object.assign(PLAN, { budget, km: 0, usd: 0, n: 0, funded: [] });
+  for (const d of G.districts) d.plan = { km: 0, usd: 0 };
+  for (const s of rankedCanals) {
+    if (open && PLAN.usd + s.usd > budget) open = false;
+    s.funded = open;
+    if (!open) continue;
+    PLAN.usd += s.usd; PLAN.km += s.km; PLAN.n++; PLAN.funded.push(s);
+    const d = districtByName[s.district]; if (d) { d.plan.km += s.km; d.plan.usd += s.usd; }
+    lost += s.rate * (s.usd / T.usdPerSqft) * T.days / T.gallonsPerAf;   // acre-feet seeping through the treated area
+  }
+  PLAN.afLow = lost * T.cutLow; PLAN.afHigh = lost * T.cutHigh;
+}
+applyBudget(PLAN.budget);
+const VIEW = {
+  us: boxOf(G.states), texas: boxOf(G.texas),
+  valley: lonlatBox(-98.75, 25.8, -97.1, 26.75), maverick: lonlatBox(-100.75, 28.35, -100.2, 28.95), elpaso: lonlatBox(-106.7, 31.1, -105.3, 32.05),
+};
+// A 4 km grid over the canals so hovering only tests nearby segments
+const CELL = 4, grid = new Map();
+for (const s of G.canals) for (let gx = Math.floor(s.box[0] / CELL); gx <= Math.floor(s.box[2] / CELL); gx++) for (let gy = Math.floor(s.box[1] / CELL); gy <= Math.floor(s.box[3] / CELL); gy++) {
+  const k = gx + "," + gy; if (!grid.has(k)) grid.set(k, []); grid.get(k).push(s);
+}
+
+/* ---------- map state ---------- */
+const canvas = $("#map"), ctx = canvas.getContext("2d"), stage = $("#stage");
+const cam = { x: 0, y: 0, k: 1 };
+// Layer strengths, each 0 to 1. Before the scan the map shows plain water lines only.
+const S = { us: 0.22, dots: 0, sweep: -1, tx: 1, mesh: 0.5, rivers: 1, canals: 1, lev: 0, risk: 0, lakes: 1, reticle: 0 };
+const levelOn = D.levels.map(() => true);
+let W = 0, H = 0, dpr = 1, hover = null, pinned = null, kTexas = 1, scanning = false, scanned = false, skip = false;
+
+function fit(box, pad = 0.86) {
+  const k = Math.min(W / (box[2] - box[0]), H / (box[3] - box[1])) * pad;
+  return { x: (box[0] + box[2]) / 2, y: (box[1] + box[3]) / 2, k };
+}
+function resize() {
+  const r = stage.getBoundingClientRect(), first = W === 0, old = fit(VIEW.texas).k;
+  W = r.width; H = r.height; dpr = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  kTexas = fit(VIEW.texas).k;
+  if (first) Object.assign(cam, fit(VIEW.texas)); else cam.k *= kTexas / old;
+  draw();
+}
+const toWorld = (sx, sy) => [(sx - W / 2) / cam.k + cam.x, (sy - H / 2) / cam.k + cam.y];
+const toScreen = (x, y) => [(x - cam.x) * cam.k + W / 2, (y - cam.y) * cam.k + H / 2];
+
+function path(pts, frac = 1) {
+  const n = Math.max(2, Math.floor((pts.length / 2) * frac)) * 2;
+  ctx.moveTo(pts[0], pts[1]);
+  for (let i = 2; i < n; i += 2) ctx.lineTo(pts[i], pts[i + 1]);
+}
+function stroke(lines, color, px, alpha, frac = 1) {
+  if (alpha <= 0.003) return;
+  ctx.beginPath(); for (const l of lines) path(l, frac);
+  ctx.strokeStyle = color; ctx.globalAlpha = alpha; ctx.lineWidth = px / cam.k; ctx.stroke();
+}
+function label(text, x, y, color, size = 12.5, align = "center") {
+  const [sx, sy] = toScreen(x, y);
+  ctx.font = `500 ${size}px ${css("--sans")}`; ctx.textAlign = align; ctx.textBaseline = "middle";
+  ctx.lineWidth = 3.5; ctx.strokeStyle = "#0B1517"; ctx.strokeText(text, sx, sy);
+  ctx.fillStyle = color; ctx.fillText(text, sx, sy);
+}
+
+function draw() {
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.globalAlpha = 1; ctx.clearRect(0, 0, W, H);
+  ctx.setTransform(cam.k * dpr, 0, 0, cam.k * dpr, (W / 2 - cam.x * cam.k) * dpr, (H / 2 - cam.y * cam.k) * dpr);
+  ctx.lineJoin = ctx.lineCap = "round"; ctx.setLineDash([]);
+  const zoom = Math.min(3, Math.max(1, Math.pow(cam.k / kTexas, 0.35)));
+  const sweepX = S.sweep >= 0 ? toWorld(S.sweep * W, 0)[0] : -1e9;
+
+  // the national grid: one sample point per county, and state lines
+  if (S.dots > 0.003) {
+    const d = 1.7 / cam.k;
+    for (const pass of [0, 1]) {
+      ctx.fillStyle = pass ? COLORS.river : COLORS.muted; ctx.globalAlpha = S.dots * (pass ? 0.95 : 0.28);
+      ctx.beginPath();
+      for (let i = 0; i < G.dots.length; i += 2) if ((G.dots[i] < sweepX) === !!pass) ctx.rect(G.dots[i] - d / 2, G.dots[i + 1] - d / 2, d, d);
+      ctx.fill();
+    }
+  }
+  stroke(G.states, COLORS.muted, 0.8, S.us);
+  stroke(G.mesh, COLORS.rule, 0.7, S.mesh * S.tx);
+
+  // county fills by overall risk level
+  if (S.risk > 0.003) for (const c of G.counties) {
+    ctx.beginPath(); for (const r of c.rings) { path(r); ctx.closePath(); }
+    ctx.fillStyle = COLORS[c.risk]; ctx.globalAlpha = S.risk * (hover && hover.county === c ? 0.34 : 0.17); ctx.fill();
+    ctx.strokeStyle = COLORS[c.risk]; ctx.globalAlpha = S.risk * 0.55; ctx.lineWidth = 0.9 / cam.k; ctx.stroke();
+  }
+  // irrigation district boundaries, in the colour of the district's level
+  if (S.risk > 0.003) for (const d of G.districts) {
+    ctx.beginPath(); for (const r of d.rings) { path(r); ctx.closePath(); }
+    if (hover && hover.district === d) { ctx.fillStyle = COLORS[d.risk]; ctx.globalAlpha = S.risk * 0.22; ctx.fill(); }
+    ctx.strokeStyle = COLORS[d.risk]; ctx.globalAlpha = S.risk * 0.95; ctx.lineWidth = (hover && hover.district === d ? 2.4 : 1.3) / cam.k; ctx.stroke();
+  }
+  stroke(G.texas, COLORS.text, 1.3, S.tx * 0.9);
+
+  // rivers
+  stroke(G.rivers.filter((r) => !r.main).map((r) => r.pts), COLORS.river, 1.1 * zoom, 0.42 * Math.min(1, S.rivers * 1.5), S.rivers);
+  stroke(G.rivers.filter((r) => r.main).map((r) => r.pts), COLORS.river, 2.6 * zoom, Math.min(1, S.rivers * 1.5), S.rivers);
+
+  // canals: plain water colour before the scan, priority colour after
+  if (S.canals > 0.003) {
+    const [vx0, vy0] = toWorld(0, 0), [vx1, vy1] = toWorld(W, H);
+    const seen = G.canals.filter((s) => s.order <= S.canals && s.box[2] >= vx0 && s.box[0] <= vx1 && s.box[3] >= vy0 && s.box[1] <= vy1);
+    if (S.lev < 0.997) stroke(seen.map((s) => s.pts), COLORS.river, 0.8 * zoom, 0.62 * (1 - S.lev));
+    if (S.lev > 0.003) D.levels.forEach((name, i) => {
+      if (!levelOn[i]) return;
+      ctx.setLineDash(name === "Unknown soil" ? [3 / cam.k, 3 / cam.k] : []);
+      stroke(seen.filter((s) => s.level === i).map((s) => s.pts), COLORS[name], LEVEL_WIDTH[i] * zoom, S.lev * (i === 2 ? 1 : 0.8));
+    });
+    ctx.setLineDash([]);
+    // canals the sealant budget pays for, drawn on top in white
+    if (PLAN.on && S.lev > 0.5) stroke(PLAN.funded.filter((s) => s.order <= S.canals).map((s) => s.pts), "#FFFFFF", 2.1 * zoom, 0.95);
+  }
+  for (const s of [pinned, hover && hover.canal]) if (s) { stroke([s.pts], "#FFFFFF", 4.2 * zoom, 0.95); stroke([s.pts], S.lev > 0.5 ? COLORS[D.levels[s.level]] : COLORS.river, 2 * zoom, 1); }
+
+  // everything below is drawn in screen pixels
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.globalAlpha = 1;
+  if (S.lakes > 0.003) for (const r of G.lakes) {   // reservoirs as storage gauges
+    const [sx, sy] = toScreen(r.xy[0], r.xy[1]);
+    ctx.globalAlpha = S.lakes; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.arc(sx, sy, 10, 0, 7); ctx.fillStyle = "#0B1517"; ctx.fill(); ctx.strokeStyle = COLORS.rule; ctx.stroke();
+    ctx.beginPath(); ctx.arc(sx, sy, 10, -Math.PI / 2, -Math.PI / 2 + (r.pct / 100) * 2 * Math.PI * S.lakes); ctx.strokeStyle = COLORS.river; ctx.stroke();
+    label(`${r.name} ${fmt(r.pct, 1)}%`, r.xy[0] + 18 / cam.k, r.xy[1], COLORS.text, 12.5, "left");
+  }
+  if (S.tx > 0.5 && S.rivers > 0.9 && !scanning) {
+    const seenNames = new Set();
+    for (const r of [...G.rivers].sort((a, b) => b.pts.length - a.pts.length)) {
+      if (!LABELLED.has(r.name) || seenNames.has(r.name)) continue; seenNames.add(r.name);
+      const m = Math.floor(r.pts.length / 4) * 2, [sx, sy] = toScreen(r.pts[m], r.pts[m + 1]);
+      if (sx > 40 && sx < W - 40 && sy > 30 && sy < H - 30) { ctx.globalAlpha = r.main ? 1 : 0.7; label(r.name, r.pts[m], r.pts[m + 1] - 11 / cam.k, COLORS.river, r.main ? 13.5 : 12); }
+    }
+    if (S.risk > 0.9 && cam.k > kTexas * 1.6) { ctx.globalAlpha = 0.85; for (const c of G.counties) label(c.name, c.xy[0], c.xy[1], COLORS.text, 12); }
+  }
+  ctx.globalAlpha = 1;
+  if (S.sweep >= 0 && S.sweep <= 1) {   // the sweep front
+    const x = S.sweep * W, g = ctx.createLinearGradient(x - 160, 0, x, 0);
+    g.addColorStop(0, "rgba(79,182,216,0)"); g.addColorStop(1, "rgba(79,182,216,0.16)");
+    ctx.fillStyle = g; ctx.fillRect(x - 160, 0, 160, H);
+    ctx.fillStyle = COLORS.river; ctx.fillRect(x - 1, 0, 2, H);
+  }
+  if (S.reticle > 0.003) {   // brackets locking on to the study area
+    const b = VIEW.texas, grow = 1 + (1 - S.reticle) * 0.5, cx = (b[0] + b[2]) / 2, cy = (b[1] + b[3]) / 2;
+    const [x0, y0] = toScreen(cx + (b[0] - cx) * grow * 1.06, cy + (b[1] - cy) * grow * 1.06), [x1, y1] = toScreen(cx + (b[2] - cx) * grow * 1.06, cy + (b[3] - cy) * grow * 1.06);
+    const a = Math.min(26, (x1 - x0) / 5);
+    ctx.globalAlpha = Math.min(1, S.reticle * 1.4); ctx.strokeStyle = COLORS.text; ctx.lineWidth = 2; ctx.beginPath();
+    for (const [x, y, dx, dy] of [[x0, y0, 1, 1], [x1, y0, -1, 1], [x0, y1, 1, -1], [x1, y1, -1, -1]]) { ctx.moveTo(x + dx * a, y); ctx.lineTo(x, y); ctx.lineTo(x, y + dy * a); }
+    ctx.stroke(); ctx.globalAlpha = 1;
+  }
+}
+
+/* ---------- animation ---------- */
+const ease = { io: (t) => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2, out: (t) => 1 - Math.pow(1 - t, 4), lin: (t) => t };
+const tweens = new Set(); let ticking = false;
+function tick(now) {
+  for (const t of [...tweens]) t(now);
+  draw();
+  if (tweens.size) requestAnimationFrame(tick); else ticking = false;
+}
+function tween(obj, to, ms, fn = ease.io, onStep) {
+  return new Promise((done) => {
+    const from = {}; for (const k in to) from[k] = obj[k];
+    let t0 = null;
+    const step = (now) => {
+      if (t0 === null) t0 = now;
+      const u = skip || reduced ? 1 : Math.min(1, (now - t0) / ms), e = fn(u);
+      for (const k in to) obj[k] = from[k] + (to[k] - from[k]) * e;
+      if (onStep) onStep(e);
+      if (u >= 1) { tweens.delete(step); done(); }
+    };
+    tweens.add(step);
+    if (!ticking) { ticking = true; requestAnimationFrame(tick); }
+  });
+}
+const wait = (ms) => new Promise((r) => (skip || reduced ? r() : setTimeout(r, ms)));
+// Camera moves interpolate zoom on a log scale so the push-in feels even
+function fly(box, ms = 1400, pad) {
+  const t = fit(box, pad), from = { ...cam }, m = { u: 0 };
+  return tween(m, { u: 1 }, ms, ease.io, (e) => { cam.k = from.k * Math.pow(t.k / from.k, e); cam.x = from.x + (t.x - from.x) * e; cam.y = from.y + (t.y - from.y) * e; });
+}
+
+/* ---------- the scan sequence ---------- */
+const logBox = $("#log");
+async function say(html) {
+  for (const d of logBox.children) d.classList.remove("live");
+  const line = el("div", "live", ""); logBox.appendChild(line);
+  while (logBox.children.length > 7) logBox.firstChild.remove();
+  if (skip || reduced) { line.innerHTML = html; return; }
+  const plain = html.replace(/<[^>]+>/g, "");
+  for (let i = 0; i <= plain.length; i += 3) { line.textContent = plain.slice(0, i); await new Promise((r) => setTimeout(r, 12)); }
+  line.innerHTML = html;
+}
+function hud(phase, a = "", b = "") { $("#phase").textContent = phase; $("#hud1").textContent = a; $("#hud2").textContent = b; }
+const progress = (p) => { $("#bar").style.width = p * 100 + "%"; };
+
+async function runScan() {
+  if (scanning) return;
+  scanning = true; skip = false; pinned = null; hover = null; hideTip(); PLAN.on = false;
+  document.body.classList.add("scanning"); $("#controls").classList.add("off"); $("#ranked").classList.remove("on"); $("#hud").classList.add("on");
+  logBox.innerHTML = ""; stage.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "center" });
+  const inspect = D.canalKm["Inspect first"], totalKm = Object.values(D.canalKm).reduce((a, b) => a + b, 0);
+  const worst = [...G.counties].sort((a, b) => b.pSeason - a.pSeason)[0];
+  const nWarn = G.counties.filter((c) => c.risk === "Warning").length;
+
+  hud("Initialising", "domain: conterminous United States"); progress(0.03);
+  await Promise.all([tween(S, { rivers: 0, canals: 0, lakes: 0, tx: 0, risk: 0, lev: 0, mesh: 0 }, 500), fly(VIEW.us, 1100, 0.9), tween(S, { us: 0.5, dots: 1 }, 1100)]);
+  await say("Projection set: <b>Albers equal-area conic</b>, standard parallels 29.5 N and 45.5 N.");
+
+  hud("National sweep", "sampling county units");
+  S.sweep = 0;
+  const sweep = tween(S, { sweep: 1.02 }, 2800, ease.lin, (e) => { $("#hud2").textContent = fmt(Math.round(D.nCounties * Math.min(1, e))) + " of " + fmt(D.nCounties) + " indexed"; progress(0.03 + e * 0.2); });
+  await say(`Indexing <b>${fmt(D.nCounties)}</b> county units against five river main stems.`);
+  await sweep; S.sweep = -1;
+  await say("Basin of interest resolved: <b>Rio Grande</b> (Rio Bravo del Norte). The other four basins failed the transfer test.");
+
+  hud("Constraining domain", "Texas reach"); progress(0.28);
+  S.tx = 1; S.mesh = 0;
+  await tween(S, { reticle: 1 }, 700, ease.out);
+  await say(`Domain: Texas, ${D.nTexasCounties} counties. <b>${G.counties.length}</b> have a centroid within 50 km of the main stem.`);
+  await Promise.all([fly(VIEW.texas, 1700), tween(S, { us: 0.2, dots: 0, mesh: 0.5 }, 1700), tween(S, { reticle: 0 }, 1500, ease.io)]);
+
+  hud("Hydrography", "river centrelines"); progress(0.4);
+  const rivers = tween(S, { rivers: 1 }, 1500, ease.io);
+  await say(`Hydrography: Natural Earth 1:10m centrelines, <b>${D.rivers.length}</b> reaches in frame.`);
+  await rivers;
+
+  hud("Conveyance network", "canals and ditches"); progress(0.52);
+  await fly(VIEW.valley, 1500);
+  const canals = tween(S, { canals: 1 }, 1700, ease.lin, (e) => { $("#hud2").textContent = fmt(Math.round(G.canals.length * e)) + " segments"; progress(0.52 + e * 0.12); });
+  await say(`Conveyance network: USGS National Hydrography Dataset, feature type 336. <b>${fmt(G.canals.length)}</b> segments, ${fmt(totalKm)} km.`);
+  await canals;
+
+  hud("Pedology", "soil texture at about 1 m"); progress(0.68);
+  const recolor = tween(S, { lev: 1 }, 1500);
+  await say("Pedology: SSURGO dominant texture class at canal-bed depth. Seepage flux assigned per class, <b>1.5 to 11.22</b> gal per sq ft per day (Fipps 1998).");
+  await recolor; await wait(500);
+
+  hud("Drought state and storage", "week of " + D.week); progress(0.8);
+  await Promise.all([fly(VIEW.texas, 1500), tween(S, { risk: 1, lakes: 1 }, 1500)]);
+  await say(`U.S. Drought Monitor, week of ${D.week}. Reservoir storage: Amistad-Falcon at <b>${fmt(worst.resPct > 0 ? G.counties.find((c) => c.reservoir === "Amistad-Falcon").resPct : 0, 1)}%</b> of conservation capacity.`);
+
+  hud("Forecast", "26-week horizon"); progress(0.92);
+  await say(`Random forest, 26-week horizon: P(run of 8 or more weeks at D2). Threshold 0.25. Highest: <b>${worst.name} ${fmt(worst.pSeason, 2)}</b>.`);
+  await say(`Classification complete. <b>${nWarn}</b> of ${G.counties.length} counties at Warning. <b>${fmt(inspect, 1)} km</b> of canal flagged inspect first.`);
+  hud("Districts and sealant plan", G.districts.length + " irrigation districts"); progress(0.96);
+  PLAN.on = true;
+  await fly(VIEW.valley, 1500);
+  await say(`Districts: Texas Commission on Environmental Quality boundaries. <b>${G.districts.length}</b> irrigation districts hold ${fmt(G.districts.reduce((a, d) => a + d.canalKm, 0))} km of mapped canal.`);
+  await say(`Sealant plan: ${usd(PLAN.budget)} treats <b>${fmt(PLAN.km)} km</b>, ranked by seepage flux x P(drought season). Canal width and lining are assumed, not measured.`);
+  await say("Pre-computed outputs. No model inference ran in this build.");
+  progress(1); await wait(500);
+  finishScan();
+}
+function finishScan() {
+  scanning = false; scanned = true; skip = false; S.sweep = -1; PLAN.on = true;
+  document.body.classList.remove("scanning"); document.body.classList.add("scanned");
+  $("#controls").classList.remove("off"); $("#ranked").classList.add("on"); $("#hud").classList.remove("on");
+  $("#run").textContent = "Replay scan"; $("#bar").style.width = "0";
+  for (const d of logBox.children) d.style.opacity = 0;
+  setTimeout(() => { if (!scanning) logBox.innerHTML = ""; }, 900);
+  buildChips(); draw(); watchReveals();
+}
+$("#run").onclick = runScan;
+$("#skip").onclick = () => { skip = true; };
+
+/* ---------- pointer interaction ---------- */
+function nearestCanal(wx, wy, maxPx) {
+  let best = null, bestD = (maxPx / cam.k) ** 2;
+  for (const s of grid.get(Math.floor(wx / CELL) + "," + Math.floor(wy / CELL)) || []) {
+    if ((scanned && !levelOn[s.level]) || s.order > S.canals) continue;
+    const p = s.pts;
+    for (let i = 0; i < p.length - 2; i += 2) {
+      const ax = p[i], ay = p[i + 1], dx = p[i + 2] - ax, dy = p[i + 3] - ay, len = dx * dx + dy * dy;
+      const t = len ? Math.max(0, Math.min(1, ((wx - ax) * dx + (wy - ay) * dy) / len)) : 0, d = (wx - ax - t * dx) ** 2 + (wy - ay - t * dy) ** 2;
+      if (d < bestD) { bestD = d; best = s; }
+    }
+  }
+  return best;
+}
+function inRing(x, y, r) {
+  let inside = false;
+  for (let i = 0, j = r.length - 2; i < r.length; j = i, i += 2) if ((r[i + 1] > y) !== (r[j + 1] > y) && x < ((r[j] - r[i]) * (y - r[i + 1])) / (r[j + 1] - r[i + 1]) + r[i]) inside = !inside;
+  return inside;
+}
+function pick(sx, sy) {
+  const [wx, wy] = toWorld(sx, sy);
+  for (const r of G.lakes) { const [x, y] = toScreen(r.xy[0], r.xy[1]); if ((x - sx) ** 2 + (y - sy) ** 2 < 196) return { lake: r }; }
+  const canal = nearestCanal(wx, wy, 7); if (canal) return { canal };
+  if (scanned) { const district = G.districts.find((d) => d.rings.some((r) => inRing(wx, wy, r))); if (district) return { district }; }
+  const county = G.counties.find((c) => c.rings.some((r) => inRing(wx, wy, r))); if (county) return { county };
+  return null;
+}
+const tip = $("#tip");
+const rows = (pairs) => "<dl>" + pairs.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("") + "</dl>";
+function hideTip() { tip.classList.remove("on"); }
+function showTip(h, sx, sy) {
+  let html = "";
+  if (h.canal) {
+    const s = h.canal, c = countyByFips[s.fips];
+    html = `<h3>${s.name || "Unnamed canal or ditch"}</h3>` + rows([
+      ["County", c ? c.name : s.fips], ["Length", fmt(s.km, 2) + " km"], ["Soil texture", s.soil],
+      ["Seepage flux", s.rate == null ? "no published rate" : fmt(s.rate, 2) + " gal/sq ft/day"],
+      ...(scanned ? [["Priority class", `<span style="color:${COLORS[D.levels[s.level]]}">${D.levels[s.level]}</span>`],
+        ["District", s.district || "none mapped"],
+        ...(s.rank ? [["Sealant plan", s.funded ? `funded, rank ${fmt(s.rank)}` : `rank ${fmt(s.rank)}, outside budget`], ["Sealant cost", usd(s.usd)]] : [])] : []),
+    ]) + `<p class="note">${scanned ? "An estimate of where seepage is likely. Lining is not known, so inspect on the ground." : "Run the basin scan to classify this segment."}</p>`;
+  } else if (h.lake) {
+    html = `<h3>${h.lake.name} Reservoir</h3>` + rows([["Conservation storage", fmt(h.lake.pct, 1) + "% full"], ["Reading", h.lake.date]]) + `<p class="note">Texas Water Development Board. Marker position is approximate.</p>`;
+  } else if (h.district) {
+    const d = h.district;
+    html = `<h3>${d.name}</h3>` + rows([
+      ["Counties", d.counties.join(", ")], ["Level", `<span style="color:${COLORS[d.risk]}">${d.risk}</span>`],
+      ["P(drought season)", fmt(d.pSeason, 2)], ["Canal mapped", fmt(d.canalKm) + " km"], ["Treatable", fmt(d.treatableKm) + " km"],
+      [`At ${usd(PLAN.budget)}`, `${fmt(d.plan.km, 1)} km, ${usd(d.plan.usd)}`],
+    ]) + `<p class="note">${d.kind}. Boundary from the Texas Commission on Environmental Quality. The plan assumes bare-earth canals.</p>`;
+  } else {
+    const c = h.county;
+    html = `<h3>${c.name} County</h3>` + rows(scanned ? [
+      ["Overall level", `<span style="color:${COLORS[c.risk]}">${c.risk}</span>`], ["Drought Monitor now", DROUGHT_CLASS[c.cls]],
+      ["P(drought season)", fmt(c.pSeason, 2)], ["Weeks at D2+, next 52", `${fmt(c.weeksLow)} to ${fmt(c.weeksHigh)}`],
+      ["Feed cost, 100 head", usd(c.feedUsd)],
+    ] : [["Drought Monitor now", DROUGHT_CLASS[c.cls]]]) + `<p class="note">${scanned ? "The feed cost is an untested estimate." : "Run the basin scan for the outlook."}</p>`;
+  }
+  tip.innerHTML = html; tip.classList.add("on");
+  const tw = 270, th = tip.offsetHeight;
+  tip.style.left = Math.max(8, Math.min(W - tw - 8, sx + 16)) + "px"; tip.style.top = Math.max(8, Math.min(H - th - 8, sy + 16)) + "px";
+}
+let dragFrom = null;
+canvas.addEventListener("pointerdown", (e) => { if (scanning) return; dragFrom = { x: e.clientX, y: e.clientY, cx: cam.x, cy: cam.y, moved: false }; canvas.setPointerCapture(e.pointerId); });
+canvas.addEventListener("pointermove", (e) => {
+  if (scanning) return;
+  const r = canvas.getBoundingClientRect(), sx = e.clientX - r.left, sy = e.clientY - r.top;
+  if (dragFrom) {
+    const dx = e.clientX - dragFrom.x, dy = e.clientY - dragFrom.y;
+    if (Math.abs(dx) + Math.abs(dy) > 4) { dragFrom.moved = true; canvas.classList.add("drag"); hideTip(); }
+    if (dragFrom.moved) { cam.x = dragFrom.cx - dx / cam.k; cam.y = dragFrom.cy - dy / cam.k; draw(); }
+    return;
+  }
+  const h = pick(sx, sy);
+  if ((h && (h.canal || h.district || h.county || h.lake)) !== (hover && (hover.canal || hover.district || hover.county || hover.lake))) { hover = h; draw(); }
+  if (h) showTip(h, sx, sy); else hideTip();
+});
+canvas.addEventListener("pointerup", (e) => {
+  if (dragFrom && !dragFrom.moved && hover) { pinned = hover.canal || null; draw(); }
+  dragFrom = null; canvas.classList.remove("drag");
+});
+canvas.addEventListener("pointerleave", () => { hover = null; hideTip(); draw(); });
+function zoomAt(factor, sx = W / 2, sy = H / 2) {
+  const [wx, wy] = toWorld(sx, sy), k = Math.max(kTexas * 0.35, Math.min(kTexas * 220, cam.k * factor));
+  cam.x = wx - (sx - W / 2) / k; cam.y = wy - (sy - H / 2) / k; cam.k = k; draw();
+}
+canvas.addEventListener("wheel", (e) => {   // plain scrolling still scrolls the page
+  if (scanning || !(e.ctrlKey || e.metaKey)) return;
+  e.preventDefault(); const r = canvas.getBoundingClientRect(); zoomAt(Math.exp(-e.deltaY * 0.01), e.clientX - r.left, e.clientY - r.top);
+}, { passive: false });
+canvas.addEventListener("dblclick", (e) => { if (scanning) return; const r = canvas.getBoundingClientRect(); zoomAt(2, e.clientX - r.left, e.clientY - r.top); });
+$("#zin").onclick = () => !scanning && zoomAt(1.6); $("#zout").onclick = () => !scanning && zoomAt(1 / 1.6);
+document.querySelectorAll("[data-view]").forEach((b) => { b.onclick = () => { if (!scanning) { fly(VIEW[b.dataset.view], 1100); stage.scrollIntoView({ behavior: "smooth", block: "center" }); } }; });
+function flyTo(box, pad) { stage.scrollIntoView({ behavior: "smooth", block: "center" }); return fly(box, 1200, pad); }
+
+/* ---------- map controls built from data ---------- */
+function buildChips() {
+  const box = $("#chips"); box.innerHTML = "";
+  D.levels.forEach((name, i) => {
+    const n = G.canals.filter((s) => s.level === i).length;
+    const b = el("button", "chip" + (levelOn[i] ? "" : " off"), `<i style="background:${COLORS[name]}"></i>${name} <span class="num">${fmt(n)}</span>`);
+    b.onclick = () => { levelOn[i] = !levelOn[i]; buildChips(); draw(); };
+    box.appendChild(b);
+  });
+  if (scanned) {   // one more chip: show or hide the canals the sealant budget pays for
+    const b = el("button", "chip" + (PLAN.on ? "" : " off"), `<i style="background:#FFFFFF"></i>Sealant plan <span class="num">${fmt(PLAN.n)}</span>`);
+    b.onclick = () => { PLAN.on = !PLAN.on; buildChips(); draw(); };
+    box.appendChild(b);
+  }
+}
+function buildRanked() {
+  const list = $("#rankedlist"), top = G.canals.filter((s) => s.level === 2).sort((a, b) => b.km - a.km).slice(0, 7);
+  for (const s of top) {
+    const b = el("button", "", `<span>${s.name || "Unnamed"}, ${countyByFips[s.fips].name}</span><span class="num">${fmt(s.km, 1)} km</span>`);
+    b.onclick = () => { pinned = s; const m = 6; fly([s.box[0] - m, s.box[1] - m, s.box[2] + m, s.box[3] + m], 1200); };
+    list.appendChild(b);
+  }
+}
+
+/* ---------- page content built from data ---------- */
+function buildSituation() {
+  const by = (lvl) => G.counties.filter((c) => c.risk === lvl).length, n = G.counties.length;
+  const sys = G.counties.find((c) => c.reservoir === "Amistad-Falcon"), totalKm = Object.values(D.canalKm).reduce((a, b) => a + b, 0);
+  const lossTotal = D.losses.byYear.reduce((a, r) => a + r[1], 0);
+  $("#weektag").textContent = "Data week " + D.week;
+  $("#headline").textContent = `${by("Warning")} of ${n} Texas counties on the Rio Grande are at Warning this week.`;
+  $("#sublede").textContent = `Week of ${D.week}. ${by("Watch")} more are at Watch and ${by("Low")} at Low. A Warning means the 4-week alert or the 6-month outlook has crossed its tested threshold for severe drought, class D2 or worse on the U.S. Drought Monitor.`;
+  const tiles = [
+    [`<span data-count="${by("Warning")}">0</span> / ${n}`, "counties at Warning", `<div class="riskrow">${["Warning", "Watch", "Low"].map((l) => `<i style="flex:${by(l)};background:${COLORS[l]}" title="${l}: ${by(l)}"></i>`).join("")}</div>`],
+    [`<span data-count="${sys.resPct}" data-dec="1">0</span>%`, "Amistad-Falcon system, share of conservation storage", ""],
+    [`<span data-count="${Math.round(totalKm)}">0</span> km`, `canal and ditch mapped in these counties, ${fmt(G.canals.length)} segments`, ""],
+    [`$<span data-count="${lossTotal / 1e6}" data-dec="0">0</span>M`, `insured crop losses to drought, ${D.losses.byYear[0][0]} to ${D.losses.byYear.at(-1)[0]}`, ""],
+  ];
+  for (const [big, what, extra] of tiles) $("#tiles").appendChild(el("div", "tile", `<div class="big">${big}</div><div class="what">${what}</div>${extra}`));
+  $("#maplede").textContent = `${fmt(G.canals.length)} canal and ditch segments and ${D.rivers.length} river reaches. Hover for records. Run the scan to classify every segment.`;
+  countUp(document.querySelectorAll("#tiles [data-count]"));
+}
+function countUp(nodes) {
+  nodes.forEach((n) => {
+    const to = +n.dataset.count, dec = +(n.dataset.dec || 0), t0 = performance.now();
+    if (reduced) { n.textContent = fmt(to, dec); return; }
+    const step = (now) => { const u = Math.min(1, (now - t0) / 1400); n.textContent = fmt(to * ease.out(u), dec); if (u < 1) requestAnimationFrame(step); };
+    requestAnimationFrame(step);
+  });
+}
+function bar(parent, name, share, value, color, onclick) {
+  const b = el(onclick ? "button" : "div", "hbar", `<span>${name}</span><span class="track"><span class="fill" data-w="${Math.max(0.6, share * 100)}" style="display:block;background:${color}"></span></span><span class="v">${value}</span>`);
+  if (onclick) b.onclick = onclick; parent.appendChild(b);
+}
+function buildFindings() {
+  const totalKm = Object.values(D.canalKm).reduce((a, b) => a + b, 0), maxKm = Math.max(...Object.values(D.canalKm));
+  $("#findlede").textContent = `${fmt(totalKm)} km of canal and ditch across ${G.counties.length} counties, each segment classed by two things: whether the 6-month outlook warns for its county, and whether the soil beneath it has a high published seepage rate.`;
+  [2, 1, 0, 4, 3].forEach((i) => { const name = D.levels[i]; bar($("#levelbars"), name, D.canalKm[name] / maxKm, fmt(D.canalKm[name]) + " km", COLORS[name], () => { levelOn.forEach((_, j) => { levelOn[j] = j === i; }); buildChips(); flyTo(VIEW.valley); }); });
+  $("#levelbars").appendChild(el("p", "muted", `Inspect first means both conditions hold. Watch means one. Drain is a drain, wasteway or floodway by name. <button class="btn ghost small" id="allon" style="margin-left:6px">Show all classes</button>`));
+  $("#levelbars").lastChild.style.cssText = "font-size:13.5px;margin-top:12px";
+  $("#allon").onclick = () => { levelOn.fill(true); buildChips(); draw(); };
+  const soil = {}; for (const s of G.canals) if (s.rate != null) { soil[s.soil] = soil[s.soil] || { km: 0, rate: s.rate }; soil[s.soil].km += s.km; }
+  const top = Object.entries(soil).sort((a, b) => b[1].rate - a[1].rate || b[1].km - a[1].km).filter(([, v]) => v.km > 15).slice(0, 9);
+  for (const [name, v] of top) bar($("#soilbars"), name, v.rate / 11.22, `${fmt(v.rate, 2)} · ${fmt(v.km)} km`, v.rate >= 7.48 ? COLORS["Inspect first"] : COLORS.Low);
+  $("#soilbars").querySelectorAll(".hbar").forEach((b) => { b.style.gridTemplateColumns = "130px 1fr 120px"; });
+  $("#soilbars").appendChild(el("p", "muted", "Orange marks classes at or above the 7.48 threshold the pipeline treats as leaky (loam or sandier)."));
+  $("#soilbars").lastChild.style.cssText = "font-size:13.5px;margin-top:12px";
+
+  const t = $("#countytable");
+  t.innerHTML = `<thead><tr><th>County</th><th>Level</th><th>Drought Monitor</th><th class="r">P(season)</th><th>Weeks at D2+, next 52</th><th class="r">Feed cost, 100 head</th></tr></thead>`;
+  const body = el("tbody");
+  for (const c of G.counties) {
+    const tr = el("tr", "", `<td>${c.name}</td><td><span class="pill" style="background:${COLORS[c.risk]}">${c.risk}</span></td><td class="muted">${DROUGHT_CLASS[c.cls]}</td><td class="r num">${fmt(c.pSeason, 2)}</td>
+      <td><div style="display:flex;gap:10px;align-items:center"><div class="range" style="flex:1"><i style="left:${(c.weeksLow / 52) * 100}%;width:${((c.weeksHigh - c.weeksLow) / 52) * 100}%"></i><b style="left:${Math.min(100, (c.typical / 52) * 100)}%"></b></div><span class="num muted" style="font-size:13px;white-space:nowrap">${fmt(c.weeksLow)} to ${fmt(c.weeksHigh)}</span></div></td>
+      <td class="r num">${usd(c.feedUsd)}</td>`);
+    tr.onclick = () => flyTo(boxOf(c.rings), 0.7);
+    body.appendChild(tr);
+  }
+  t.appendChild(body);
+}
+function buildPlan() {
+  const T = D.sealant, slider = $("#budget");
+  slider.max = Math.ceil(T.maxBudget / 5000) * 5000; slider.value = T.budget;
+  $("#planlede").textContent = `${G.districts.length} Texas irrigation districts along the river, each with the canals that lie inside its boundary. The forecast says when water will be short, the soil says where canals seep fastest, and the budget goes where the two meet.`;
+  $("#planrule").textContent = T.rule;
+  $("#planlimit").textContent = T.note;
+  const render = () => {
+    applyBudget(+slider.value);
+    $("#budgetv").textContent = usd(PLAN.budget);
+    $("#plantotal").textContent = fmt(PLAN.km) + " km treated";
+    $("#plannote").textContent = `${usd(PLAN.usd)} of sealant on ${fmt(PLAN.n)} canal segments in ${G.districts.filter((d) => d.plan.usd > 0).length} districts. If every treated canal is bare earth and carries water for ${T.days} days, that could hold back roughly ${fmt(PLAN.afLow)} to ${fmt(PLAN.afHigh)} acre-feet. Treating every treatable canal once would cost ${usd(T.maxBudget)}.`;
+    const t = $("#districttable"), body = el("tbody"), top = Math.max(1, ...G.districts.map((d) => d.plan.usd));
+    t.innerHTML = `<thead><tr><th>District</th><th>Level</th><th class="r">P(season)</th><th class="r">Canal km</th><th class="r">Treatable km</th><th class="r">Treated km</th><th>Share of budget</th><th class="r">Sealant</th></tr></thead>`;
+    for (const d of [...G.districts].sort((a, b) => b.plan.usd - a.plan.usd || b.pSeason - a.pSeason)) {
+      const tr = el("tr", "", `<td>${d.name}<div class="muted" style="font-size:12.5px">${d.counties.join(", ")}</div></td><td><span class="pill" style="background:${COLORS[d.risk]}">${d.risk}</span></td><td class="r num">${fmt(d.pSeason, 2)}</td><td class="r num">${fmt(d.canalKm)}</td><td class="r num">${fmt(d.treatableKm)}</td><td class="r num">${fmt(d.plan.km, 1)}</td>
+        <td><div style="display:flex;gap:10px;align-items:center"><div class="range" style="flex:1"><i style="left:0;width:${(d.plan.usd / top) * 100}%;background:${COLORS["Inspect first"]}"></i></div><span class="num muted" style="font-size:13px;white-space:nowrap">${fmt((d.plan.usd / Math.max(1, PLAN.usd)) * 100)}%</span></div></td>
+        <td class="r num">${usd(d.plan.usd)}</td>`);
+      tr.onclick = () => flyTo(d.box, 0.6);
+      body.appendChild(tr);
+    }
+    t.appendChild(body);
+    if (scanned) buildChips();
+    if (W) draw();   // the map has no size until the page is laid out
+  };
+  slider.oninput = render; render();
+}
+function buildCosts() {
+  const years = D.losses.byYear, total = years.reduce((a, r) => a + r[1], 0), max = Math.max(...years.map((r) => r[1])), peak = years.find((r) => r[1] === max);
+  $("#costlede").textContent = `Federal crop insurance paid ${usd(total)} for drought in these ${G.counties.length} counties from ${years[0][0]} to ${years.at(-1)[0]}. That is a floor: it counts insured crops only, and no livestock.`;
+  $("#losssub").textContent = `${D.losses.source}. Cause of loss: drought. Hover a bar.`;
+  const read = $("#lossread"), idle = `Peak year ${peak[0]}: ${usd(peak[1])}`; read.textContent = idle;
+  for (const [y, v] of years) {
+    const d = el("div"); d.dataset.h = Math.max(1, (v / max) * 100); d.title = `${y}: ${usd(v)}`;
+    d.onmouseenter = () => { read.textContent = `${y}: ${usd(v)}`; }; d.onmouseleave = () => { read.textContent = idle; };
+    $("#losscols").appendChild(d);
+  }
+  $("#lossfirst").textContent = years[0][0]; $("#losslast").textContent = years.at(-1)[0];
+  const cmax = D.losses.byCounty[0][1];
+  for (const [name, v] of D.losses.byCounty.filter((r) => r[1] > 0).slice(0, 9)) bar($("#countyloss"), name, v / cmax, usd(v), COLORS["Inspect first"]);
+
+  const sel = $("#feedcounty");
+  [...G.counties].sort((a, b) => b.feedUsd - a.feedUsd).forEach((c) => sel.appendChild(new Option(c.name, c.fips)));
+  const feed = () => {
+    const c = countyByFips[sel.value], herd = +$("#herd").value;
+    $("#herdv").textContent = fmt(herd) + " head"; $("#feedtotal").textContent = usd((c.feedUsd / 100) * herd);
+    $("#feednote").textContent = `${fmt(c.feedUsd / 100 / D.feedCost, 1)} months of bought feed at $${D.feedCost} per head per month. The aid programme pays 60% of the monthly rate once the county triggers.`;
+  };
+  sel.onchange = feed; $("#herd").oninput = feed; feed();
+  const wl = $("#worklevel");
+  wl.appendChild(new Option(`Inspect first (${fmt(D.canalKm["Inspect first"], 1)} km)`, D.canalKm["Inspect first"]));
+  wl.appendChild(new Option(`Inspect first and Watch (${fmt(D.canalKm["Inspect first"] + D.canalKm.Watch)} km)`, D.canalKm["Inspect first"] + D.canalKm.Watch));
+  const work = () => {
+    const km = +wl.value, unit = +$("#unit").value;
+    $("#unitv").textContent = usd(unit); $("#worktotal").textContent = usd(km * unit);
+    $("#worknote").textContent = `${fmt(km, 1)} km at ${usd(unit)} per km. Replace the unit cost with a quote from the district engineer.`;
+  };
+  wl.onchange = work; $("#unit").oninput = work; work();
+
+  const inData = '<span class="tag">in the pipeline data</span>', verify = '<span class="tag warn">verify before presenting</span>';
+  const funding = [
+    ["USDA crop insurance indemnities", `Risk Management Agency. Paid ${usd(total)} for drought here since ${years[0][0]}. Pays growers after the loss.`, inData],
+    ["Livestock Forage Disaster Program", `USDA Farm Service Agency. Pays 60% of the monthly feed cost ($${D.feedCost} per adult beef cow in 2026) once a county holds D2 long enough.`, inData],
+    ["Reclamation WaterSMART grants", "U.S. Bureau of Reclamation cost-share grants that irrigation districts use for canal lining and piping.", verify],
+    ["Texas agricultural water conservation funding", "Texas Water Development Board grants and loans for district conservation projects.", verify],
+    ["NRCS conservation programmes", "USDA Natural Resources Conservation Service cost-share for on-farm irrigation efficiency.", verify],
+    ["Border water infrastructure finance", "North American Development Bank lending and grants for water projects along the border.", verify],
+  ];
+  for (const [name, text, tag] of funding) $("#funding").appendChild(el("div", "item reveal", `<h3>${name}</h3><p>${text}</p>${tag}`));
+
+  const contacts = [
+    ["Irrigation district boards and managers", "Decide whether to seal, line or pipe a canal before the season. The primary user of the inspect-first list."],
+    ["Rio Grande Watermaster", "Texas Commission on Environmental Quality. Allocates water from the Amistad-Falcon system to rights holders."],
+    ["International Boundary and Water Commission, U.S. Section", "Operates Amistad and Falcon dams with Mexico under the 1944 treaty."],
+    ["Texas Water Development Board", "State water planning and project finance, including the Rio Grande regional planning group."],
+    ["USDA Farm Service Agency county offices", "Take applications for drought aid to livestock producers."],
+    ["County judges and commissioners courts", "Local drought and disaster declarations."],
+  ];
+  for (const [name, text] of contacts) $("#contactlist").appendChild(el("div", "item reveal", `<h3>${name}</h3><p>${text}</p><span class="tag warn">contact details to add and verify</span>`));
+}
+function buildMethod() {
+  const k = D.skill, cards = [
+    ["4-week alert", `${fmt(k.alert.recall * 100, 1)}% recall`, `Precision ${fmt(k.alert.precision * 100, 1)}%. Cost score ${fmt(k.alert.cost)} against ${fmt(k.alertBestRule)} for the best simple rule: close to a tie. A second version, chosen on validation years only, scores ${fmt(k.alertV2.v2)}.`],
+    ["6-month outlook", `${fmt(k.season.recall * 100, 1)}% recall`, `Precision ${fmt(k.season.precision * 100, 1)}%. Cost score ${fmt(k.season.system_cost)} against ${fmt(k.season.d1_rule_cost)} for the "D1 or worse now" rule.`],
+    ["12-month estimate", `±${fmt(k.year.mae_system, 1)} weeks`, `Mean absolute error, against a mean of ${fmt(k.year.mean_weeks, 1)} weeks. A planning range, not a precise forecast.`],
+    ["Drought onsets", `${k.events.warned_within_4_weeks} of ${k.events.n}`, `Onsets warned within 4 weeks. Median lead time ${fmt(k.events.median_lead_weeks)} weeks.`],
+  ];
+  for (const [name, big, text] of cards) $("#skill").appendChild(el("div", "tile reveal", `<div class="what" style="margin:0 0 6px">${name}</div><div class="big" style="font-size:30px">${big}</div><div class="what">${text}</div>`));
+  const pickLimit = (word) => D.limits.find((l) => l.includes(word));
+  for (const l of ["not a calibrated", "move together", "damage figure", "Design choices", "district map", "sealant plan is a ranking"].map(pickLimit).filter(Boolean)) $("#limits").appendChild(el("li", "", l));
+  $("#limits").appendChild(el("li", "", "Canal lining is unknown. The priority classes are a list of segments to inspect, not a list of proven leaks."));
+  $("#foot").innerHTML = `Demo build of pre-computed outputs for the week of ${D.week}. Sources: U.S. Drought Monitor, USGS National Hydrography Dataset, USDA NRCS SSURGO, Texas Water Development Board, USDA Risk Management Agency, USDA Farm Service Agency, Natural Earth, Fipps (Texas A&amp;M, 1998), Texas Commission on Environmental Quality (district boundaries), U.S. Bureau of Reclamation (sealant price).`;
+}
+function watchReveals() {
+  const io = new IntersectionObserver((entries) => {
+    for (const e of entries) if (e.isIntersecting) {
+      e.target.classList.add("in");
+      e.target.querySelectorAll(".fill").forEach((f) => { f.style.width = f.dataset.w + "%"; });
+      e.target.querySelectorAll(".cols div").forEach((d, i) => { d.style.transitionDelay = i * 18 + "ms"; d.style.height = d.dataset.h + "%"; });
+      io.unobserve(e.target);
+    }
+  }, { threshold: 0.12 });
+  document.querySelectorAll("#results .reveal:not(.in)").forEach((n, i) => { n.style.transitionDelay = (i % 4) * 70 + "ms"; io.observe(n); });
+}
+
+/* ---------- sign in screen and start ---------- */
+function loginBackdrop() {   // the county sample grid, drawn once behind the sign-in card
+  const c = $("#loginmap"), g = c.getContext("2d"), w = innerWidth, h = innerHeight, b = VIEW.us;
+  c.width = w; c.height = h;
+  const k = Math.min(w / (b[2] - b[0]), h / (b[3] - b[1])) * 0.92, ox = w / 2 - ((b[0] + b[2]) / 2) * k, oy = h / 2 - ((b[1] + b[3]) / 2) * k;
+  g.fillStyle = COLORS.muted; g.globalAlpha = 0.5;
+  for (let i = 0; i < G.dots.length; i += 2) g.fillRect(G.dots[i] * k + ox, G.dots[i + 1] * k + oy, 1.6, 1.6);
+  g.strokeStyle = COLORS.river; g.globalAlpha = 0.9; g.lineWidth = 1.6; g.beginPath();
+  for (const r of G.rivers) if (r.main) { g.moveTo(r.pts[0] * k + ox, r.pts[1] * k + oy); for (let i = 2; i < r.pts.length; i += 2) g.lineTo(r.pts[i] * k + ox, r.pts[i + 1] * k + oy); }
+  g.stroke();
+}
+$("#loginform").onsubmit = (e) => { e.preventDefault(); $("#login").classList.add("gone"); buildSituation(); };
+const noVideo = () => { $("#videobox").innerHTML = '<div><h3>Demo video goes here</h3><p class="muted" style="margin-top:8px;font-size:14.5px">Save the recording as <span class="num">demo/demo.mp4</span> and it will play in this frame.</p></div>'; };
+$("#video").addEventListener("error", noVideo);
+if ($("#video").error || $("#video").networkState === 3) noVideo();
+
+buildRanked(); buildFindings(); buildPlan(); buildCosts(); buildMethod(); loginBackdrop();
+new ResizeObserver(resize).observe(stage);
+if (location.hash === "#skiplogin") { $("#login").classList.add("gone"); buildSituation(); }
+</script>
+</body>
+</html>

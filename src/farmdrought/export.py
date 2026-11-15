@@ -17,6 +17,7 @@ import numpy as np
 import pandas as pd
 
 from farmdrought.canals import run_canals
+from farmdrought.districts import run_districts
 from farmdrought.alert import make_forest, run_alert, split_masks
 from farmdrought.config import (ALERT_WEEKS, COUNTY_RESERVOIR, D2_CLASS, FEED_COST_PER_HEAD_MONTH, FOCUS_RIVER, LATEST, METRICS, MISS_COST, OUTLOOK, OUTLOOK_TEST,
                                 PREDICTIONS, PROCESSED, REPORTS, SEASON_THRESHOLD, SEASON_WEEKS, TEST_START,
@@ -32,6 +33,7 @@ from farmdrought.reservoirs import add_reservoir_features, reservoir_summary
 from farmdrought.robustness import ROBUSTNESS
 from farmdrought.snow import FEATURES_S, add_snow_features
 from farmdrought.trigger import run_trigger
+from farmdrought.v2 import V2_JSON, alert_v2
 
 IS_FINAL = True  # the numbers are locked: reports/decision.md was committed before this run
 
@@ -47,6 +49,8 @@ LATEST_COLUMNS = ["date", "fips", "county", "state", "river", "lat", "lon", "cls
 # Pivot columns (canal action). Added at the END of the files, which contract rule 2 allows.
 PIVOT_OUTLOOK_COLUMNS = ["p_season_res"]
 PIVOT_LATEST_COLUMNS = ["p_season_res", "d2_share_history", "res_name", "res_pct_full"]
+# Version 2 column (v2.py), also at the END of the files. See add_v2_alarm below.
+V2_COLUMNS = ["alarm_v2"]
 WHOLE_NUMBERS = ["y", "cls", "d2_streak", "y_season", "y_weeks"]
 
 
@@ -271,6 +275,40 @@ def build_metrics(alert, season, year, predictions, scored, panel):
     }
 
 
+def add_v2_alarm(table, v2_alarm):
+    """Add the version 2 alarm of the 4-week alert as a last column.
+
+    Version 2 exists for the Rio Grande only. On the other rivers the column repeats version 1's
+    alarm, because the contract allows no empty cells.
+    shortcut: this week's version 2 alarm comes from the forest trained on 2000-2014 (the tested
+    one), not one retrained on all years like version 1's live alarm. Retrain if v2 goes live.
+    """
+    table = table.merge(v2_alarm, on=["fips", "date"], how="left")
+    table["alarm_v2"] = table["alarm_v2"].fillna(table["alarm_system"]).astype(bool)
+    return table
+
+
+def v2_metrics(metrics_limits):
+    """The "v2" key: reports/v2.json as written by v2.py, plus its limit sentences."""
+    with open(V2_JSON) as f:
+        v2 = json.load(f)
+    a, s, y, seeds = v2["alert"], v2["season"], v2["year"], v2["seed_check"]["seeds_where_v2_beats_v1"]
+    limits = [
+        "Version 2 was built after version 1's test results were known, so its list of candidates is not blind. "
+        "Only the choice among candidates is protected: it never uses a year it is then scored on.",
+        f"Version 2, 4-week alert: cost {a['v2']} against {a['v1']} for version 1 and {a['simple_rule']} for the "
+        f"best simple rule. It won with {seeds['alert']} random seeds. The recipe ({a['chosen']}) was chosen on "
+        "only 4 validation years, and it leans on a simple rule that an outside review found after the test.",
+        f"Version 2, 6-month outlook: cost {s['v2']} against {s['v1']} for version 1. It did not improve "
+        f"(it won with {seeds['season']} seeds). Version 1 stays.",
+        f"Version 2, 12-month outlook: {y['v2']} weeks off against {y['v1']} for version 1, but the simple rule "
+        f"alone is {y['simple_rule']}. In most years version 2 simply chose that rule over the forest.",
+        f"Weather inputs alone (rain and temperature) did not help: 4-week {a['weather_alone']}, 6-month "
+        f"{s['weather_alone']}, 12-month {y['weather_alone']}, each worse than version 1.",
+    ]
+    return {"limits": metrics_limits + limits, "v2": v2}
+
+
 def pivot_metrics(scored, season, panel, metrics_limits, latest):
     """The five pivot keys (trigger, reservoir, losses, canals, canal_priority), plus their limit sentences added to the
     existing list of limits (metrics_limits)."""
@@ -329,13 +367,16 @@ def main():
     predictions = panel[test].copy()
     predictions["tier"] = tiers(predictions["p_model"], alert["threshold"])
     metrics = build_metrics(alert, season, year, predictions, scored, panel)
-    predictions = finish(predictions, PREDICTION_COLUMNS, ["date", "fips"])
+    # Version 2 of the 4-week alert (Rio Grande only): its alarm goes in as a last column
+    _, v2_alarm = alert_v2(panel)
+    predictions = finish(add_v2_alarm(predictions, v2_alarm), PREDICTION_COLUMNS + V2_COLUMNS, ["date", "fips"])
     outlook = finish(scored, OUTLOOK_COLUMNS + PIVOT_OUTLOOK_COLUMNS, ["date", "fips"])
     # This week's rows, plus the extra columns for the risk map (added at the end, which
     # contract rule 2 allows). The length range uses each river's measured 12-month error.
     error_by_river = {entry["river"]: entry["mae_system"] for entry in year["per_river"]}
     latest = add_map_fields(latest_table(panel, alert["threshold"]), panel, error_by_river)
-    latest = finish(latest, LATEST_COLUMNS + MAP_COLUMNS + PIVOT_LATEST_COLUMNS, ["fips"])
+    latest = finish(add_v2_alarm(latest, v2_alarm), LATEST_COLUMNS + MAP_COLUMNS + PIVOT_LATEST_COLUMNS + V2_COLUMNS,
+                    ["fips"])
     rg_scored = scored[scored["river"] == FOCUS_RIVER]
     metrics["map_fields"] = {
         "columns": {
@@ -386,6 +427,18 @@ def main():
         ]
     # ---- Pivot keys (canal action), at the very end ----
     metrics.update(pivot_metrics(scored, season, panel, metrics["limits"], latest))
+    # ---- Version 2 key, after everything else (run farmdrought.v2 first: it writes v2.json) ----
+    if V2_JSON.exists():
+        metrics.update(v2_metrics(metrics["limits"]))
+    # ---- Districts and the sealant plan: the last link of the chain (must run after the canal levels) ----
+    metrics["districts"] = run_districts(latest)
+    metrics["limits"] += [
+        "The district map and sealant plan cover Texas districts only. We found no public boundary file for "
+        "districts in New Mexico or Colorado.",
+        "The sealant plan is a ranking, not a measurement. It assumes every canal is bare earth, has 20 feet of "
+        "wetted width and carries water for 90 days. We do not know which canals are already lined. The budget "
+        "is an example figure, and the sealant price is materials only.",
+    ]
     with open(METRICS, "w") as f:
         # default=... turns numpy numbers into plain numbers that JSON accepts
         json.dump(metrics, f, indent=2, default=lambda value: value.item())

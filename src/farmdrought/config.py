@@ -153,3 +153,19 @@ SEEPAGE_GAL_SQFT_DAY = {
 # Our rule: a soil counts as "leaky" from loam upward (7.48 or more). In the source's own
 # summary table (Table 6), clay soils top out at 2.99 and loam starts at 4.49 to 7.48.
 LEAKY_SOIL_RATE = 7.48
+
+# 8f. Irrigation districts and the sealant plan (districts.py)
+DISTRICTS_RAW = RAW / "districts" / "tx_districts.geojson"   # district boundaries as downloaded
+DISTRICTS_GEOJSON = PROCESSED / "districts.geojson"          # boundaries + risk + sealant plan, for the App
+MIN_DISTRICT_CANAL_KM = 5      # a district needs at least this much mapped canal to be listed
+# The sealant figures below are the same ones the App's calculator uses, so both sides agree.
+# Sealant = a polymer (polyacrylamide) spread in an earth canal to plug the pores of the soil.
+SEALANT_USD_PER_SQFT = 0.004   # materials only, a best case. U.S. Bureau of Reclamation:
+                               # https://www.usbr.gov/research/projects/detail.cfm?id=845
+SEALANT_CUT = (0.28, 0.87)     # field trials cut seepage by 28% to 87% (Desert Research Institute)
+SEALANT_DAYS = 90              # one application lasts up to about 3 months (Lund et al. 2021)
+# OUR ASSUMPTIONS (not measured): we do not know any canal's real size, or anyone's budget.
+WETTED_WIDTH_FT = 20           # width of canal bed and banks touched by water, for every canal
+SEALANT_BUDGET_USD = 100_000   # the example budget that the plan shares out
+FEET_PER_KM = 3280.84
+GALLONS_PER_ACRE_FOOT = 325_851
