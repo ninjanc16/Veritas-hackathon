@@ -107,3 +107,20 @@ def test_the_build_refuses_when_a_handoff_file_is_missing(tmp_path, monkeypatch)
     with pytest.raises(SystemExit, match="missing real file"):
         build(out)
     assert not out.exists()
+
+
+def test_deployment_files_route_the_live_reading_and_keep_the_site_deployable():
+    # Arrange
+    config = json.loads((REPO_ROOT / "vercel.json").read_text())
+    ignored = [line.strip() for line in (REPO_ROOT / ".vercelignore").read_text().splitlines()
+               if line.strip() and not line.startswith("#")]
+
+    # Assert: the page's relative "api/live" is sent to the root function, which reuses the one handler
+    assert {"source": "/app/site/api/live", "destination": "/api/live"} in config["rewrites"]
+    assert {"source": "/", "destination": "/app/site/", "permanent": False} in config["redirects"]
+    assert 'require("../app/site/api/live.js")' in (REPO_ROOT / "api" / "live.js").read_text()
+    assert (REPO_ROOT / "app" / "site" / "api" / "live.js").exists()
+    # nothing the site or the function reads is kept out of the deployment
+    assert all(line.startswith("/") for line in ignored)                  # root folders only
+    assert not {"/app", "/api", "/vercel.json"} & set(ignored)
+    assert not any(line.startswith("/app") or line.startswith("/api") for line in ignored)

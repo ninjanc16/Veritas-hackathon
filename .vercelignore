@@ -1,0 +1,9 @@
+# Not part of the website: keep these out of the deployment. Each line starts with "/" so it
+# only matches the folder at the repo root (app/site/data must stay: the pages read it).
+# The site needs app/site, api/ and vercel.json, and nothing below.
+/data
+/reports
+/tests
+/src
+/notebooks
+/tools
