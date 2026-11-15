@@ -49,6 +49,8 @@ Cost = 3 x missed droughts + false alarms. That rule is our assumption, not a fa
 
 At a cost ratio of 0.25 the forecast is worth 0.3135 per decision against 0.3132 for the D1 rule. That is a tie, not a win. Reservoir storage did not help.
 
+**Version 2.** A refined model, built after version 1's test results were known, so its list of candidates is not blind. For the 4-week alert it cost 1742 against 1912 for version 1 and 1840 for the best simple rule, but the recipe was chosen on only 4 validation years and leans on a simple rule. For the 6-month outlook it did not improve (2433 against 2324), so version 1 stays. For the 12-month outlook it was 13.46 weeks off against 14.0, but the simple rule alone is 13.21.
+
 **Other rivers.** The Rio Grande-trained model did not beat the best simple rule on the Mississippi, Missouri, Colorado or Ohio.
 
 **A weak result.** For counties not yet in severe drought, our system cost 1735 against 1794 for the best simple rule (Worsening).
@@ -141,3 +143,10 @@ Never claim a number of acre-feet or dollars saved on the Rio Grande.
 - The loss figures are insured crop losses only, not all drought losses, and are not adjusted for inflation.
 - The canal map shows where canals and ditches are. It does not say which are irrigation canals, which are lined, how much any canal leaks or which district owns it.
 - The canal priority levels are an estimate of where leaks are likely, not measured leaks. They combine the 6-month forecast with a published seepage rate for the soil under each canal. They assume bare-earth canals, because we do not know which canals are lined. No canal was inspected or measured by us.
+- Version 2 was built after version 1's test results were known, so its list of candidates is not blind. Only the choice among candidates is protected: it never uses a year it is then scored on.
+- Version 2, 4-week alert: cost 1742 against 1912 for version 1 and 1840 for the best simple rule. It won with 5/5 random seeds. The recipe (deep + weather, forest 75% + worsening 4 or 8 weeks) was chosen on only 4 validation years, and it leans on a simple rule that an outside review found after the test.
+- Version 2, 6-month outlook: cost 2433 against 2324 for version 1. It did not improve (it won with 3/5 seeds). Version 1 stays.
+- Version 2, 12-month outlook: 13.46 weeks off against 14.0 for version 1, but the simple rule alone is 13.21. In most years version 2 simply chose that rule over the forest.
+- Weather inputs alone (rain and temperature) did not help: 4-week 2050, 6-month 2559, 12-month 14.12, each worse than version 1.
+- The district map and sealant plan cover Texas districts only. We found no public boundary file for districts in New Mexico or Colorado.
+- The sealant plan is a ranking, not a measurement. It assumes every canal is bare earth, has 20 feet of wetted width and carries water for 90 days. We do not know which canals are already lined. The budget is an example figure, and the sealant price is materials only.

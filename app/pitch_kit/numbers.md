@@ -7,7 +7,7 @@ Every value below is copied from reports/metrics.json. Nothing is computed here.
 ## Setup
 
 - `contract_version`: 2
-- `generated_at`: 2026-11-14T12:43:55-08:00
+- `generated_at`: 2026-11-14T16:29:43-08:00
 - `is_final`: True
 - `focus_river`: Rio Grande
 - `training_scope`: Rio Grande counties only
@@ -442,6 +442,13 @@ Every value below is copied from reports/metrics.json. Nothing is computed here.
 - `limits[28]`: The loss figures are insured crop losses only, not all drought losses, and are not adjusted for inflation.
 - `limits[29]`: The canal map shows where canals and ditches are. It does not say which are irrigation canals, which are lined, how much any canal leaks or which district owns it.
 - `limits[30]`: The canal priority levels are an estimate of where leaks are likely, not measured leaks. They combine the 6-month forecast with a published seepage rate for the soil under each canal. They assume bare-earth canals, because we do not know which canals are lined. No canal was inspected or measured by us.
+- `limits[31]`: Version 2 was built after version 1's test results were known, so its list of candidates is not blind. Only the choice among candidates is protected: it never uses a year it is then scored on.
+- `limits[32]`: Version 2, 4-week alert: cost 1742 against 1912 for version 1 and 1840 for the best simple rule. It won with 5/5 random seeds. The recipe (deep + weather, forest 75% + worsening 4 or 8 weeks) was chosen on only 4 validation years, and it leans on a simple rule that an outside review found after the test.
+- `limits[33]`: Version 2, 6-month outlook: cost 2433 against 2324 for version 1. It did not improve (it won with 3/5 seeds). Version 1 stays.
+- `limits[34]`: Version 2, 12-month outlook: 13.46 weeks off against 14.0 for version 1, but the simple rule alone is 13.21. In most years version 2 simply chose that rule over the forest.
+- `limits[35]`: Weather inputs alone (rain and temperature) did not help: 4-week 2050, 6-month 2559, 12-month 14.12, each worse than version 1.
+- `limits[36]`: The district map and sealant plan cover Texas districts only. We found no public boundary file for districts in New Mexico or Colorado.
+- `limits[37]`: The sealant plan is a ranking, not a measurement. It assumes every canal is bare earth, has 20 feet of wetted width and carries water for 90 days. We do not know which canals are already lined. The budget is an example figure, and the sealant price is materials only.
 
 ## Pre-season trigger
 
@@ -1535,3 +1542,682 @@ Every value below is copied from reports/metrics.json. Nothing is computed here.
 - `canal_priority.named[19].seepage_rate`: 8.41
 - `canal_priority.named[19].p_season`: 0.262
 - `canal_priority.note`: An estimate of where leaks are LIKELY, not measured leaks. It assumes bare-earth canals: we do not know which canals are lined. Real seepage also depends on construction, silt and the water table. The levels change every week with the forecast. Use it to choose canals to inspect, not to claim water savings.
+- `v2.season.rows`: 6665
+- `v2.season.v2`: 2433
+- `v2.season.v1`: 2324
+- `v2.season.simple_rule`: 2382
+- `v2.season.v2_beats_v1`: False
+- `v2.season.v2_beats_simple_rule`: False
+- `v2.season.weather_alone`: 2559
+- `v2.season.chosen_each_year.2008`: v1 settings + weather, forest 50%
+- `v2.season.chosen_each_year.2009`: v1 settings + weather, forest 50%
+- `v2.season.chosen_each_year.2010`: more trees, forest 75%
+- `v2.season.chosen_each_year.2011`: more trees, forest 75%
+- `v2.season.chosen_each_year.2012`: v1 settings, forest 75%
+- `v2.season.chosen_each_year.2013`: v1 settings, forest 75%
+- `v2.season.chosen_each_year.2014`: v1 settings, forest 75%
+- `v2.season.chosen_each_year.2015`: v1 settings, forest 75%
+- `v2.season.chosen_each_year.2016`: v1 settings, forest 100%
+- `v2.season.chosen_each_year.2017`: v1 settings, forest 100%
+- `v2.season.chosen_each_year.2018`: v1 settings, forest 100%
+- `v2.season.chosen_each_year.2019`: v1 settings, forest 100%
+- `v2.season.chosen_each_year.2020`: v1 settings, forest 100%
+- `v2.season.chosen_each_year.2021`: v1 settings, forest 100%
+- `v2.season.chosen_each_year.2022`: v1 settings, forest 100%
+- `v2.season.chosen_each_year.2023`: v1 settings, forest 100%
+- `v2.season.chosen_each_year.2024`: v1 settings, forest 100%
+- `v2.season.chosen_each_year.2025`: v1 settings, forest 75%
+- `v2.season.every_candidate_on_test.v1 settings, forest 100%`: 2324
+- `v2.season.every_candidate_on_test.v1 settings, forest 75%`: 2345
+- `v2.season.every_candidate_on_test.v1 settings, forest 50%`: 2383
+- `v2.season.every_candidate_on_test.v1 settings + weather, forest 100%`: 2559
+- `v2.season.every_candidate_on_test.v1 settings + weather, forest 75%`: 2363
+- `v2.season.every_candidate_on_test.v1 settings + weather, forest 50%`: 2380
+- `v2.season.every_candidate_on_test.more trees, forest 100%`: 2374
+- `v2.season.every_candidate_on_test.more trees, forest 75%`: 2354
+- `v2.season.every_candidate_on_test.more trees, forest 50%`: 2383
+- `v2.season.every_candidate_on_test.more trees + weather, forest 100%`: 2535
+- `v2.season.every_candidate_on_test.more trees + weather, forest 75%`: 2380
+- `v2.season.every_candidate_on_test.more trees + weather, forest 50%`: 2379
+- `v2.season.every_candidate_on_test.shallow, forest 100%`: 2451
+- `v2.season.every_candidate_on_test.shallow, forest 75%`: 2372
+- `v2.season.every_candidate_on_test.shallow, forest 50%`: 2383
+- `v2.season.every_candidate_on_test.shallow + weather, forest 100%`: 2492
+- `v2.season.every_candidate_on_test.shallow + weather, forest 75%`: 2391
+- `v2.season.every_candidate_on_test.shallow + weather, forest 50%`: 2383
+- `v2.season.every_candidate_on_test.deep, forest 100%`: 2481
+- `v2.season.every_candidate_on_test.deep, forest 75%`: 2375
+- `v2.season.every_candidate_on_test.deep, forest 50%`: 2373
+- `v2.season.every_candidate_on_test.deep + weather, forest 100%`: 2563
+- `v2.season.every_candidate_on_test.deep + weather, forest 75%`: 2388
+- `v2.season.every_candidate_on_test.deep + weather, forest 50%`: 2369
+- `v2.season.every_candidate_on_test.simple rule alone`: 2382
+- `v2.year.rows`: 6665
+- `v2.year.v2`: 13.46
+- `v2.year.v1`: 14.0
+- `v2.year.simple_rule`: 13.21
+- `v2.year.v2_beats_v1`: True
+- `v2.year.v2_beats_simple_rule`: False
+- `v2.year.weather_alone`: 14.12
+- `v2.year.chosen_each_year.2008`: shallow, forest 75%
+- `v2.year.chosen_each_year.2009`: shallow, forest 50%
+- `v2.year.chosen_each_year.2010`: simple rule alone
+- `v2.year.chosen_each_year.2011`: simple rule alone
+- `v2.year.chosen_each_year.2012`: simple rule alone
+- `v2.year.chosen_each_year.2013`: simple rule alone
+- `v2.year.chosen_each_year.2014`: simple rule alone
+- `v2.year.chosen_each_year.2015`: simple rule alone
+- `v2.year.chosen_each_year.2016`: simple rule alone
+- `v2.year.chosen_each_year.2017`: simple rule alone
+- `v2.year.chosen_each_year.2018`: simple rule alone
+- `v2.year.chosen_each_year.2019`: simple rule alone
+- `v2.year.chosen_each_year.2020`: simple rule alone
+- `v2.year.chosen_each_year.2021`: simple rule alone
+- `v2.year.chosen_each_year.2022`: simple rule alone
+- `v2.year.chosen_each_year.2023`: simple rule alone
+- `v2.year.chosen_each_year.2024`: shallow, forest 50%
+- `v2.year.chosen_each_year.2025`: shallow, forest 50%
+- `v2.year.every_candidate_on_test.v1 settings, forest 100%`: 14.0
+- `v2.year.every_candidate_on_test.v1 settings, forest 75%`: 13.37
+- `v2.year.every_candidate_on_test.v1 settings, forest 50%`: 13.02
+- `v2.year.every_candidate_on_test.v1 settings + weather, forest 100%`: 14.12
+- `v2.year.every_candidate_on_test.v1 settings + weather, forest 75%`: 13.48
+- `v2.year.every_candidate_on_test.v1 settings + weather, forest 50%`: 13.09
+- `v2.year.every_candidate_on_test.more trees, forest 100%`: 14.0
+- `v2.year.every_candidate_on_test.more trees, forest 75%`: 13.38
+- `v2.year.every_candidate_on_test.more trees, forest 50%`: 13.02
+- `v2.year.every_candidate_on_test.more trees + weather, forest 100%`: 14.13
+- `v2.year.every_candidate_on_test.more trees + weather, forest 75%`: 13.49
+- `v2.year.every_candidate_on_test.more trees + weather, forest 50%`: 13.09
+- `v2.year.every_candidate_on_test.shallow, forest 100%`: 13.86
+- `v2.year.every_candidate_on_test.shallow, forest 75%`: 13.3
+- `v2.year.every_candidate_on_test.shallow, forest 50%`: 12.98
+- `v2.year.every_candidate_on_test.shallow + weather, forest 100%`: 14.0
+- `v2.year.every_candidate_on_test.shallow + weather, forest 75%`: 13.42
+- `v2.year.every_candidate_on_test.shallow + weather, forest 50%`: 13.06
+- `v2.year.every_candidate_on_test.deep, forest 100%`: 14.14
+- `v2.year.every_candidate_on_test.deep, forest 75%`: 13.44
+- `v2.year.every_candidate_on_test.deep, forest 50%`: 13.03
+- `v2.year.every_candidate_on_test.deep + weather, forest 100%`: 14.32
+- `v2.year.every_candidate_on_test.deep + weather, forest 75%`: 13.61
+- `v2.year.every_candidate_on_test.deep + weather, forest 50%`: 13.15
+- `v2.year.every_candidate_on_test.simple rule alone`: 13.21
+- `v2.alert.rows`: 12617
+- `v2.alert.chosen`: deep + weather, forest 75% + worsening 4 or 8 weeks
+- `v2.alert.chosen_validation_cost`: 593
+- `v2.alert.v1_validation_cost`: 636
+- `v2.alert.v2`: 1742
+- `v2.alert.v1`: 1912
+- `v2.alert.simple_rule`: 1840
+- `v2.alert.v2_beats_v1`: True
+- `v2.alert.v2_beats_simple_rule`: True
+- `v2.alert.weather_alone`: 2050
+- `v2.alert.every_candidate_on_validation.v1 settings, forest 100%`: 636
+- `v2.alert.every_candidate_on_validation.v1 settings, forest 75% + worsening`: 625
+- `v2.alert.every_candidate_on_validation.v1 settings, forest 50% + worsening`: 626
+- `v2.alert.every_candidate_on_validation.v1 settings, forest 75% + worsening 4 or 8 weeks`: 608
+- `v2.alert.every_candidate_on_validation.v1 settings, forest 50% + worsening 4 or 8 weeks`: 611
+- `v2.alert.every_candidate_on_validation.v1 settings + weather, forest 100%`: 621
+- `v2.alert.every_candidate_on_validation.v1 settings + weather, forest 75% + worsening`: 633
+- `v2.alert.every_candidate_on_validation.v1 settings + weather, forest 50% + worsening`: 626
+- `v2.alert.every_candidate_on_validation.v1 settings + weather, forest 75% + worsening 4 or 8 weeks`: 603
+- `v2.alert.every_candidate_on_validation.v1 settings + weather, forest 50% + worsening 4 or 8 weeks`: 602
+- `v2.alert.every_candidate_on_validation.more trees, forest 100%`: 634
+- `v2.alert.every_candidate_on_validation.more trees, forest 75% + worsening`: 631
+- `v2.alert.every_candidate_on_validation.more trees, forest 50% + worsening`: 625
+- `v2.alert.every_candidate_on_validation.more trees, forest 75% + worsening 4 or 8 weeks`: 609
+- `v2.alert.every_candidate_on_validation.more trees, forest 50% + worsening 4 or 8 weeks`: 610
+- `v2.alert.every_candidate_on_validation.more trees + weather, forest 100%`: 613
+- `v2.alert.every_candidate_on_validation.more trees + weather, forest 75% + worsening`: 627
+- `v2.alert.every_candidate_on_validation.more trees + weather, forest 50% + worsening`: 621
+- `v2.alert.every_candidate_on_validation.more trees + weather, forest 75% + worsening 4 or 8 weeks`: 603
+- `v2.alert.every_candidate_on_validation.more trees + weather, forest 50% + worsening 4 or 8 weeks`: 601
+- `v2.alert.every_candidate_on_validation.shallow, forest 100%`: 639
+- `v2.alert.every_candidate_on_validation.shallow, forest 75% + worsening`: 631
+- `v2.alert.every_candidate_on_validation.shallow, forest 50% + worsening`: 631
+- `v2.alert.every_candidate_on_validation.shallow, forest 75% + worsening 4 or 8 weeks`: 601
+- `v2.alert.every_candidate_on_validation.shallow, forest 50% + worsening 4 or 8 weeks`: 603
+- `v2.alert.every_candidate_on_validation.shallow + weather, forest 100%`: 640
+- `v2.alert.every_candidate_on_validation.shallow + weather, forest 75% + worsening`: 626
+- `v2.alert.every_candidate_on_validation.shallow + weather, forest 50% + worsening`: 629
+- `v2.alert.every_candidate_on_validation.shallow + weather, forest 75% + worsening 4 or 8 weeks`: 615
+- `v2.alert.every_candidate_on_validation.shallow + weather, forest 50% + worsening 4 or 8 weeks`: 618
+- `v2.alert.every_candidate_on_validation.deep, forest 100%`: 640
+- `v2.alert.every_candidate_on_validation.deep, forest 75% + worsening`: 612
+- `v2.alert.every_candidate_on_validation.deep, forest 50% + worsening`: 628
+- `v2.alert.every_candidate_on_validation.deep, forest 75% + worsening 4 or 8 weeks`: 599
+- `v2.alert.every_candidate_on_validation.deep, forest 50% + worsening 4 or 8 weeks`: 601
+- `v2.alert.every_candidate_on_validation.deep + weather, forest 100%`: 618
+- `v2.alert.every_candidate_on_validation.deep + weather, forest 75% + worsening`: 614
+- `v2.alert.every_candidate_on_validation.deep + weather, forest 50% + worsening`: 615
+- `v2.alert.every_candidate_on_validation.deep + weather, forest 75% + worsening 4 or 8 weeks`: 593
+- `v2.alert.every_candidate_on_validation.deep + weather, forest 50% + worsening 4 or 8 weeks`: 600
+- `v2.alert.every_candidate_on_validation.worsening alone`: 655
+- `v2.alert.every_candidate_on_validation.worsening 4 or 8 weeks alone`: 622
+- `v2.alert.every_candidate_on_test.v1 settings, forest 100%`: 1912
+- `v2.alert.every_candidate_on_test.v1 settings, forest 75% + worsening`: 2054
+- `v2.alert.every_candidate_on_test.v1 settings, forest 50% + worsening`: 2051
+- `v2.alert.every_candidate_on_test.v1 settings, forest 75% + worsening 4 or 8 weeks`: 1931
+- `v2.alert.every_candidate_on_test.v1 settings, forest 50% + worsening 4 or 8 weeks`: 1925
+- `v2.alert.every_candidate_on_test.v1 settings + weather, forest 100%`: 2050
+- `v2.alert.every_candidate_on_test.v1 settings + weather, forest 75% + worsening`: 2166
+- `v2.alert.every_candidate_on_test.v1 settings + weather, forest 50% + worsening`: 2022
+- `v2.alert.every_candidate_on_test.v1 settings + weather, forest 75% + worsening 4 or 8 weeks`: 1752
+- `v2.alert.every_candidate_on_test.v1 settings + weather, forest 50% + worsening 4 or 8 weeks`: 1771
+- `v2.alert.every_candidate_on_test.more trees, forest 100%`: 1935
+- `v2.alert.every_candidate_on_test.more trees, forest 75% + worsening`: 2172
+- `v2.alert.every_candidate_on_test.more trees, forest 50% + worsening`: 2020
+- `v2.alert.every_candidate_on_test.more trees, forest 75% + worsening 4 or 8 weeks`: 1771
+- `v2.alert.every_candidate_on_test.more trees, forest 50% + worsening 4 or 8 weeks`: 1869
+- `v2.alert.every_candidate_on_test.more trees + weather, forest 100%`: 2074
+- `v2.alert.every_candidate_on_test.more trees + weather, forest 75% + worsening`: 2069
+- `v2.alert.every_candidate_on_test.more trees + weather, forest 50% + worsening`: 2058
+- `v2.alert.every_candidate_on_test.more trees + weather, forest 75% + worsening 4 or 8 weeks`: 1763
+- `v2.alert.every_candidate_on_test.more trees + weather, forest 50% + worsening 4 or 8 weeks`: 1756
+- `v2.alert.every_candidate_on_test.shallow, forest 100%`: 2008
+- `v2.alert.every_candidate_on_test.shallow, forest 75% + worsening`: 2107
+- `v2.alert.every_candidate_on_test.shallow, forest 50% + worsening`: 2107
+- `v2.alert.every_candidate_on_test.shallow, forest 75% + worsening 4 or 8 weeks`: 1837
+- `v2.alert.every_candidate_on_test.shallow, forest 50% + worsening 4 or 8 weeks`: 1853
+- `v2.alert.every_candidate_on_test.shallow + weather, forest 100%`: 1972
+- `v2.alert.every_candidate_on_test.shallow + weather, forest 75% + worsening`: 2115
+- `v2.alert.every_candidate_on_test.shallow + weather, forest 50% + worsening`: 2104
+- `v2.alert.every_candidate_on_test.shallow + weather, forest 75% + worsening 4 or 8 weeks`: 1825
+- `v2.alert.every_candidate_on_test.shallow + weather, forest 50% + worsening 4 or 8 weeks`: 1838
+- `v2.alert.every_candidate_on_test.deep, forest 100%`: 1927
+- `v2.alert.every_candidate_on_test.deep, forest 75% + worsening`: 1874
+- `v2.alert.every_candidate_on_test.deep, forest 50% + worsening`: 2015
+- `v2.alert.every_candidate_on_test.deep, forest 75% + worsening 4 or 8 weeks`: 1781
+- `v2.alert.every_candidate_on_test.deep, forest 50% + worsening 4 or 8 weeks`: 1797
+- `v2.alert.every_candidate_on_test.deep + weather, forest 100%`: 1923
+- `v2.alert.every_candidate_on_test.deep + weather, forest 75% + worsening`: 2065
+- `v2.alert.every_candidate_on_test.deep + weather, forest 50% + worsening`: 2081
+- `v2.alert.every_candidate_on_test.deep + weather, forest 75% + worsening 4 or 8 weeks`: 1742
+- `v2.alert.every_candidate_on_test.deep + weather, forest 50% + worsening 4 or 8 weeks`: 1723
+- `v2.alert.every_candidate_on_test.worsening alone`: 1971
+- `v2.alert.every_candidate_on_test.worsening 4 or 8 weeks alone`: 1840
+- `v2.seed_check.runs[0].seed`: 0
+- `v2.seed_check.runs[0].alert_v1`: 1912
+- `v2.seed_check.runs[0].alert_v2`: 1742
+- `v2.seed_check.runs[0].season_v1`: 2324
+- `v2.seed_check.runs[0].season_v2`: 2433
+- `v2.seed_check.runs[0].year_v1`: 14.0
+- `v2.seed_check.runs[0].year_v2`: 13.46
+- `v2.seed_check.runs[1].seed`: 1
+- `v2.seed_check.runs[1].alert_v1`: 1940
+- `v2.seed_check.runs[1].alert_v2`: 1733
+- `v2.seed_check.runs[1].season_v1`: 2453
+- `v2.seed_check.runs[1].season_v2`: 2388
+- `v2.seed_check.runs[1].year_v1`: 14.14
+- `v2.seed_check.runs[1].year_v2`: 13.47
+- `v2.seed_check.runs[2].seed`: 2
+- `v2.seed_check.runs[2].alert_v1`: 1899
+- `v2.seed_check.runs[2].alert_v2`: 1739
+- `v2.seed_check.runs[2].season_v1`: 2407
+- `v2.seed_check.runs[2].season_v2`: 2415
+- `v2.seed_check.runs[2].year_v1`: 13.95
+- `v2.seed_check.runs[2].year_v2`: 13.47
+- `v2.seed_check.runs[3].seed`: 3
+- `v2.seed_check.runs[3].alert_v1`: 1888
+- `v2.seed_check.runs[3].alert_v2`: 1738
+- `v2.seed_check.runs[3].season_v1`: 2429
+- `v2.seed_check.runs[3].season_v2`: 2414
+- `v2.seed_check.runs[3].year_v1`: 14.02
+- `v2.seed_check.runs[3].year_v2`: 13.46
+- `v2.seed_check.runs[4].seed`: 4
+- `v2.seed_check.runs[4].alert_v1`: 1883
+- `v2.seed_check.runs[4].alert_v2`: 1711
+- `v2.seed_check.runs[4].season_v1`: 2446
+- `v2.seed_check.runs[4].season_v2`: 2410
+- `v2.seed_check.runs[4].year_v1`: 13.94
+- `v2.seed_check.runs[4].year_v2`: 13.45
+- `v2.seed_check.seeds_where_v2_beats_v1.alert`: 5/5
+- `v2.seed_check.seeds_where_v2_beats_v1.season`: 3/5
+- `v2.seed_check.seeds_where_v2_beats_v1.year`: 5/5
+- `districts.source`: Texas Commission on Environmental Quality, Water Districts map service (active districts)
+- `districts.map_file`: data/processed/districts.geojson
+- `districts.budget_usd`: 100000
+- `districts.assumptions.wetted_width_ft`: 20
+- `districts.assumptions.sealant_usd_per_sqft`: 0.004
+- `districts.assumptions.sealant_cut_low`: 0.28
+- `districts.assumptions.sealant_cut_high`: 0.87
+- `districts.assumptions.days_one_application_lasts`: 90
+- `districts.rule`: Canals inside a district are ranked by seepage rate x chance of a drought season. The budget pays for canals from the top of the list down. A district's risk is its counties' 6-month forecast, weighted by canal km.
+- `districts.n_districts`: 30
+- `districts.canal_km_in_districts`: 5549.9
+- `districts.treatable_km`: 4808.0
+- `districts.cost_to_treat_everything_usd`: 1261947
+- `districts.sealed_km`: 380.8
+- `districts.spent_usd`: 99935
+- `districts.saved_af_low`: 9128
+- `districts.saved_af_high`: 28363
+- `districts.districts[0].district`: Cameron County Irrigation District 2
+- `districts.districts[0].kind`: Irrigation District
+- `districts.districts[0].counties[0]`: Cameron
+- `districts.districts[0].counties[1]`: Willacy
+- `districts.districts[0].p_season`: 0.244
+- `districts.districts[0].risk`: Watch
+- `districts.districts[0].canal_km`: 760.1
+- `districts.districts[0].treatable_km`: 672.5
+- `districts.districts[0].leaky_soil_km`: 0.0
+- `districts.districts[0].sealed_km`: 118.6
+- `districts.districts[0].sealant_sqft`: 7779269
+- `districts.districts[0].sealant_usd`: 31117
+- `districts.districts[0].budget_share`: 0.311
+- `districts.districts[0].saved_af_low`: 2701
+- `districts.districts[0].saved_af_high`: 8393
+- `districts.districts[0].first_canals[0]`: Lateral R Canal
+- `districts.districts[1].district`: Cameron County Irrigation District 6
+- `districts.districts[1].kind`: Irrigation District
+- `districts.districts[1].counties[0]`: Cameron
+- `districts.districts[1].p_season`: 0.243
+- `districts.districts[1].risk`: Watch
+- `districts.districts[1].canal_km`: 303.2
+- `districts.districts[1].treatable_km`: 228.1
+- `districts.districts[1].leaky_soil_km`: 0.0
+- `districts.districts[1].sealed_km`: 106.5
+- `districts.districts[1].sealant_sqft`: 6990453
+- `districts.districts[1].sealant_usd`: 27962
+- `districts.districts[1].budget_share`: 0.28
+- `districts.districts[1].saved_af_low`: 2427
+- `districts.districts[1].saved_af_high`: 7542
+- `districts.districts[1].first_canals[0]`: Los Fresnos Canal
+- `districts.districts[2].district`: Brownsville Irrigation District
+- `districts.districts[2].kind`: Water Control & Improvement District
+- `districts.districts[2].counties[0]`: Cameron
+- `districts.districts[2].p_season`: 0.243
+- `districts.districts[2].risk`: Watch
+- `districts.districts[2].canal_km`: 155.6
+- `districts.districts[2].treatable_km`: 111.2
+- `districts.districts[2].leaky_soil_km`: 0.0
+- `districts.districts[2].sealed_km`: 29.4
+- `districts.districts[2].sealant_sqft`: 1929678
+- `districts.districts[2].sealant_usd`: 7719
+- `districts.districts[2].budget_share`: 0.077
+- `districts.districts[2].saved_af_low`: 671
+- `districts.districts[2].saved_af_high`: 2086
+- `districts.districts[3].district`: Maverick County WCID 1
+- `districts.districts[3].kind`: Water Control & Improvement District
+- `districts.districts[3].counties[0]`: Maverick
+- `districts.districts[3].p_season`: 0.304
+- `districts.districts[3].risk`: Warning
+- `districts.districts[3].canal_km`: 321.5
+- `districts.districts[3].treatable_km`: 257.0
+- `districts.districts[3].leaky_soil_km`: 13.9
+- `districts.districts[3].sealed_km`: 27.4
+- `districts.districts[3].sealant_sqft`: 1796990
+- `districts.districts[3].sealant_usd`: 7188
+- `districts.districts[3].budget_share`: 0.072
+- `districts.districts[3].saved_af_low`: 835
+- `districts.districts[3].saved_af_high`: 2595
+- `districts.districts[3].first_canals[0]`: Lateral Twentytwo
+- `districts.districts[3].first_canals[1]`: Ditch Number Fifteen
+- `districts.districts[4].district`: Rio Grande Palms Water District
+- `districts.districts[4].kind`: Water Control & Improvement District
+- `districts.districts[4].counties[0]`: Cameron
+- `districts.districts[4].p_season`: 0.243
+- `districts.districts[4].risk`: Watch
+- `districts.districts[4].canal_km`: 50.5
+- `districts.districts[4].treatable_km`: 43.4
+- `districts.districts[4].leaky_soil_km`: 0.0
+- `districts.districts[4].sealed_km`: 18.5
+- `districts.districts[4].sealant_sqft`: 1210827
+- `districts.districts[4].sealant_usd`: 4843
+- `districts.districts[4].budget_share`: 0.048
+- `districts.districts[4].saved_af_low`: 420
+- `districts.districts[4].saved_af_high`: 1306
+- `districts.districts[5].district`: Bayview Irrigation District 11
+- `districts.districts[5].kind`: Irrigation District
+- `districts.districts[5].counties[0]`: Cameron
+- `districts.districts[5].p_season`: 0.243
+- `districts.districts[5].risk`: Watch
+- `districts.districts[5].canal_km`: 84.0
+- `districts.districts[5].treatable_km`: 55.2
+- `districts.districts[5].leaky_soil_km`: 0.0
+- `districts.districts[5].sealed_km`: 15.6
+- `districts.districts[5].sealant_sqft`: 1021081
+- `districts.districts[5].sealant_usd`: 4084
+- `districts.districts[5].budget_share`: 0.041
+- `districts.districts[5].saved_af_low`: 355
+- `districts.districts[5].saved_af_high`: 1102
+- `districts.districts[6].district`: Delta Lake Irrigation District
+- `districts.districts[6].kind`: Irrigation District
+- `districts.districts[6].counties[0]`: Hidalgo
+- `districts.districts[6].counties[1]`: Willacy
+- `districts.districts[6].p_season`: 0.32
+- `districts.districts[6].risk`: Warning
+- `districts.districts[6].canal_km`: 628.2
+- `districts.districts[6].treatable_km`: 616.1
+- `districts.districts[6].leaky_soil_km`: 0.0
+- `districts.districts[6].sealed_km`: 10.9
+- `districts.districts[6].sealant_sqft`: 716929
+- `districts.districts[6].sealant_usd`: 2868
+- `districts.districts[6].budget_share`: 0.029
+- `districts.districts[6].saved_af_low`: 166
+- `districts.districts[6].saved_af_high`: 515
+- `districts.districts[7].district`: Cameron County Water Improvement District 10
+- `districts.districts[7].kind`: Water Improvement District
+- `districts.districts[7].counties[0]`: Cameron
+- `districts.districts[7].p_season`: 0.243
+- `districts.districts[7].risk`: Watch
+- `districts.districts[7].canal_km`: 47.4
+- `districts.districts[7].treatable_km`: 39.7
+- `districts.districts[7].leaky_soil_km`: 0.0
+- `districts.districts[7].sealed_km`: 9.9
+- `districts.districts[7].sealant_sqft`: 647441
+- `districts.districts[7].sealant_usd`: 2590
+- `districts.districts[7].budget_share`: 0.026
+- `districts.districts[7].saved_af_low`: 225
+- `districts.districts[7].saved_af_high`: 699
+- `districts.districts[8].district`: La Feria Irrigation District Cameron County 3
+- `districts.districts[8].kind`: Irrigation District
+- `districts.districts[8].counties[0]`: Cameron
+- `districts.districts[8].p_season`: 0.243
+- `districts.districts[8].risk`: Watch
+- `districts.districts[8].canal_km`: 211.2
+- `districts.districts[8].treatable_km`: 201.9
+- `districts.districts[8].leaky_soil_km`: 0.0
+- `districts.districts[8].sealed_km`: 9.3
+- `districts.districts[8].sealant_sqft`: 613267
+- `districts.districts[8].sealant_usd`: 2453
+- `districts.districts[8].budget_share`: 0.025
+- `districts.districts[8].saved_af_low`: 213
+- `districts.districts[8].saved_af_high`: 662
+- `districts.districts[9].district`: Hidalgo County Irrigation District 5
+- `districts.districts[9].kind`: Irrigation District
+- `districts.districts[9].counties[0]`: Hidalgo
+- `districts.districts[9].p_season`: 0.307
+- `districts.districts[9].risk`: Warning
+- `districts.districts[9].canal_km`: 43.4
+- `districts.districts[9].treatable_km`: 32.8
+- `districts.districts[9].leaky_soil_km`: 0.0
+- `districts.districts[9].sealed_km`: 7.4
+- `districts.districts[9].sealant_sqft`: 486614
+- `districts.districts[9].sealant_usd`: 1946
+- `districts.districts[9].budget_share`: 0.019
+- `districts.districts[9].saved_af_low`: 169
+- `districts.districts[9].saved_af_high`: 525
+- `districts.districts[10].district`: Harlingen Irrigation District-Cameron County-1
+- `districts.districts[10].kind`: Irrigation District
+- `districts.districts[10].counties[0]`: Cameron
+- `districts.districts[10].p_season`: 0.243
+- `districts.districts[10].risk`: Watch
+- `districts.districts[10].canal_km`: 228.6
+- `districts.districts[10].treatable_km`: 215.8
+- `districts.districts[10].leaky_soil_km`: 0.0
+- `districts.districts[10].sealed_km`: 7.3
+- `districts.districts[10].sealant_sqft`: 476039
+- `districts.districts[10].sealant_usd`: 1904
+- `districts.districts[10].budget_share`: 0.019
+- `districts.districts[10].saved_af_low`: 165
+- `districts.districts[10].saved_af_high`: 514
+- `districts.districts[11].district`: Fort Hancock WCID
+- `districts.districts[11].kind`: Water Control & Improvement District
+- `districts.districts[11].counties[0]`: Hudspeth
+- `districts.districts[11].p_season`: 0.274
+- `districts.districts[11].risk`: Warning
+- `districts.districts[11].canal_km`: 15.2
+- `districts.districts[11].treatable_km`: 11.9
+- `districts.districts[11].leaky_soil_km`: 4.4
+- `districts.districts[11].sealed_km`: 4.4
+- `districts.districts[11].sealant_sqft`: 288976
+- `districts.districts[11].sealant_usd`: 1156
+- `districts.districts[11].budget_share`: 0.012
+- `districts.districts[11].saved_af_low`: 209
+- `districts.districts[11].saved_af_high`: 649
+- `districts.districts[11].first_canals[0]`: Davis Lateral
+- `districts.districts[12].district`: Adams Gardens Irrigation District 19
+- `districts.districts[12].kind`: Irrigation District
+- `districts.districts[12].counties[0]`: Cameron
+- `districts.districts[12].p_season`: 0.243
+- `districts.districts[12].risk`: Watch
+- `districts.districts[12].canal_km`: 81.2
+- `districts.districts[12].treatable_km`: 81.0
+- `districts.districts[12].leaky_soil_km`: 0.0
+- `districts.districts[12].sealed_km`: 3.4
+- `districts.districts[12].sealant_sqft`: 224738
+- `districts.districts[12].sealant_usd`: 899
+- `districts.districts[12].budget_share`: 0.009
+- `districts.districts[12].saved_af_low`: 78
+- `districts.districts[12].saved_af_high`: 242
+- `districts.districts[13].district`: Hidalgo & Cameron Counties Irrigation District 9
+- `districts.districts[13].kind`: Irrigation District
+- `districts.districts[13].counties[0]`: Cameron
+- `districts.districts[13].counties[1]`: Hidalgo
+- `districts.districts[13].p_season`: 0.303
+- `districts.districts[13].risk`: Warning
+- `districts.districts[13].canal_km`: 594.5
+- `districts.districts[13].treatable_km`: 554.2
+- `districts.districts[13].leaky_soil_km`: 3.3
+- `districts.districts[13].sealed_km`: 3.4
+- `districts.districts[13].sealant_sqft`: 221916
+- `districts.districts[13].sealant_usd`: 888
+- `districts.districts[13].budget_share`: 0.009
+- `districts.districts[13].saved_af_low`: 158
+- `districts.districts[13].saved_af_high`: 491
+- `districts.districts[14].district`: Hidalgo County Irrigation District 16
+- `districts.districts[14].kind`: Irrigation District
+- `districts.districts[14].counties[0]`: Hidalgo
+- `districts.districts[14].p_season`: 0.307
+- `districts.districts[14].risk`: Warning
+- `districts.districts[14].canal_km`: 33.1
+- `districts.districts[14].treatable_km`: 33.1
+- `districts.districts[14].leaky_soil_km`: 3.3
+- `districts.districts[14].sealed_km`: 3.3
+- `districts.districts[14].sealant_sqft`: 217454
+- `districts.districts[14].sealant_usd`: 870
+- `districts.districts[14].budget_share`: 0.009
+- `districts.districts[14].saved_af_low`: 157
+- `districts.districts[14].saved_af_high`: 489
+- `districts.districts[15].district`: Hidalgo County WCID 18
+- `districts.districts[15].kind`: Water Control & Improvement District
+- `districts.districts[15].counties[0]`: Hidalgo
+- `districts.districts[15].p_season`: 0.307
+- `districts.districts[15].risk`: Warning
+- `districts.districts[15].canal_km`: 5.8
+- `districts.districts[15].treatable_km`: 5.0
+- `districts.districts[15].leaky_soil_km`: 0.5
+- `districts.districts[15].sealed_km`: 1.4
+- `districts.districts[15].sealant_sqft`: 91864
+- `districts.districts[15].sealant_usd`: 367
+- `districts.districts[15].budget_share`: 0.004
+- `districts.districts[15].saved_af_low`: 44
+- `districts.districts[15].saved_af_high`: 138
+- `districts.districts[16].district`: Cameron County Irrigation District 16
+- `districts.districts[16].kind`: Irrigation District
+- `districts.districts[16].counties[0]`: Cameron
+- `districts.districts[16].p_season`: 0.243
+- `districts.districts[16].risk`: Watch
+- `districts.districts[16].canal_km`: 10.9
+- `districts.districts[16].treatable_km`: 7.3
+- `districts.districts[16].leaky_soil_km`: 0.0
+- `districts.districts[16].sealed_km`: 1.4
+- `districts.districts[16].sealant_sqft`: 91049
+- `districts.districts[16].sealant_usd`: 364
+- `districts.districts[16].budget_share`: 0.004
+- `districts.districts[16].saved_af_low`: 32
+- `districts.districts[16].saved_af_high`: 98
+- `districts.districts[17].district`: Santa Cruz Irrigation District 15
+- `districts.districts[17].kind`: Irrigation District
+- `districts.districts[17].counties[0]`: Hidalgo
+- `districts.districts[17].p_season`: 0.307
+- `districts.districts[17].risk`: Warning
+- `districts.districts[17].canal_km`: 105.8
+- `districts.districts[17].treatable_km`: 102.5
+- `districts.districts[17].leaky_soil_km`: 1.1
+- `districts.districts[17].sealed_km`: 1.1
+- `districts.districts[17].sealant_sqft`: 72244
+- `districts.districts[17].sealant_usd`: 289
+- `districts.districts[17].budget_share`: 0.003
+- `districts.districts[17].saved_af_low`: 52
+- `districts.districts[17].saved_af_high`: 162
+- `districts.districts[18].district`: Hudspeth County Conservation & Reclamation District 1
+- `districts.districts[18].kind`: Water Improvement District
+- `districts.districts[18].counties[0]`: Hudspeth
+- `districts.districts[18].p_season`: 0.274
+- `districts.districts[18].risk`: Warning
+- `districts.districts[18].canal_km`: 192.3
+- `districts.districts[18].treatable_km`: 148.4
+- `districts.districts[18].leaky_soil_km`: 0.9
+- `districts.districts[18].sealed_km`: 0.9
+- `districts.districts[18].sealant_sqft`: 56496
+- `districts.districts[18].sealant_usd`: 226
+- `districts.districts[18].budget_share`: 0.002
+- `districts.districts[18].saved_af_low`: 33
+- `districts.districts[18].saved_af_high`: 102
+- `districts.districts[19].district`: Donna Irrigation District Hidalgo County 1
+- `districts.districts[19].kind`: Irrigation District
+- `districts.districts[19].counties[0]`: Hidalgo
+- `districts.districts[19].p_season`: 0.307
+- `districts.districts[19].risk`: Warning
+- `districts.districts[19].canal_km`: 286.2
+- `districts.districts[19].treatable_km`: 259.7
+- `districts.districts[19].leaky_soil_km`: 0.0
+- `districts.districts[19].sealed_km`: 0.8
+- `districts.districts[19].sealant_sqft`: 50459
+- `districts.districts[19].sealant_usd`: 202
+- `districts.districts[19].budget_share`: 0.002
+- `districts.districts[19].saved_af_low`: 18
+- `districts.districts[19].saved_af_high`: 54
+- `districts.districts[20].district`: Engelman Irrigation District
+- `districts.districts[20].kind`: Irrigation District
+- `districts.districts[20].counties[0]`: Hidalgo
+- `districts.districts[20].p_season`: 0.307
+- `districts.districts[20].risk`: Warning
+- `districts.districts[20].canal_km`: 44.2
+- `districts.districts[20].treatable_km`: 44.1
+- `districts.districts[20].leaky_soil_km`: 0.0
+- `districts.districts[20].sealed_km`: 0.0
+- `districts.districts[20].sealant_sqft`: 0
+- `districts.districts[20].sealant_usd`: 0
+- `districts.districts[20].budget_share`: 0.0
+- `districts.districts[20].saved_af_low`: 0
+- `districts.districts[20].saved_af_high`: 0
+- `districts.districts[21].district`: Hidalgo County Irrigation District 1
+- `districts.districts[21].kind`: Irrigation District
+- `districts.districts[21].counties[0]`: Hidalgo
+- `districts.districts[21].p_season`: 0.307
+- `districts.districts[21].risk`: Warning
+- `districts.districts[21].canal_km`: 157.7
+- `districts.districts[21].treatable_km`: 152.3
+- `districts.districts[21].leaky_soil_km`: 0.0
+- `districts.districts[21].sealed_km`: 0.0
+- `districts.districts[21].sealant_sqft`: 0
+- `districts.districts[21].sealant_usd`: 0
+- `districts.districts[21].budget_share`: 0.0
+- `districts.districts[21].saved_af_low`: 0
+- `districts.districts[21].saved_af_high`: 0
+- `districts.districts[22].district`: Hidalgo County Irrigation District 2
+- `districts.districts[22].kind`: Irrigation District
+- `districts.districts[22].counties[0]`: Hidalgo
+- `districts.districts[22].p_season`: 0.307
+- `districts.districts[22].risk`: Warning
+- `districts.districts[22].canal_km`: 333.0
+- `districts.districts[22].treatable_km`: 270.0
+- `districts.districts[22].leaky_soil_km`: 0.0
+- `districts.districts[22].sealed_km`: 0.0
+- `districts.districts[22].sealant_sqft`: 0
+- `districts.districts[22].sealant_usd`: 0
+- `districts.districts[22].budget_share`: 0.0
+- `districts.districts[22].saved_af_low`: 0
+- `districts.districts[22].saved_af_high`: 0
+- `districts.districts[23].district`: Hidalgo County Irrigation District 6
+- `districts.districts[23].kind`: Irrigation District
+- `districts.districts[23].counties[0]`: Hidalgo
+- `districts.districts[23].p_season`: 0.307
+- `districts.districts[23].risk`: Warning
+- `districts.districts[23].canal_km`: 73.2
+- `districts.districts[23].treatable_km`: 69.6
+- `districts.districts[23].leaky_soil_km`: 0.0
+- `districts.districts[23].sealed_km`: 0.0
+- `districts.districts[23].sealant_sqft`: 0
+- `districts.districts[23].sealant_usd`: 0
+- `districts.districts[23].budget_share`: 0.0
+- `districts.districts[23].saved_af_low`: 0
+- `districts.districts[23].saved_af_high`: 0
+- `districts.districts[24].district`: United Irrigation District
+- `districts.districts[24].kind`: Irrigation District
+- `districts.districts[24].counties[0]`: Hidalgo
+- `districts.districts[24].p_season`: 0.307
+- `districts.districts[24].risk`: Warning
+- `districts.districts[24].canal_km`: 113.7
+- `districts.districts[24].treatable_km`: 110.6
+- `districts.districts[24].leaky_soil_km`: 0.0
+- `districts.districts[24].sealed_km`: 0.0
+- `districts.districts[24].sealant_sqft`: 0
+- `districts.districts[24].sealant_usd`: 0
+- `districts.districts[24].budget_share`: 0.0
+- `districts.districts[24].saved_af_low`: 0
+- `districts.districts[24].saved_af_high`: 0
+- `districts.districts[25].district`: Hidalgo County WCID 19
+- `districts.districts[25].kind`: Water Control & Improvement District
+- `districts.districts[25].counties[0]`: Hidalgo
+- `districts.districts[25].p_season`: 0.307
+- `districts.districts[25].risk`: Warning
+- `districts.districts[25].canal_km`: 14.2
+- `districts.districts[25].treatable_km`: 7.1
+- `districts.districts[25].leaky_soil_km`: 0.0
+- `districts.districts[25].sealed_km`: 0.0
+- `districts.districts[25].sealant_sqft`: 0
+- `districts.districts[25].sealant_usd`: 0
+- `districts.districts[25].budget_share`: 0.0
+- `districts.districts[25].saved_af_low`: 0
+- `districts.districts[25].saved_af_high`: 0
+- `districts.districts[26].district`: Valley Acres Irrigation District
+- `districts.districts[26].kind`: Irrigation District
+- `districts.districts[26].counties[0]`: Cameron
+- `districts.districts[26].counties[1]`: Hidalgo
+- `districts.districts[26].p_season`: 0.296
+- `districts.districts[26].risk`: Warning
+- `districts.districts[26].canal_km`: 62.7
+- `districts.districts[26].treatable_km`: 62.7
+- `districts.districts[26].leaky_soil_km`: 0.0
+- `districts.districts[26].sealed_km`: 0.0
+- `districts.districts[26].sealant_sqft`: 0
+- `districts.districts[26].sealant_usd`: 0
+- `districts.districts[26].budget_share`: 0.0
+- `districts.districts[26].saved_af_low`: 0
+- `districts.districts[26].saved_af_high`: 0
+- `districts.districts[27].district`: El Paso County WCID 4
+- `districts.districts[27].kind`: Water Control & Improvement District
+- `districts.districts[27].counties[0]`: El Paso
+- `districts.districts[27].p_season`: 0.031
+- `districts.districts[27].risk`: Low
+- `districts.districts[27].canal_km`: 5.7
+- `districts.districts[27].treatable_km`: 5.2
+- `districts.districts[27].leaky_soil_km`: 0.0
+- `districts.districts[27].sealed_km`: 0.0
+- `districts.districts[27].sealant_sqft`: 0
+- `districts.districts[27].sealant_usd`: 0
+- `districts.districts[27].budget_share`: 0.0
+- `districts.districts[27].saved_af_low`: 0
+- `districts.districts[27].saved_af_high`: 0
+- `districts.districts[28].district`: El Paso County Tornillo WID
+- `districts.districts[28].kind`: Water Improvement District
+- `districts.districts[28].counties[0]`: El Paso
+- `districts.districts[28].p_season`: 0.031
+- `districts.districts[28].risk`: Low
+- `districts.districts[28].canal_km`: 68.4
+- `districts.districts[28].treatable_km`: 31.1
+- `districts.districts[28].leaky_soil_km`: 0.0
+- `districts.districts[28].sealed_km`: 0.0
+- `districts.districts[28].sealant_sqft`: 0
+- `districts.districts[28].sealant_usd`: 0
+- `districts.districts[28].budget_share`: 0.0
+- `districts.districts[28].saved_af_low`: 0
+- `districts.districts[28].saved_af_high`: 0
+- `districts.districts[29].district`: El Paso County Water Improvement District 1
+- `districts.districts[29].kind`: Water Improvement District
+- `districts.districts[29].counties[0]`: El Paso
+- `districts.districts[29].p_season`: 0.031
+- `districts.districts[29].risk`: Low
+- `districts.districts[29].canal_km`: 518.0
+- `districts.districts[29].treatable_km`: 378.5
+- `districts.districts[29].leaky_soil_km`: 0.0
+- `districts.districts[29].sealed_km`: 0.0
+- `districts.districts[29].sealant_sqft`: 0
+- `districts.districts[29].sealant_usd`: 0
+- `districts.districts[29].budget_share`: 0.0
+- `districts.districts[29].saved_af_low`: 0
+- `districts.districts[29].saved_af_high`: 0
+- `districts.note`: Texas districts only: we found no public boundary file for New Mexico or Colorado districts. The plan assumes every canal is bare earth, 20 feet of wetted width and full of water for 90 days. None of that was measured, and lined canals are not excluded because no data says which are lined. The sealant price is materials only. The sealant has not been field-tested on the Rio Grande. Water saved is a rough range, not a forecast.
