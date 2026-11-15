@@ -1,28 +1,30 @@
 <!doctype html>
 <!--
-  index.html: the intro page.
+  index.html: the intro page of RioIQ. In order:
 
-  One full-screen map (a <canvas>, drawn by js/landing.js from the real map data) stays fixed
-  behind the page. As you scroll, the map moves: the whole river, then the reservoirs, the
-  drought, the canals of the Lower Valley, and finally the canals being sealed. Each stop has
-  one big number and one sentence.
+    1. The title page and the river from source to sea (built by js/opening.js).
+    2. Texas: three stops on one live map (js/landing.js): the drought, the leak, the fix.
+    3. The people this is about: three real, sourced stories.
+    4. How it works, what it does not claim, and the way into the platform.
 
-  Every number is filled in by js/landing.js from data/core.js and data/sim.js, so the page
-  always matches the pipeline's latest run. Figures from named reports carry their source.
+  Numbers in part 2 are filled in by js/landing.js from data/core.js, so they always match
+  the pipeline's latest run. Facts and quotes from named reports carry their source.
 -->
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Headgate: Rio Grande Drought and Canal Portal</title>
+  <title>RioIQ: Rio Grande Drought and Canal Portal</title>
   <meta name="description" content="A six-month drought forecast for the Texas reach of the Rio Grande, joined to a map of every irrigation canal, so districts know which canals to seal first.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400;1,8..60,600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..600;1,9..144,300..500&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/landing.css">
+  <link rel="stylesheet" href="css/opening.css">
+  <link rel="preload" as="image" href="photos/opening-santa-elena.jpg">
 </head>
 <body>
-  <!-- The map, the film grain over it, and the light that follows the pointer. -->
+  <!-- The Texas map (fixed behind part 2), the film grain over it, and the light that follows the pointer. -->
   <canvas id="map" aria-hidden="true"></canvas>
   <div id="glow" aria-hidden="true"></div>
   <div id="grain" aria-hidden="true"></div>
@@ -30,112 +32,115 @@
   <header class="top">
     <a class="brand" href="#top">
       <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 5v22M26 5v22M6 9h20M11 9v9M16 9v13M21 9v6"/><path d="M3 27c3-2 5 2 8 0s5 2 8 0 5 2 10 0" stroke="#38c8f5"/></svg>
-      Headgate
+      RioIQ
     </a>
-    <span class="coords" id="coords"></span>
     <a class="enter" href="app.html">Open the platform <i>&rarr;</i></a>
   </header>
 
-  <!-- How far down the river you have scrolled. -->
-  <div class="gauge" aria-hidden="true"><i id="gaugeFill"></i></div>
+  <!-- ============ 1. Title page, then the river from source to sea (js/opening.js) ============ -->
+  <section class="opening" id="top" aria-label="The Rio Grande, from source to sea"></section>
 
-  <main id="top">
-    <!-- 0. Opening -->
-    <section class="beat hero" data-beat="0">
+  <!-- ============ 2. Texas, on one live map ============ -->
+  <main id="texas">
+    <section class="beat" data-beat="0">
       <div class="copy">
-        <p class="eyebrow" id="eyebrow"></p>
-        <h1>
-          <span class="line"><span>The river is</span></span>
-          <span class="line"><span>running short.</span></span>
-          <span class="line it"><span>The canals leak</span></span>
-          <span class="line it"><span>what is left.</span></span>
-        </h1>
-        <p class="lede">Headgate forecasts drought on the Rio Grande six months out, then shows each irrigation district which canals to seal first.</p>
-        <div class="go">
-          <a class="btn" href="app.html">Open the platform</a>
-          <a class="btn line" href="app.html?step=sim">Run the simulation</a>
-        </div>
-      </div>
-      <div class="ticker" aria-hidden="true"><div id="ticker"></div></div>
-      <div class="scrollCue" aria-hidden="true">scroll <i></i></div>
-    </section>
-
-    <!-- 1. Reservoirs -->
-    <section class="beat" data-beat="1">
-      <div class="copy">
-        <p class="tag">01 &nbsp; The supply</p>
-        <p class="num"><span data-count id="nRes" data-digits="1">0</span><small>% full</small></p>
-        <p class="say">Amistad and Falcon, the two reservoirs behind every farm from Del Rio to Brownsville. Upstream, Elephant Butte holds <b id="nButte"></b>.</p>
-        <p class="src">Texas Water Development Board, <span id="resDate"></span></p>
-      </div>
-    </section>
-
-    <!-- 2. Drought -->
-    <section class="beat right" data-beat="2">
-      <div class="copy">
-        <p class="tag">02 &nbsp; The drought</p>
+        <p class="tag">Texas this week</p>
         <p class="num"><span data-count id="nDrought">0</span><small>of 254</small></p>
-        <p class="say">Texas counties in drought this week. On the river, <b id="nWarn"></b> of 14 counties are over our six-month warning line.</p>
-        <p class="src">U.S. Drought Monitor, week of <span id="week"></span></p>
+        <p class="say">Texas counties are in drought. The two reservoirs that feed every farm and town from Del Rio to Brownsville are <b id="nRes"></b> full.</p>
+        <p class="src">U.S. Drought Monitor, week of <span id="week"></span>; Texas Water Development Board</p>
       </div>
     </section>
 
-    <!-- 3. Canals -->
-    <section class="beat" data-beat="3">
+    <section class="beat right" data-beat="1">
       <div class="copy">
-        <p class="tag">03 &nbsp; The leak</p>
-        <p class="num"><span data-count id="nKm">0</span><small>km</small></p>
-        <p class="say">of canals and ditches carry what water there is to the fields. Most are bare earth, and bare earth leaks: <b id="nRate"></b> gallons through every square foot, every day.</p>
-        <p class="src">USGS and OpenStreetMap canal lines; leak rates from Fipps, Texas A&amp;M, 1998</p>
+        <p class="tag">The leak</p>
+        <p class="num"><span data-count id="nGal">0</span><small>million gallons a day</small></p>
+        <p class="say">can soak into the ground from the canals that carry that water to the fields. That is about <b id="nPools"></b> Olympic pools, every day the canals run. Most canals are bare earth, and bare earth leaks.</p>
+        <p class="src">An upper estimate: it treats all <span id="nKm"></span> km of rankable canal as unlined. Leak rates: Fipps, Texas A&amp;M, 1998</p>
       </div>
     </section>
 
-    <!-- 4. Cost -->
-    <section class="beat right" data-beat="4">
+    <section class="beat" data-beat="2">
       <div class="copy">
-        <p class="tag">04 &nbsp; The bill</p>
-        <p class="num">$<span data-count id="nCost" data-digits="1">0</span><small>million</small></p>
-        <p class="say">in crops is what one year without irrigation water costs the Valley. The help comes afterwards: $280 million in federal relief in 2025, for water lost in 2023 and 2024.</p>
-        <p class="src">Texas A&amp;M AgriLife, 2023 (a worst case, not an observed loss); USDA, 2025</p>
-      </div>
-    </section>
-
-    <!-- 5. The fix -->
-    <section class="beat" data-beat="5">
-      <div class="copy">
-        <p class="tag">05 &nbsp; The fix</p>
+        <p class="tag">The fix</p>
         <p class="num">$<span data-count id="nSeal" data-digits="2">0</span><small>million</small></p>
-        <p class="say">of sealant covers all <b id="nSealKm"></b> km of rankable canal once. Headgate ranks every segment, leakiest soil first, and tells you when the forecast says to start.</p>
+        <p class="say">of sealant covers every one of those canals once. RioIQ ranks them, leakiest soil first, and tells a district where to send its crews before the dry season starts.</p>
         <p class="src">Sealant price: U.S. Bureau of Reclamation. Materials only; not yet field-tested on the Rio Grande.</p>
         <div class="go">
-          <a class="btn" href="app.html?step=sim">See what acting saves</a>
+          <a class="btn" href="app.html?step=sim">See what sealing saves</a>
           <a class="btn line" href="app.html">Open the platform</a>
         </div>
       </div>
     </section>
   </main>
 
-  <!-- After the map: how it works, and what it does not claim. -->
+  <!-- ============ 3. The people this is about ============ -->
+  <section class="people">
+    <p class="tag">Who is at the end of the canal</p>
+    <h2>Water that leaks out on the way never reaches <em>them.</em></h2>
+    <div class="stories">
+      <article>
+        <figure>
+          <img src="photos/story-harvest.jpg" alt="A worker on a forklift moves bins of grapefruit between rows of citrus trees" loading="lazy" width="730" height="1100">
+          <figcaption>Citrus harvest, Lower Rio Grande Valley, 2010. Photo: <a href="https://commons.wikimedia.org/wiki/File:Farmers_and_Ranchers_(20100512-APHIS-DB-0082).jpg" target="_blank" rel="noopener">USDA, public domain</a>. Not the people quoted.</figcaption>
+        </figure>
+        <h3>500 acres ploughed under, and a 40-year job gone</h3>
+        <p>Mike England farms near Mercedes. In 2024, with no irrigation water, he destroyed 500 acres of sugar cane and laid off his workers.</p>
+        <blockquote>&ldquo;One of them has worked for me for 40-some-odd years. We were just past teenagers when he started here. You think I liked laying him off?&rdquo;</blockquote>
+        <p>That February the last sugar mill in Texas closed after 51 years. More than 500 people worked there.</p>
+        <p class="src"><a href="https://www.texastribune.org/2024/04/18/south-texas-drought-agriculture/" target="_blank" rel="noopener">Texas Tribune, April 2024</a> · <a href="https://texasstandard.org/stories/santa-rosa-texas-sugar-mill-closes-water-drought-rio-grande-valley/" target="_blank" rel="noopener">Texas Standard, February 2024</a></p>
+      </article>
+      <article>
+        <figure>
+          <img style="object-position: top" src="photos/story-watertower.jpg" alt="A tall water tower marked Siesta Shores W.C.I.D. above dry brush" loading="lazy" width="619" height="1100">
+          <figcaption>Siesta Shores water tower, Zapata County, December 2022. Photo: <a href="https://commons.wikimedia.org/wiki/File:20221216_USDA_RD_LSC_0538_(52579367457).jpg" target="_blank" rel="noopener">USDA, public domain</a>.</figcaption>
+        </figure>
+        <h3>A town came dangerously close to running out of drinking water</h3>
+        <p>In August 2022 Falcon Lake fell to 9% full. Zapata's intake was pulling up mud and its pumps were failing. Downstream in Edcouch, the city engineer warned residents:</p>
+        <blockquote>&ldquo;There's basically no water, and we could expect shutdowns from a day up to three days.&rdquo;</blockquote>
+        <p>In the Valley, city water rides to the treatment plant on top of farm water, in the same canals. When farms get none, a city has to spend its own water just to push the rest through.</p>
+        <p class="src"><a href="https://www.texastribune.org/2022/10/31/texas-water-plan-reservoirs-climate-change/" target="_blank" rel="noopener">Texas Tribune, October 2022</a> · <a href="https://www.tpr.org/border-immigration/2022-08-12/scorched-border-counties-downstream-of-depleted-falcon-lake-face-threat-of-imminent-disaster" target="_blank" rel="noopener">Texas Public Radio, August 2022</a> · <a href="https://www.texastribune.org/2024/07/18/rio-grande-river-drought/" target="_blank" rel="noopener">Texas Tribune, July 2024</a></p>
+      </article>
+      <article>
+        <figure>
+          <img src="photos/story-canal-group.jpg" alt="Sixteen people stand on a footbridge over an irrigation canal" loading="lazy" width="1100" height="733">
+          <figcaption>Valley water users with a USDA official on a canal at Delta Lake Irrigation District, December 2025. Photo: <a href="https://commons.wikimedia.org/wiki/File:20251217-USDA-TFAA-TX-LSC-3311_(54993936639).jpg" target="_blank" rel="noopener">USDA, public domain</a>. Not the person quoted.</figcaption>
+        </figure>
+        <h3>The first year in 38 without irrigation water</h3>
+        <p>Brian Jones is a fourth-generation Valley farmer. In 2024 he planted half his farm, let some employees go and cut the hours of the rest.</p>
+        <blockquote>&ldquo;Without water, what are we using to grow our crops? What are we able to pay back those loans with?&rdquo;</blockquote>
+        <p class="src"><a href="https://www.texastribune.org/2024/04/18/south-texas-drought-agriculture/" target="_blank" rel="noopener">Texas Tribune, April 2024</a></p>
+      </article>
+    </div>
+    <p class="mission">Sealing a canal cannot make it rain. It can make sure the water that is released reaches a field or a tap, instead of the bed of a ditch. <b>RioIQ exists to get the most out of every gallon Texas has left.</b></p>
+    <div class="go"><a class="btn" href="app.html?step=sim">See what sealing saves</a><a class="btn line" href="app.html">Open the platform</a></div>
+  </section>
+
+  <!-- ============ 4. How it works, and what it does not claim ============ -->
   <section class="after">
     <div class="cols">
       <div><span>01</span><h3>Forecast</h3><p id="howForecast"></p></div>
       <div><span>02</span><h3>Rank</h3><p id="howRank"></p></div>
-      <div><span>03</span><h3>Simulate</h3><p>Run a district, several, or all of them through 300 possible futures, doing nothing beside sealing early. Same weather, same reservoir, same prices.</p></div>
+      <div><span>03</span><h3>Simulate</h3><p>Run one district, several, or all of them through 300 possible futures, doing nothing beside sealing early. Same weather, same reservoir, same prices.</p></div>
     </div>
     <div class="limits">
-      <h2>What this does not claim</h2>
+      <h2>What we don't know</h2>
       <ul>
         <li id="limitModel"></li>
-        <li>No public source records which canals are already lined, so every canal is treated as bare earth. Savings are upper estimates.</li>
-        <li>Texas districts only. Prices are sealant materials only. Nothing here was measured in the field.</li>
+        <li>No public source records which canals are already lined, so every canal is treated as bare earth. Leakage and savings are upper estimates.</li>
+        <li>Texas districts only. Prices are sealant materials only. We measured nothing in the field.</li>
       </ul>
-      <a class="btn" href="app.html">Open the platform</a>
     </div>
-    <footer>A student hackathon project (Veritas AI, AI + Climate track). Not a government website. Data and sources are listed inside the platform.</footer>
+    <footer>
+      <p>A student hackathon project (Veritas AI, AI + Climate track). Not a government website. Every dataset is listed in the platform's Sources tab.</p>
+      <p>Photos: Santa Elena Canyon by Carol M. Highsmith, Library of Congress (public domain); Rio Grande below Creede by Tim Engleman (<a href="https://commons.wikimedia.org/wiki/File:Rio_grande_below_Creede_CO.jpg" target="_blank" rel="noopener">CC BY-SA 2.0</a>); Albuquerque and Elephant Butte from space by NASA (public domain); Texas aerials from USGS The National Map (public domain); Rio Grande Valley photographs by USDA (public domain).</p>
+    </footer>
   </section>
 
   <script src="data/core.js"></script>
   <script src="data/sim.js"></script>
+  <script src="data/river.js"></script>
+  <script src="js/opening.js"></script>
   <script src="js/landing.js"></script>
 </body>
 </html>

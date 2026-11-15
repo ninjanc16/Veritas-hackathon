@@ -26,32 +26,25 @@
   const niceDate = (iso) => new Date(iso + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 
   /* ---------- 1. The numbers ---------- */
-  const PUBLISHED_CROP_LOSS_MILLION = 495.8;   // Texas A&M AgriLife, 2023: a year with no irrigation water, four Valley counties
+  const GALLONS_IN_AN_OLYMPIC_POOL = 660430;   // 2,500 cubic metres
   const inDrought = HG.texas.filter((c) => c.dm != null && c.dm >= 2).length;            // D1 or worse
-  const warned = HG.river.filter((c) => c.pSeason >= HG.threshold).length;
   const amistadFalcon = (HG.river.find((c) => c.reservoir === "Amistad-Falcon") || {}).reservoirPct;
-  const butte = HG.lakes.find((l) => l.name === "Elephant Butte");
-  const canalKm = HG.canals.reduce((sum, c) => sum + c[4], 0);
-  const rates = Object.keys(HG.seepage).map((k) => HG.seepage[k]);
   const test = SIM.pre2020 && SIM.pre2020.test.preSeason;
+  // Water that can leak in a day from every rankable canal inside a district, if all run full:
+  // length x wetted width x the leak rate of the soil under it (gallons per square foot per day).
+  const a = HG.plan.assumptions, FEET_PER_KM = 3280.84;
+  let leakGallons = 0, leakKm = 0;
+  HG.canals.forEach((c) => { if (c[8] != null && c[7] >= 0) { leakGallons += c[4] * FEET_PER_KM * a.wetted_width_ft * c[5]; leakKm += c[4]; } });
 
-  $("eyebrow").textContent = "Rio Grande · Texas reach · week of " + niceDate(HG.week);
-  $("nRes").dataset.to = amistadFalcon; $("nButte").textContent = butte.pct + "%"; $("resDate").textContent = niceDate(butte.date);
-  $("nDrought").dataset.to = inDrought; $("nWarn").textContent = warned; $("week").textContent = niceDate(HG.week);
-  $("nKm").dataset.to = Math.round(canalKm); $("nRate").textContent = Math.min.apply(null, rates) + " to " + Math.max.apply(null, rates);
-  $("nCost").dataset.to = PUBLISHED_CROP_LOSS_MILLION;
-  $("nSeal").dataset.to = HG.plan.cost_to_treat_everything_usd / 1e6; $("nSealKm").textContent = num(HG.plan.treatable_km);
+  $("nDrought").dataset.to = inDrought; $("nRes").textContent = amistadFalcon + "%"; $("week").textContent = niceDate(HG.week);
+  $("nGal").dataset.to = Math.round(leakGallons / 1e6); $("nPools").textContent = num(Math.round(leakGallons / GALLONS_IN_AN_OLYMPIC_POOL / 10) * 10); $("nKm").textContent = num(leakKm);
+  $("nSeal").dataset.to = HG.plan.cost_to_treat_everything_usd / 1e6;
   $("howForecast").textContent = "A random forest reads the weekly Drought Monitor and the El Niño index." +
     (test ? " Frozen at the end of 2019 and tested on the years since, its January to March warnings caught " + test.forecast.caught + " of " + test.forecast.droughtSeasons + " drought seasons." : "");
   $("howRank").textContent = num(HG.canals.length) + " canal segments, each matched to the soil under it. Leak rate times drought chance gives the sealing order, with a cost, a crew time and the water kept for every one.";
   $("limitModel").textContent = test
     ? "The forecast is accurate but not special: the simple rule \"already in moderate drought\" caught " + test.d1Rule.caught + " of the same " + test.d1Rule.droughtSeasons + " seasons. We show both."
     : "The forecast only narrowly matches the simple rule \"already in moderate drought\".";
-  // The strip of readings under the headline (written twice so it can loop without a gap).
-  const readings = HG.lakes.map((l) => l.name + " <b>" + l.pct + "%</b>")
-    .concat(["Counties in drought <b>" + inDrought + " / 254</b>", "River counties warned <b>" + warned + " / 14</b>", "Canals mapped <b>" + num(canalKm) + " km</b>",
-             "Irrigation districts <b>" + HG.districts.length + "</b>", "Forecast week <b>" + niceDate(HG.week) + "</b>"]);
-  $("ticker").innerHTML = readings.concat(readings).map((r) => "<span>" + r + "</span>").join("");
 
   /* Numbers count up the first time their beat comes into view. */
   function countUp(el) {
@@ -115,17 +108,14 @@
   }
   const lakes = HG.lakes.map((l) => ({ name: l.name, pct: l.pct, xy: project(l.lon, l.lat) }));
 
-  // Where the camera looks at each beat: a box in longitude and latitude.
+  // Where the camera looks at each stop: a box in longitude and latitude.
   const CAMERA = [
-    boxOf(-110.5, 25.2, -92.5, 38.6),     // 0 the whole river, Colorado to the Gulf
-    boxOf(-108.4, 25.4, -96.2, 34.4),     // 1 the reservoirs
-    boxOf(-107.2, 25.4, -93.2, 36.8),     // 2 Texas and its drought
-    boxOf(-98.62, 25.82, -97.12, 26.72),  // 3 the canals of the Lower Valley
-    boxOf(-98.95, 25.7, -96.95, 26.9),    // 4 the same, a step back
-    boxOf(-98.5, 25.86, -97.2, 26.66),    // 5 the canals being sealed
+    boxOf(-107.2, 25.4, -93.2, 36.8),     // 0 Texas and its drought
+    boxOf(-98.62, 25.82, -97.12, 26.72),  // 1 the canals of the Lower Valley
+    boxOf(-98.5, 25.86, -97.2, 26.66),    // 2 the same canals being sealed
   ];
 
-  let W = 0, H = 0, dpr = 1, beat = 0, clock = 0, last = 0;
+  let W = 0, H = 0, dpr = 1, beat = 0, clock = 0, last = 0, onScreen = false;
   const cam = { x: 0, y: 0, k: 1 };
   function resize() { W = innerWidth; H = innerHeight; dpr = Math.min(devicePixelRatio || 1, 1.5); canvas.width = W * dpr; canvas.height = H * dpr; }
   addEventListener("resize", resize); resize();
@@ -138,7 +128,7 @@
     const cx = wide ? (side > 0 ? W * (1 - free / 2) - W * 0.02 : W * free / 2 + W * 0.02) : W / 2, cy = wide ? H / 2 : H * 0.32;
     return { k, x: (box[0] + box[2]) / 2 - (cx - W / 2) / k, y: (box[1] + box[3]) / 2 - (cy - H / 2) / k };
   }
-  const SIDE = [1, 1, -1, 1, -1, 1];      // +1 = map on the right (text on the left)
+  const SIDE = [1, -1, 1];      // +1 = map on the right (text on the left)
 
   /* Scroll position as a beat number: 0 at the top of the hero, 5 at the last beat. */
   const beats = Array.from(document.querySelectorAll(".beat"));
@@ -149,7 +139,9 @@
     const here = beats[b], next = beats[b + 1];
     if (next) { const c0 = here.offsetTop + here.offsetHeight / 2, c1 = next.offsetTop + next.offsetHeight / 2; b += Math.max(0, Math.min(1, (mid - c0) / (c1 - c0))); }
     beat = b;
-    const doc = document.documentElement; $("gaugeFill").style.height = Math.min(100, 100 * scrollY / (doc.scrollHeight - innerHeight)) + "%";
+    // The map is only on screen between the end of the opening and the stories section.
+    const main = document.getElementById("texas");
+    onScreen = scrollY + innerHeight > main.offsetTop && scrollY < main.offsetTop + main.offsetHeight;
   }
   addEventListener("scroll", readScroll, { passive: true }); readScroll();
   addEventListener("pointermove", (e) => { document.body.style.setProperty("--mx", e.clientX + "px"); document.body.style.setProperty("--my", e.clientY + "px"); }, { passive: true });
@@ -173,6 +165,7 @@
   /* ---------- One frame ---------- */
   function frame(now) {
     const dt = Math.min(0.05, (now - last) / 1000 || 0); last = now; clock += dt;
+    if (!onScreen) { requestAnimationFrame(frame); return; }           // nothing to draw while the opening or the stories are showing
     // Camera: glide between the two beats we are between, holding still near each one.
     const i = Math.min(CAMERA.length - 2, Math.floor(beat)), u = smooth(beat - i, 0.2, 0.8);
     const a = fit(CAMERA[i], SIDE[i]), b = fit(CAMERA[i + 1], SIDE[i + 1]);
@@ -182,13 +175,12 @@
     if (!last || cam.k === 1) Object.assign(cam, target);
 
     // How strongly each layer shows, from the scroll position.
-    const intro = reduced ? 1 : smooth(clock, 0.3, 3.2);              // the river draws itself when the page opens
-    const drought = smooth(beat, 1.35, 1.95) * (1 - 0.8 * smooth(beat, 2.45, 2.95));
-    const sweep = smooth(beat, 1.3, 2.0);
-    const lakeShow = smooth(beat, 0.45, 0.9) * (1 - smooth(beat, 2.4, 2.8));
-    const canalsDrawn = Math.round(GROUPS * smooth(beat, 2.5, 3.25));
-    const canalsSealed = Math.round(GROUPS * smooth(beat, 4.35, 4.95));
-    const zoomed = smooth(beat, 2.4, 3);
+    const intro = 1;                                                  // the river is always drawn (the opening already told its story)
+    const zoomed = smooth(beat, 0.35, 0.95);
+    const drought = 1 - 0.8 * zoomed, sweep = 1;
+    const lakeShow = 1 - smooth(beat, 0.3, 0.6);
+    const canalsDrawn = Math.round(GROUPS * smooth(beat, 0.5, 1.0));
+    const canalsSealed = Math.round(GROUPS * smooth(beat, 1.4, 1.95));
 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.globalAlpha = 1; ctx.fillStyle = COLOR.ground; ctx.fillRect(0, 0, W, H);
     ctx.setTransform(dpr * cam.k, 0, 0, dpr * cam.k, dpr * (W / 2 - cam.x * cam.k), dpr * (H / 2 - cam.y * cam.k));
@@ -197,7 +189,7 @@
 
     // Drought colours, revealed in a sweep from west to east.
     if (drought > 0.01) {
-      const tb = CAMERA[2];
+      const tb = CAMERA[0];
       ctx.save(); ctx.beginPath(); ctx.rect(tb[0] - 200, tb[1] - 200, (tb[2] - tb[0] + 400) * sweep, tb[3] - tb[1] + 400); ctx.clip();
       counties.forEach((path, cls) => { ctx.globalAlpha = drought * 0.9; ctx.fillStyle = COLOR.dm[cls]; ctx.fill(path, "evenodd"); });
       ctx.restore();
@@ -247,7 +239,7 @@
     // Reservoirs: a ring that fills to how full each one is, with its reading beside it.
     if (lakeShow > 0.01) {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      const fill = smooth(beat, 0.6, 1.0);
+      const fill = 1;
       lakes.forEach((l) => {
         const x = (l.xy[0] - cam.x) * cam.k + W / 2, y = (l.xy[1] - cam.y) * cam.k + H / 2;
         ctx.globalAlpha = lakeShow; ctx.lineWidth = 5; ctx.strokeStyle = "rgba(255,255,255,.18)"; ctx.beginPath(); ctx.arc(x, y, 17, 0, 7); ctx.stroke();
@@ -257,13 +249,6 @@
       });
     }
 
-    // The readout in the top bar: where the camera is looking.
-    if (Math.round(clock * 10) % 2 === 0) {
-      // Undo the map projection to get the longitude and latitude at the centre of the view.
-      const yy = cam.y + EARTH * R0, th = Math.atan2(cam.x, yy), rho = Math.hypot(cam.x, yy) / EARTH;
-      const lat = Math.asin((AC - (rho * AN) ** 2) / (2 * AN)) / RAD, lon = (L0 + th / AN) / RAD;
-      $("coords").textContent = Math.abs(lat).toFixed(2) + "°N  " + Math.abs(lon).toFixed(2) + "°W";
-    }
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
