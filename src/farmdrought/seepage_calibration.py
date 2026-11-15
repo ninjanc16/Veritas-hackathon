@@ -34,7 +34,8 @@ THE TEST (leave one district out)
   PASS RULE: a bootstrap over districts (10,000 draws, seed 0) of
       (rival's median error - M1's median error)
   must lie entirely above zero against the length rival. Otherwise the model did not beat canal
-  length, and the volumes are not reliable.
+  length, and the volumes are not reliable. (The statistic is the difference of the two medians,
+  recomputed on each resample; it is not the median of the per-district differences.)
 
 THE SEGMENT SET, the same for all four: segments that are fundable (canal_class.fundable), lie
 inside a district matched in the crosswalk, and have BOTH a permeability and a 1946 texture
@@ -279,6 +280,10 @@ def calibration_item(losses, crosswalk, segments):
     kept, summary = model_set(segments, crosswalk)
     table = raw_seepage(kept).join(losses.set_index("district")[["loss_af", "authorized_af"]], how="inner")
     no_segments = sorted(set(crosswalk.loc[crosswalk["match"] != "none", "district"]) & set(losses["district"]) - set(table.index))
+    # Counts are for the districts that are really fitted. A matched district with no loss in the
+    # 1998 table has segments in the set but enters no fit, so it is counted apart.
+    fitted = kept[kept["reference_district"].isin(table.index)]
+    not_fitted = kept[~kept["reference_district"].isin(table.index)]
     fits = {model: fit_factor(table[model], table["loss_af"]) for model in MODELS}
     held_out = leave_one_out(table)
     gap = held_out["gaps"]["length_minus_M1"]
@@ -303,9 +308,13 @@ def calibration_item(losses, crosswalk, segments):
         "segment_set": "fundable segments inside a matched district that have a permeability AND a 1946 texture "
                        "rate; the same segments for all four models",
         "segments_by_district": summary.reset_index().rename(columns={"reference_district": "district"}).to_dict("records"),
-        "segments_kept": int(len(kept)), "km_kept": float(kept["length_km"].sum()),
-        "class_counts_in_the_set": kept["class"].value_counts().to_dict(),
-        "feature_code_33601_in_the_set": int((kept["fcode"] == 33601).sum()),
+        "districts_fitted": int(len(table)),
+        "segments_kept": int(len(fitted)), "km_kept": float(fitted["length_km"].sum()),
+        "counts_cover": "the fitted districts only (those with a loss in the 1998 table)",
+        "segments_in_matched_districts_with_no_loss": int(len(not_fitted)),
+        "km_in_matched_districts_with_no_loss": float(not_fitted["length_km"].sum()),
+        "class_counts_in_the_set": fitted["class"].value_counts().to_dict(),
+        "feature_code_33601_in_the_set": int((fitted["fcode"] == 33601).sum()),
         "raw_af_by_district": table[MODELS + ["loss_af", "authorized_af"]].reset_index().rename(
             columns={"index": "district", "reference_district": "district"}).to_dict("records"),
         "fit_all_districts": fits,

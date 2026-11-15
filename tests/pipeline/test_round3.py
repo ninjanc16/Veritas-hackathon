@@ -1794,3 +1794,23 @@ def test_calibration_item_lists_a_district_above_its_own_loss_and_states_the_sen
     assert item["sentence"] in (seepage.FAIL_SENTENCE,) or item["sentence"].startswith("Held-out districts: median error")
     assert item["passes"] == item["held_out"]["gaps"]["length_minus_M1"]["passes"]
     assert json.loads(json.dumps(item, default=lambda value: value.item()))["segments_kept"] == 6
+
+
+def test_calibration_counts_cover_only_the_districts_that_are_fitted():
+    # Arrange: district Z is matched in the crosswalk but has no authorised water, so no loss
+    losses = seepage.district_losses(pd.DataFrame({
+        "district": ["A", "B", "C", "Z"], "efficiency_pct": [60, 75, 80, 95],
+        "authorized_af": [100000, 50000, 80000, np.nan]}))
+    crosswalk = pd.DataFrame({"district": ["A", "B", "C", "Z"], "map_district": ["Map A", "Map B", "Map C", "Map Z"],
+                              "match": ["exact"] * 4})
+
+    # Act
+    item = seepage.calibration_item(losses, crosswalk, made_up_segments())
+
+    # Assert: Z's one 9 km segment is in the set of matched districts but enters no fit
+    assert item["districts_fitted"] == 3 and item["held_out"]["n_districts"] == 3
+    assert item["segments_kept"] == 6 and item["km_kept"] == pytest.approx(2 + 1 + 3 + 4 + 6 + 2)
+    assert item["segments_in_matched_districts_with_no_loss"] == 1
+    assert item["km_in_matched_districts_with_no_loss"] == 9.0
+    assert sum(item["class_counts_in_the_set"].values()) == 6
+    assert item["districts_without_a_loss"] == ["Z"]
