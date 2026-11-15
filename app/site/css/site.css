@@ -30,6 +30,7 @@
   --dm0: #22363b; --dm1: #f4e58c; --dm2: #ffce3a; --dm3: #ff8a1f; --dm4: #ff4d5e; --dm5: #c4163a;
   /* map-only colours */
   --map: #081216; --casing: #0b2c38; --flow: #d5f1fa; --hl: #ffffff; --cline: #4a6a73; --vig: 1;
+  --wet: #25b58f; --dry: #c4944f; --dead: #5a3418;   /* simulation fields: watered, dry, long dry */
   --radius: 10px;
   --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .28);
   --sans: "Public Sans", -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -43,6 +44,7 @@
   --unknown: #7b8086; --fund: #0b63b5;
   --dm0: #efe9d8; --dm1: #efdf8e; --dm2: #e8b53a; --dm3: #db5f00; --dm4: #c8102e; --dm5: #7a0c22;
   --map: #fbf8ef; --casing: #ffffff; --flow: #ffffff; --hl: #111111; --cline: #b9ae8e; --vig: .35;
+  --wet: #2e9e6b; --dry: #c99a52; --dead: #6b4423;
   --shadow: 0 1px 2px rgba(11, 31, 58, .06), 0 8px 24px rgba(11, 31, 58, .08);
 }
 
@@ -219,11 +221,11 @@ body.app { height: 100vh; display: flex; flex-direction: column; overflow: hidde
 
 .shell { flex: 1; display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(430px, 1fr); min-height: 0; }
 
-/* The stage: the hand-drawn map (js/scanmap.js) or, on the Simulation step, The Fork (js/fork.js). */
+/* The stage: the hand-drawn map (js/scanmap.js) or, at the end of the Simulation step, the twin picture (js/twin.js). */
 .stage { position: relative; min-height: 0; background: var(--map); overflow: hidden; touch-action: none; font-family: var(--serif); }
 .stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 #map { cursor: grab; } #map.drag { cursor: grabbing; }
-.stage.sim #map, .stage.sim .mapOnly, .stage:not(.sim) #fork, .stage:not(.sim) .simOnly { display: none !important; }
+.stage.sim #map, .stage.sim .mapOnly, .stage:not(.sim) #twin, .stage:not(.sim) .simOnly { display: none !important; }
 #bar { position: absolute; left: 0; top: 0; height: 3px; width: 0; background: var(--blue); z-index: 3; transition: width .4s; }
 .sbtn { background: color-mix(in srgb, var(--card) 94%, transparent); color: var(--ink); border: 1px solid var(--line); border-radius: 4px; padding: 6px 11px; font: 500 15px var(--serif); }
 .sbtn:hover { border-color: var(--muted); }
@@ -262,19 +264,43 @@ body.app { height: 100vh; display: flex; flex-direction: column; overflow: hidde
 .scanning .cine { height: 7vh; }
 #vig { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 55%, rgba(0, 0, 0, .5) 100%); opacity: calc(.45 * var(--vig)); transition: opacity 1.2s; }
 .scanning #vig { opacity: var(--vig); }
-/* The Fork's controls and ledger. */
-#forkLedger { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -42%); width: min(250px, 34%); background: color-mix(in srgb, var(--card) 92%, transparent); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; font-size: 13.5px; z-index: 2; }
-#forkLedger h4 { margin: 0 0 6px; font: 700 15px var(--serif); text-align: center; color: var(--head); }
-#forkLedger table { width: 100%; border-collapse: collapse; }
-#forkLedger td { padding: 2px 0; text-align: right; font-variant-numeric: tabular-nums; }
-#forkLedger td:first-child { text-align: left; color: var(--muted); }
-#forkLedger tr.h td { color: var(--muted); font-size: 11.5px; border-bottom: 1px solid var(--line); }
-#forkLedger tr.sum td { border-top: 1px solid var(--line); font-weight: 700; color: var(--head); }
-#forkBar { position: absolute; left: 16px; right: 16px; bottom: 12px; display: flex; gap: 10px; align-items: center; z-index: 3; }
-#forkBar input[type=range] { flex: 1; }
-#forkDate { font-size: 15px; min-width: 118px; text-align: right; color: var(--ink); }
-#forkTop { position: absolute; left: 16px; top: 16px; right: 16px; display: flex; gap: 6px; flex-wrap: wrap; z-index: 3; align-items: center; }
-#forkTop span { color: var(--muted); font-size: 14px; margin-right: 4px; }
+/* The Simulation step: sub-step chips, prompt, scenario cards and the play bar (drawing is js/twin.js). */
+#simSteps, #simPrompt, #simCards { display: none; }
+.stage.flow #simSteps { display: flex; }
+.stage.flow:not(.sim) #simPrompt { display: block; }
+.stage.cards #simCards { display: flex; }
+.stage.flow #views, .stage.flow #actions, .stage.flow #hud { display: none !important; }
+#simSteps { position: absolute; left: 16px; top: 14px; gap: 6px; z-index: 4; }
+#simSteps button { background: color-mix(in srgb, var(--card) 94%, transparent); border: 1px solid var(--line); border-radius: 4px; padding: 6px 12px; font: 500 15px var(--serif); color: var(--muted); }
+#simSteps button b { color: var(--blue); margin-right: 6px; }
+#simSteps button.on { border-color: var(--blue); color: var(--ink); font-weight: 700; }
+#simSteps button:disabled { opacity: .45; cursor: default; }
+#simPrompt { position: absolute; left: 50%; top: 62px; transform: translateX(-50%); z-index: 3; text-align: center; pointer-events: none; width: min(92%, 640px); text-shadow: 0 0 8px var(--map), 0 0 8px var(--map), 0 0 8px var(--map); }
+#simPrompt b { display: block; font-size: clamp(20px, 2.4vw, 30px); line-height: 1.15; color: var(--head); }
+#simPrompt span { font-size: 15px; font-style: italic; color: var(--muted); }
+#simCards { position: absolute; right: 14px; top: 58px; bottom: 12px; width: min(330px, 44%); flex-direction: column; gap: 8px; justify-content: center; z-index: 4; }
+.stage.cards #simPrompt { left: calc(50% - 170px); width: min(60%, 520px); }
+.scase { flex: 0 1 auto; min-height: 0; overflow: hidden; text-align: left; background: color-mix(in srgb, var(--card) 95%, transparent); color: var(--ink); border: 1px solid var(--line); border-left: 5px solid var(--warning); border-radius: 4px; padding: 9px 12px; font-family: var(--serif); animation: caseIn .6s cubic-bezier(.2, .7, .2, 1) backwards; transition: transform .2s, box-shadow .2s; }
+.scase:nth-child(2) { animation-delay: .12s; } .scase:nth-child(3) { animation-delay: .24s; } .scase:nth-child(4) { animation-delay: .36s; }
+@keyframes caseIn { from { opacity: 0; transform: translateX(40px); } }
+.scase:hover { transform: translateX(-6px); box-shadow: 0 6px 24px rgba(0, 0, 0, .35); }
+.scase.best { border-left-color: var(--low); } .scase.likely { border-left-color: var(--watch); } .scase.check { border-left-color: var(--blue); }
+.scase h3 { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin: 0; font-size: 18px; color: var(--head); }
+.scase h3 small { font-size: 12.5px; font-weight: 400; font-style: italic; color: var(--muted); }
+.scase .big { font-size: 26px; font-weight: 700; line-height: 1.1; margin-top: 2px; color: var(--head); font-variant-numeric: tabular-nums; }
+.scase p { margin: 0; font-size: 12.5px; color: var(--muted); line-height: 1.3; }
+.scase p.tiny { font-size: 11.5px; font-style: italic; }
+.scase svg { display: block; width: 100%; height: 22px; margin-top: 3px; }
+@media (max-height: 900px) { .scase p.tiny { display: none; } }
+.scase .gain { font-size: 14px; font-weight: 700; color: var(--low); margin-top: 3px; } .scase .gain.bad { color: var(--warning); }
+.scase .go { font-size: 13.5px; font-weight: 700; color: var(--blue); }
+#simBar { position: absolute; left: 14px; right: 14px; bottom: 10px; display: flex; gap: 10px; align-items: center; z-index: 3; }
+#simBar input[type=range] { flex: 1; min-width: 0; }
+#simDate { font-size: 15px; min-width: 118px; text-align: right; color: var(--ink); }
+.shocks { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+.shocks span { color: var(--muted); font-size: .82rem; width: 100%; }
+.watching { border-left: 5px solid var(--watch); } .watching.best { border-left-color: var(--low); } .watching.worst { border-left-color: var(--warning); } .watching.check { border-left-color: var(--blue); }
+table.t tr.go { cursor: pointer; } table.t tr.go:hover td { background: var(--soft); }
 
 /* The panel on the right. */
 .panel { display: flex; flex-direction: column; min-height: 0; background: var(--bg); border-left: 1px solid var(--line); }
@@ -413,8 +439,8 @@ details.assume summary { font-weight: 700; cursor: pointer; }
   .stepper button b { display: none; }
   .scopeBtn { max-width: 34vw; }
   .kpis { grid-template-columns: 1fr; }
-  #forkLedger { width: 46%; font-size: 12px; }
-  #forkTop span { display: none; }
+  #simCards { width: 52%; top: 108px; gap: 6px; } .stage.cards #simPrompt { left: 50%; width: 92%; } .scase p, .scase svg, .scase .go { display: none; } .scase .big { font-size: 20px; } .scase h3 { font-size: 15px; }
+  #simSteps button { padding: 5px 8px; font-size: 13.5px; } #simSkip { display: none; } #simPrompt { top: 54px; } #simPrompt span { display: none; }
   #legend { display: none; }
   .futures, .triple { grid-template-columns: 1fr; }
   .nav nav a:not(.btn) { display: none; }

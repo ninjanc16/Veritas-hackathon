@@ -18,6 +18,7 @@
     2. The reservoirs decide how much of that is delivered (the "shortage curve" below).
     3. If canals were sealed in the last ~90 days, less water seeps away. That saved water
        only counts if there is a shortage to fill. Saved water in a full year earns nothing.
+       It can also never be more than the water released that week: an empty canal saves nothing.
     4. Every acre-foot still missing costs the same crop revenue.
 
   Every number that is not measured is a parameter in DEFAULTS with a tag:
@@ -143,7 +144,9 @@
         let act = false, reapplied = false;
         if (!out.acted && plan.spent > 0) {
           const t = policy.trigger;
-          if (!decided && week.month >= p.decisionMonth && (t === "forecast" || t === "d1" || t === "always")) {
+          // The pre-season decision is made in the decision month. If a run starts after the
+          // season has ended (say in November), there is nothing to decide until next spring.
+          if (!decided && week.month >= p.decisionMonth && week.month <= p.seasonEnd && (t === "forecast" || t === "d1" || t === "always")) {
             decided = true;
             if (t === "always") act = true;
             if (t === "forecast") act = week.forecast != null && week.forecast >= p.threshold;
@@ -171,6 +174,7 @@
           demand = demandWeek;
           missing = demand * shortage(week.pct, p);
           if (i <= sealedUntil) saved = savedAcreFeet(plan.gallonsPerDay, 7, p.cut);
+          saved = Math.min(saved, demand - missing);   // a canal cannot keep more water than was released into it
           recovered = Math.min(saved, missing);     // saved water is only worth something in a shortage
           if (missing > 0) out.weeksShort += 1;
         }
@@ -287,7 +291,8 @@
     options: { startDate "YYYY-MM-DD", pctNow, pNow, years, draws, seed, cutoffYear,
                recall, falseAlarm, shocks: [{ year: 1.., month, points }], secondDryYear }
     Returns { policies: [{ policy, draws, summary }], sample: [simulate() result per policy for
-              the middle future], fan: weekly low / mid / high storage, libraryYears, dryYears }.
+              the middle future], cases: { best, likely, worst } (three futures to watch, each
+              { sample, sourceYears }), fan: weekly low / mid / high storage, libraryYears, dryYears }.
   */
   function fromToday(scope, policies, overrides, options) {
     const opt = Object.assign({ years: 5, draws: 300, seed: 11, pNow: 0.3, pctNow: 50, cutoffYear: 2020,
@@ -348,6 +353,7 @@
         return { date: c.date, year: c.year, month: c.month, cls: row.cls, forecast: warned[c.year] ? 1 : 0, pct };
       });
       const future = Object.assign({}, scope, { weeks });
+      future.sourceYears = Object.keys(source).map((y) => source[y]);   // the real years this future borrows, in order
       futures.push(future);
       policies.forEach((policy, i) => results[i].push(simulate(future, policy, overrides).totals));
     }
@@ -356,10 +362,15 @@
       const sorted = values.slice().sort((a, b) => a - b);
       return sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))];
     };
-    // The middle future: the one whose do-nothing cost is the median. It is the one the page animates.
+    // Line the futures up from mildest to harshest by what doing nothing costs, then pick three
+    // to show: a mild one (9 in 10 are harsher), the middle one, and a harsh one (9 in 10 are milder).
     const order = results[0].map((t, i) => [t.cost, i]).sort((a, b) => a[0] - b[0]);
-    const middle = order[Math.floor(order.length / 2)][1];
+    const at = (q) => order[Math.min(order.length - 1, Math.floor(q * order.length))][1];
+    const middle = at(0.5);
+    const showCase = (index) => ({ sample: policies.map((policy) => simulate(futures[index], policy, overrides)),
+                                   sourceYears: futures[index].sourceYears });
     return {
+      cases: { best: showCase(at(0.1)), likely: showCase(middle), worst: showCase(at(0.9)) },
       policies: policies.map((policy, i) => {
         const summary = {};
         for (const key of ["cost", "loss", "spend", "publicMoney", "recoveredAf"]) {

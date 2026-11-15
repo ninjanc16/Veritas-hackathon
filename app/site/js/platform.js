@@ -4,6 +4,7 @@
   HOW IT IS ORGANISED
     state      one object holding every choice the user has made (scope, step, budget ...)
     the map    js/scanmap.js draws it; this file only tells it what to show
+    the twin   js/twin.js draws the simulation (one district, twice); this file hands it the weeks
     the steps  renderRisk(), renderBudget(), renderSim() each fill the right-hand panel
     refresh()  updates the map and the current step; called after any change of state
 
@@ -33,7 +34,7 @@
     { key: "wet", label: "A wet autumn", note: "storage gains 10 points next October", shock: { year: 1, month: 10, points: 10 } },
   ];
 
-  const state = { scope: null, step: "risk", mapMode: "now", budget: null, severity: null, simMode: "today",
+  const state = { scope: null, step: "risk", mapMode: "now", budget: null, severity: null, simStep: 2, simCase: "likely",
                   overrides: {}, county: null, canal: null, live: null, shocks: {} };
 
   /* ---------- Scope helpers ---------- */
@@ -343,8 +344,8 @@
   ];
 
   /* What the engine needs for the current scope: its weekly record, its canals and the money at stake. */
-  function simScope() {
-    const d = district();
+  function simScope(d) {
+    if (d === undefined) d = district();
     const system = d && usesElephantButte(d) ? "Elephant Butte" : "Amistad-Falcon";
     const members = d ? [d] : HG.districts.filter((x) => !usesElephantButte(x));
     const fips = Array.from(new Set([].concat.apply([], members.map((x) => x.fips))));
@@ -379,13 +380,24 @@
     return { recall: t.recall, falseAlarm: t.falseAlarms / Math.max(1, t.rows - t.droughtSeasons) };
   }
 
+  /* The Simulation step has three small steps of its own, shown as chips on the stage:
+       1 District   pick one district (the state view lists them all, with what acting saves in each)
+       2 Scenario   pick a future: best, average or worst of the 300, or the real 2020 to 2025 record
+       3 Simulation watch that district twice, side by side */
+  const CASES = [
+    { key: "best", name: "Best case", tone: "low", note: "9 in 10 of the 300 futures are harsher than this one" },
+    { key: "likely", name: "Average case", tone: "watch", note: "the middle one of the 300 futures" },
+    { key: "worst", name: "Worst case", tone: "warning", note: "9 in 10 of the 300 futures are milder than this one" },
+    { key: "check", name: "The real record", tone: "accent", note: "2020 to 2025 as it happened: years the forecast model never saw" },
+  ];
+  const caseOf = (key) => CASES.find((c) => c.key === key);
   function renderSim() {
     const d = district(), p = params();
     $("view").innerHTML =
-      (d ? '<button class="back" data-act="state">&larr; All of Texas</button>' : "") +
-      "<h2>Simulation: do nothing, or act</h2><div class=\"sub\">" + U.esc(scopeName()) + ". Every future gets the same weather, the same reservoirs and the same prices. Only the decision differs.</div>" +
-      '<div class="card"><div class="seg" id="simMode"><button data-m="today" class="' + (state.simMode === "today" ? "on" : "") + '">From today, 5 years forward</button><button data-m="check" class="' + (state.simMode === "check" ? "on" : "") + '">Check it on 2020 to 2025</button></div>' +
-      '<div class="field"><label for="simBudget">Sealing budget in a year you act <output id="simBudgetOut"></output></label><input id="simBudget" type="range" min="0" max="' + maxBudget() + '" step="' + budgetStep() + '" value="' + state.budget + '"></div></div>' +
+      "<h2>" + (d ? "Simulation: " + U.esc(d.name) : "Simulation: choose a district") + "</h2>" +
+      '<div class="sub">One district, drawn twice: carrying on as now, and sealing canals when the forecast warns. Both get the same weather, the same reservoir and the same prices. Only the decision differs.</div>' +
+      '<div id="simLead"></div>' +
+      '<div class="card"><div class="field"><label for="simBudget">Sealing budget in a year you act <output id="simBudgetOut"></output></label><input id="simBudget" type="range" min="0" max="' + maxBudget() + '" step="' + budgetStep() + '" value="' + state.budget + '"></div><div id="shockRow"></div></div>' +
       '<div id="simResult"></div>' +
       '<details class="assume"><summary>Assumptions you can change (' + SLIDERS.length + ")</summary>" +
       SLIDERS.map(([k, min, max, step, show]) => '<div class="field"><label for="a_' + k + '"><span>' + E.DEFAULTS[k].label + ' <span class="tag ' + E.DEFAULTS[k].tag + '">' + E.DEFAULTS[k].tag + '</span></span><output id="o_' + k + '">' + show(p[k]) + '</output></label><input type="range" data-param="' + k + '" id="a_' + k + '" min="' + min + '" max="' + max + '" step="' + step + '" value="' + p[k] + '"></div>').join("") +
@@ -393,6 +405,24 @@
       '<div id="simNotes"></div>';
     renderSimResult();
   }
+  /* The chips and the prompt drawn over the stage on the Simulation step. */
+  function simChrome() {
+    const d = district(), n = state.simStep;
+    $("simSteps").innerHTML = [[1, "District"], [2, "Scenario"], [3, "Simulation"]].map(([k, name]) =>
+      '<button data-sim="' + k + '" class="' + (k === n ? "on" : "") + '"' + (k > 1 && !d ? " disabled" : "") + "><b>" + k + "</b>" + name + "</button>").join("");
+    $("simPrompt").innerHTML = n === 1 ? "<b>Choose a district</b><span>Click one on the map, or pick it from the table. " + HG.districts.length + " real irrigation districts on the Texas reach of the Rio Grande.</span>"
+      : n === 2 ? "<b>" + U.esc(d.name) + "</b><span>Now choose how the next five years go</span>" : "";
+  }
+  $("simSteps").addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b || b.disabled) return;
+    const k = Number(b.dataset.sim);
+    if (k === 1) { if (district()) setScope(STATE, true); return; }
+    state.simStep = k; refresh(k === 2);
+  });
+  $("simCards").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-case]");
+    if (b) { state.simCase = b.dataset.case; state.simStep = 3; refresh(false); }
+  });
 
   /* A line chart as SVG. series = [{ name, color, values, dash }], labels = x-axis labels. band = optional { low, high }. */
   function lineChart(series, labels, fmt, band) {
@@ -409,38 +439,68 @@
     return out + "</svg>" + '<div class="legend" style="margin-top:6px">' + series.map((s) => '<span><i class="lineKey" style="background:' + s.color + '"></i>' + s.name + "</span>").join("") + "</div>";
   }
 
-  /* Hand the two futures (do nothing, act on the forecast) to The Fork, week by week. */
-  let forkWeeks = [];
-  function loadFork(nothing, act, system) {
-    const flat = (run) => [].concat.apply([], run.years.map((y) => y.weekly.map((w, i) => Object.assign({}, w, { relief: i === y.weekly.length - 1 ? y.relief : 0 }))));
-    const a = flat(nothing), b = flat(act);
-    let sums = { l: { spend: 0, loss: 0, relief: 0 }, r: { spend: 0, loss: 0, relief: 0 } };
-    forkWeeks = a.map((w, i) => {
-      const add = (s, x) => { s.spend += x.spend; s.loss += x.loss; s.relief += x.relief; return Object.assign({}, s); };
-      return { date: w.date, pct: w.pct == null ? 0 : w.pct, demand: w.demand, left: w, right: b[i], sumL: add(sums.l, w), sumR: add(sums.r, b[i]) };
+  /* Hand the two futures (do nothing, act on the forecast) to the twin picture, week by week. */
+  let twinWeeks = [];
+  function loadTwin(nothing, act, scope, P, plan, which, note) {
+    const flat = (run) => [].concat.apply([], run.years.map((y) => y.weekly));
+    const a = flat(nothing), b = flat(act), sums = [{ spend: 0, loss: 0, saved: 0, recovered: 0 }, { spend: 0, loss: 0, saved: 0, recovered: 0 }];
+    const add = (sum, w) => { sum.spend += w.spend; sum.loss += w.loss; sum.saved += w.saved; sum.recovered += w.recovered; return Object.assign({}, sum); };
+    twinWeeks = a.map((w, i) => ({ date: w.date, pct: w.pct == null ? 0 : w.pct, demand: w.demand, left: w, right: b[i], sumL: add(sums[0], w), sumR: add(sums[1], b[i]) }));
+    $("simSeek").max = twinWeeks.length - 1;
+    const funded = new Set(plan.funded.map((c) => c.id));
+    twin.load({
+      rings: district().rings,
+      canals: U.canals.filter((c) => c.district === state.scope).map((c) => ({ line: c.line, km: c.km, rate: c.rate, level: c.level, ranked: c.rank != null, funded: funded.has(c.id) })),
+      weeks: twinWeeks, caseName: which.name, caseNote: note, tone: which.tone, system: scope.system, fullAt: P.fullAt, cut: P.cut,
+      sealedWord: U.theme() === "dark" ? "white" : "black", leftName: "Do nothing", rightName: "Act on the forecast", leftNote: "no canal work", rightNote: "seals when the forecast warns",
     });
-    $("forkSeek").max = forkWeeks.length - 1;
-    const reliefMax = Math.max.apply(null, a.map((w) => w.relief).concat([1]));
-    fork.load({ weeks: forkWeeks, system, leftName: "Do nothing", rightName: "Act on the forecast", reliefUnit: reliefMax / 20 });
   }
-  const fork = window.HGFork.create({ canvas: $("fork"), stage: $("stage"), onTick(i, playing) {
-    const w = forkWeeks[i]; if (!w) return;
-    $("forkSeek").value = i; $("forkPlay").textContent = playing ? "Pause" : (i >= forkWeeks.length - 1 ? "Replay" : "Play");
-    $("forkDate").textContent = "Week of " + U.niceDate(w.date);
-    const row = (label, l, r) => "<tr><td>" + label + "</td><td>" + money(l) + "</td><td>" + money(r) + "</td></tr>";
-    const totalL = w.sumL.spend + w.sumL.loss, totalR = w.sumR.spend + w.sumR.loss;
-    $("forkLedger").innerHTML = "<h4>Running ledger</h4><table><tr class=\"h\"><td></td><td>Nothing</td><td>Act</td></tr>" +
-      row("Sealing", w.sumL.spend, w.sumR.spend) + row("Crops lost", w.sumL.loss, w.sumR.loss) + row("Relief paid", w.sumL.relief, w.sumR.relief) +
-      '<tr class="sum"><td>Total cost</td><td>' + money(totalL) + "</td><td>" + money(totalR) + "</td></tr>" +
-      '<tr><td colspan="3" style="text-align:center;color:' + (totalL - totalR >= 0 ? "var(--low)" : "var(--warning)") + ';font-weight:700;padding-top:4px">' + (totalL - totalR >= 0 ? "Acting is " + money(totalL - totalR) + " ahead" : "Acting is " + money(totalR - totalL) + " behind") + "</td></tr></table>";
+  const twin = window.HGTwin.create({ canvas: $("twin"), stage: $("stage"), onTick(i, playing) {
+    const w = twinWeeks[i]; if (!w) return;
+    $("simSeek").value = i; $("simPlay").textContent = playing ? "Pause" : (i >= twinWeeks.length - 1 ? "Run again" : "Play");
+    $("simDate").textContent = "Week of " + U.niceDate(w.date);
   } });
-  $("forkPlay").onclick = () => (fork.playing() ? fork.pause() : fork.play());
-  $("forkSeek").oninput = (e) => { fork.pause(); fork.seek(Number(e.target.value)); };
-  function forkTop() {
-    $("forkTop").innerHTML = state.simMode !== "today" ? "<span>The real record, 2020 to 2025: years the forecast model never saw.</span>" :
-      "<span>Hit both futures with:</span>" + SHOCKS.map((s) => '<button class="sbtn ' + (state.shocks[s.key] ? "on" : "") + '" data-shock="' + s.key + '" title="' + s.note + ' (our assumption)">' + s.label + "</button>").join("");
+  $("simPlay").onclick = () => (twin.playing() ? twin.pause() : twin.play());
+  $("simSkip").onclick = () => { twin.pause(); twin.seek(twinWeeks.length - 1); };
+  $("simSeek").oninput = (e) => { const i = Number(e.target.value); twin.pause(); twin.seek(i); };   // read the slider first: pausing redraws it
+
+  /* The three scenario cards (and the real-record card) shown over the map on sub-step 2. */
+  function buildCards(run, check, endYear) {
+    const spark = (weeks) => {                                  // reservoir storage, week by week, as a small line
+      const pts = weeks.map((w, i) => (300 * i / (weeks.length - 1)).toFixed(1) + "," + (33 - Math.max(0, Math.min(100, w.pct || 0)) * 0.3).toFixed(1)).join(" ");
+      return '<svg viewBox="0 0 300 34" preserveAspectRatio="none" aria-hidden="true"><polyline points="0,33 300,33" fill="none" stroke="currentColor" stroke-opacity=".25"/><polyline points="' + pts + '" fill="none" stroke="var(--river)" stroke-width="2"/></svg>';
+    };
+    const flat = (r) => [].concat.apply([], r.years.map((y) => y.weekly));
+    $("simCards").innerHTML = CASES.map((c) => {
+      const pair = c.key === "check" ? [check[0], check[2]] : [run.cases[c.key].sample[0], run.cases[c.key].sample[2]];
+      const gain = pair[0].totals.cost - pair[1].totals.cost;
+      return '<button class="scase ' + c.key + '" data-case="' + c.key + '"><h3>' + c.name + "<small>" + (c.key === "check" ? "2020 to 2025" : "to " + endYear) + "</small></h3>" +
+        '<div class="big">' + money(pair[0].totals.loss) + "</div><p>in crops lost if nothing is done. " + c.note.charAt(0).toUpperCase() + c.note.slice(1) + ".</p>" + spark(flat(pair[0])) +
+        '<p class="tiny">reservoir storage, week by week</p><div class="gain ' + (gain >= 0 ? "" : "bad") + '">Acting ' + (gain >= 0 ? "saves " + money(gain) : "costs " + money(-gain) + " more") + '</div><div class="go">Run this scenario &rarr;</div></button>';
+    }).join("");
   }
-  $("forkTop").addEventListener("click", (e) => { const b = e.target.closest("[data-shock]"); if (b) { state.shocks[b.dataset.shock] = !state.shocks[b.dataset.shock]; renderSimResult(); fork.play(); } });
+
+  /* State view: every district, with what acting on the forecast saves it in the middle future.
+     Each district is run on its own canals with every treatable canal funded. */
+  let tableCache = null, tableKey = "";
+  function districtTable(over, hit, on) {
+    const key = JSON.stringify([over, state.live && state.live.systems, on.map((s) => s.key)]);
+    if (key !== tableKey) {
+      const median = (list) => list.slice().sort((a, b) => a - b)[Math.floor(list.length / 2)];
+      tableCache = HG.districts.map((d, i) => {
+        const scope = simScope(d), res = reservoirFor(d);
+        const budget = scope.canals.reduce((s, c) => s + c.usd, 0) + 1;
+        const r = E.fromToday(scope, [{ trigger: "never" }, { trigger: "forecast" }], Object.assign({}, over, { budget }), {
+          startDate: TODAY, pctNow: res.pct == null ? 50 : res.pct, pNow: scope.pNow, years: 5, draws: 100, seed: 11, cutoffYear: 2020,
+          recall: hit.recall, falseAlarm: hit.falseAlarm, shocks: on.filter((x) => x.shock).map((x) => x.shock), secondDryYear: on.some((x) => x.secondDryYear) });
+        return { d, i, loss: r.policies[0].summary.loss.mid, saved: median(r.policies[1].draws.map((t, k) => r.policies[0].draws[k].cost - t.cost)) };
+      }).sort((a, b) => b.saved - a.saved);
+      tableKey = key;
+    }
+    return "<h3>Step 1: choose a district to watch</h3><div class=\"scroll\"><table class=\"t\"><tr><th>District</th><th class=\"r\">Canals</th><th class=\"r\">Do nothing loses</th><th class=\"r\">Acting saves</th></tr>" +
+      tableCache.map((r) => '<tr class="go" data-act="district" data-i="' + r.i + '"><td><b>' + U.esc(r.d.name) + "</b><br><small>" + r.d.counties.join(", ") + '</small></td><td class="r">' + U.num(r.d.canalKm) + ' km</td><td class="r">' + money(r.loss) + '</td><td class="r"><b style="color:var(--low)">' + money(r.saved) + "</b></td></tr>").join("") +
+      '</table></div><p class="credit">Middle of 100 futures for each district over five years, with every treatable canal in that district funded. Crops lost is counted at net revenue per acre-foot of missing water. Select a row, or click a district on the map.</p>';
+  }
 
   function renderSimResult() {
     const scope = simScope(), over = Object.assign({}, state.overrides, { budget: state.budget }), P = E.makeParams(over);
@@ -449,15 +509,21 @@
     const li = (cls, text, tag) => '<li class="' + cls + '">' + text + (tag ? ' <span class="tag ' + tag + '">' + tag + "</span>" : "") + "</li>";
     const who = scope.members > 1 ? scope.members + " districts on the " + scope.system + " system" : "this district";
     let html = "<h3>What acting means each year you act</h3>" + triple(planN);
+    const d = district(), which = caseOf(state.simCase), hit = hitRates(), on = SHOCKS.filter((s) => state.shocks[s.key]);
+    const showCheck = d && state.simStep === 3 && state.simCase === "check";
+    // The real 2020 to 2025 record, with the forecasts the frozen model made for those years.
+    const test = Object.assign({}, scope, { weeks: scope.weeks.filter((w) => w.year >= 2020 && w.year <= 2025) });
+    const runs = POLICIES.map((pol) => E.simulate(test, { trigger: pol.trigger }, over));
+    const endYear = Number(TODAY.slice(0, 4)) + 5;
+    let run = null, lead = "";
 
-    if (state.simMode === "today") {
-      const res = reservoirFor(district()), hit = hitRates();
-      const on = SHOCKS.filter((s) => state.shocks[s.key]);
-      const run = E.fromToday(scope, POLICIES.map((pol) => ({ trigger: pol.trigger })), over, {
+    if (!showCheck) {
+      const res = reservoirFor(district());
+      run = E.fromToday(scope, POLICIES.map((pol) => ({ trigger: pol.trigger })), over, {
         startDate: TODAY, pctNow: res.pct == null ? 50 : res.pct, pNow: scope.pNow, years: 5, draws: 300, seed: 11,
         cutoffYear: 2020, recall: hit.recall, falseAlarm: hit.falseAlarm,
         shocks: on.filter((s) => s.shock).map((s) => s.shock), secondDryYear: on.some((s) => s.secondDryYear) });
-      const base = run.policies[0].draws, endYear = Number(TODAY.slice(0, 4)) + 5;
+      const base = run.policies[0].draws;
       // The headline: what acting saves in the middle future, and what each sealant dollar returns.
       const median = (list) => list.slice().sort((a, b) => a - b)[Math.floor(list.length / 2)];
       const actDraws = run.policies[2].draws;
@@ -489,7 +555,7 @@
           return '<div class="future ' + pol.css + '"><span>' + pol.name + "</span><b>" + money(s.mid) + "</b><small>" + money(s.low) + " to " + money(s.high) + " in 8 of 10 futures</small>" +
             (i ? '<em class="' + (mid >= 0 ? "" : "bad") + '">' + (mid >= 0 ? money(mid) + " better" : money(-mid) + " worse") + " than doing nothing</em><small>worse off in " + worse + " of " + gains.length + " futures</small>" : "<small>" + pol.blurb + "</small>") + "</div>";
         }).join("") + "</div>" +
-        '<p class="credit" style="margin:8px 0 0">300 possible futures for ' + who + ". The big number is the middle one. The picture on the left plays the middle future, week by week.</p>" +
+        '<p class="credit" style="margin:8px 0 0">300 possible futures for ' + who + ". The big number is the middle one.</p>" +
         "<h3>Reservoir storage in those futures</h3><div class=\"chart\">" +
         lineChart([{ name: "Middle future", color: U.TIER_COLOR.Low, values: run.fan.map((w) => w.mid) },
                    { name: "Farms get all their water above this", color: U.LEVEL_COLOR["Unknown soil"], values: run.fan.map(() => P.fullAt), dash: true },
@@ -503,11 +569,7 @@
         li("against", "<b>The forecast is wrong sometimes.</b> In these futures it warns before " + Math.round(hit.recall * 100) + "% of dry seasons and also before " + Math.round(hit.falseAlarm * 100) + "% of wet ones. Each wrong warning costs a full round of sealing: " + U.usd(plan.spent) + ".", "pipeline") +
         li("", "<b>Saved water only counts in a shortage.</b> When the reservoirs are over " + P.fullAt + "% farms get all their water and sealing earns nothing that year.", "assumption") +
         "</ul>";
-      loadFork(run.sample[0], run.sample[2], scope.system);
     } else {
-      // Check: the real 2020 to 2025 record, with the forecasts the frozen model made for those years.
-      const test = Object.assign({}, scope, { weeks: scope.weeks.filter((w) => w.year >= 2020 && w.year <= 2025) });
-      const runs = POLICIES.map((pol) => E.simulate(test, { trigger: pol.trigger }, over));
       const d1 = E.simulate(test, { trigger: "d1" }, over), always = E.simulate(test, { trigger: "always" }, over);
       const [nothing, react, act] = runs, years = nothing.years.map((y) => y.year);
       const diff = (a, b) => a.totals.cost - b.totals.cost;
@@ -534,10 +596,27 @@
         li(diff(always, act) > 0 ? "for" : "against", "<b>The forecast " + better(diff(always, act), "sealing every single year") + ".</b> Sealant is cheap next to lost crops, so sealing every year is hard to beat.", "assumption") +
         li("against", "<b>False alarms: " + act.totals.falseAlarms + " of " + act.totals.yearsActed + " years acted.</b> In those years sealing was paid for and there was no shortage for the saved water to fill.", "pipeline") +
         "</ul>";
-      loadFork(nothing, act, scope.system);
     }
+
+    // What the stage shows, and the few lines that lead the panel, for the current sub-step.
+    if (!d) lead = districtTable(over, hit, on);
+    else if (state.simStep === 2) {
+      buildCards(run, runs, endYear);
+      lead = '<div class="card small"><b>Step 2: choose a scenario.</b> The cards on the map are three of the 300 futures, lined up by what doing nothing would cost this district: a mild one, the middle one and a harsh one. Each is built from real years before 2020, started from today\'s reservoir level. The fourth card replays 2020 to 2025 as it really happened.</div>';
+    } else {
+      const pair = showCheck ? [runs[0], runs[2]] : [run.cases[which.key].sample[0], run.cases[which.key].sample[2]];
+      const gain = pair[0].totals.cost - pair[1].totals.cost;
+      const note = showCheck ? "The real record: real drought, real reservoir levels, the forecasts the frozen model made"
+                             : "Weather borrowed from " + run.cases[which.key].sourceYears.join(", ") + ", started from today's reservoir level";
+      loadTwin(pair[0], pair[1], scope, P, plan, which, note);
+      lead = '<div class="card small watching ' + which.key + '"><b>You are watching: ' + which.name.toLowerCase() + ".</b> " + note + ". " + which.note.charAt(0).toUpperCase() + which.note.slice(1) + ".<br>" +
+        "Do nothing: " + money(pair[0].totals.loss) + " in crops lost. Act on the forecast: " + money(pair[1].totals.loss) + " lost and " + money(pair[1].totals.spend) + " spent on sealing in " + pair[1].totals.yearsActed + " of " + pair[1].years.length + " years. " +
+        '<b style="color:var(--' + (gain >= 0 ? "low" : "warning") + ')">Acting ' + (gain >= 0 ? "saves " + money(gain) : "costs " + money(-gain) + " more") + " in this future.</b>" +
+        '<br><small class="muted">In the picture: canals are coloured by how leaky their soil is (orange leaks most) and turn ' + (U.theme() === "dark" ? "white" : "black") + ' while sealed. The view moves in on them while they are sealed. Dry fields are tan. Which squares go dry is an illustration; the share that is dry is the model\'s number. ' + plan.funded.length + " of this district's canals are sealed in a year you act (" + U.num(plan.km, 1) + " km).</small></div>";
+    }
+    $("simLead").innerHTML = lead;
+    $("shockRow").innerHTML = showCheck ? "" : '<div class="shocks"><span>Hit every future with (our assumptions):</span>' + SHOCKS.map((s) => '<button class="sbtn ' + (state.shocks[s.key] ? "on" : "") + '" data-shock="' + s.key + '" title="' + s.note + '">' + s.label + "</button>").join("") + "</div>";
     $("simResult").innerHTML = html;
-    forkTop();
 
     $("simNotes").innerHTML =
       (scope.outsideValley ? '<p class="note">The published farm-loss figure covers only Cameron, Hidalgo, Starr and Willacy counties. Applying its value per acre-foot here is our extrapolation.</p>' : "") +
@@ -553,17 +632,22 @@
   /* ---------- Putting it together ---------- */
   function refresh(refit) {
     document.querySelectorAll("#stepper button").forEach((b) => b.classList.toggle("on", b.dataset.step === state.step));
-    $("stage").classList.toggle("sim", state.step === "sim");
+    const sim = state.step === "sim";
+    if (sim) state.simStep = district() ? Math.max(2, state.simStep) : 1;      // the state view can only pick a district
+    $("stage").classList.toggle("flow", sim);                                   // chips and prompt over the stage
+    $("stage").classList.toggle("cards", sim && state.simStep === 2);           // the scenario cards
+    $("stage").classList.toggle("sim", sim && state.simStep === 3);             // the twin picture instead of the map
+    if (sim) simChrome();
     $("scopeBtn").innerHTML = "<small>" + (district() ? "District" : "View") + "</small>" + U.esc(scopeName()) + " &#9662;";
     $("viewScope").textContent = district() ? "My district" : "All of Texas";
     ({ risk: renderRisk, budget: renderBudget, sim: renderSim })[state.step]();
     syncMap();
     $("view").scrollTop = 0;
-    if (state.step === "sim") fork.play(); else fork.pause();
+    if (sim && state.simStep === 3) twin.play(); else twin.pause();
     if (refit && !map.isScanning()) map.fitScope();
   }
   function setScope(scope, noScan) {
-    state.scope = scope; state.county = null; state.canal = null; state.severity = null;
+    state.scope = scope; state.county = null; state.canal = null; state.severity = null; state.simStep = 2;
     state.budget = defaultBudget();
     try { localStorage.setItem("hg-scope", scope === STATE ? "state" : HG.districts[scope].name); } catch (e) { /* storage can be blocked */ }
     history.replaceState(null, "", location.pathname + location.search + (scope === STATE ? "#state" : "#d=" + encodeURIComponent(HG.districts[scope].name)));
@@ -594,13 +678,13 @@
   });
   $("lightbox").onclick = () => $("lightbox").classList.remove("on");
   $("view").addEventListener("click", (e) => {
-    const sev = e.target.closest("#sev button"), mode = e.target.closest("#simMode button");
+    const sev = e.target.closest("#sev button"), shock = e.target.closest("[data-shock]");
     if (sev) { state.severity = sev.dataset.p === "" ? null : Number(sev.dataset.p); renderBudget(); }
-    if (mode) { state.simMode = mode.dataset.m; renderSim(); fork.play(); }
+    if (shock) { state.shocks[shock.dataset.shock] = !state.shocks[shock.dataset.shock]; renderSimResult(); if (state.simStep === 3) twin.play(); }
   });
   $("view").addEventListener("input", (e) => {
     if (e.target.id === "budget") { state.budget = Number(e.target.value); renderBudgetResult(); }
-    if (e.target.id === "simBudget") { state.budget = Number(e.target.value); renderSimResult(); }
+    if (e.target.id === "simBudget") { state.budget = Number(e.target.value); renderSimResult(); if (state.simStep === 3) twin.play(); }
     if (e.target.dataset.param) {
       const k = e.target.dataset.param, row = SLIDERS.find((s) => s[0] === k);
       state.overrides[k] = Number(e.target.value);
@@ -619,7 +703,7 @@
   $("themeBtn").onclick = () => {
     U.setTheme(U.theme() === "dark" ? "light" : "dark");
     $("themeBtn").textContent = U.theme() === "dark" ? "Light mode" : "Dark mode";
-    map.readTheme(); fork.readTheme(); refresh(false);
+    map.readTheme(); twin.readTheme(); refresh(false);
   };
   $("themeBtn").textContent = U.theme() === "dark" ? "Light mode" : "Dark mode";
 

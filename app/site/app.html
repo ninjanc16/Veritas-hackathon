@@ -6,10 +6,11 @@
       1 Risk profile   what is the drought risk here, and which canals leak
       2 Budget plan    given a budget and a drought severity, exactly which canals to seal,
                        what it costs, how long it takes and how much water it keeps
-      3 Simulation     from today forward: what doing nothing costs against acting early
+      3 Simulation     from today forward: one district, doing nothing against acting early
 
   The map is drawn by js/scanmap.js on a <canvas>. It opens with a "scan" that builds the
-  picture one layer at a time. On the Simulation step the map gives way to js/fork.js.
+  picture one layer at a time. On the Simulation step you pick a district and a scenario on
+  the map, and then js/twin.js draws that district twice, side by side.
 
   The first visit asks who you are: a district manager (pick your district) or a state
   agency (all of Texas). There is no sign-in. All logic is in js/platform.js.
@@ -42,7 +43,7 @@
   <main class="shell" id="shell">
     <section class="stage" id="stage">
       <canvas id="map"></canvas>
-      <canvas id="fork"></canvas>
+      <canvas id="twin"></canvas>
       <div id="vig" class="mapOnly"></div><div class="cine t"></div><div class="cine b"></div>
       <div id="bar"></div>
       <!-- Map controls -->
@@ -60,10 +61,11 @@
       <div id="zoom" class="mapOnly"><button id="zin" aria-label="Zoom in">+</button><button id="zout" aria-label="Zoom out">&minus;</button></div>
       <div id="coords" class="mapOnly"></div>
       <div id="tip"></div>
-      <!-- Simulation controls (The Fork) -->
-      <div id="forkTop" class="simOnly"></div>
-      <div id="forkLedger" class="simOnly"></div>
-      <div id="forkBar" class="simOnly"><button class="sbtn main" id="forkPlay">Play</button><input type="range" id="forkSeek" min="0" max="1" value="0" aria-label="Week"><span id="forkDate"></span></div>
+      <!-- Simulation: the three sub-step chips, the prompt, the scenario cards and the play bar -->
+      <div id="simSteps"></div>
+      <div id="simPrompt"></div>
+      <div id="simCards"></div>
+      <div id="simBar" class="simOnly"><button class="sbtn main" id="simPlay">Play</button><button class="sbtn" id="simSkip">Skip to the end</button><input type="range" id="simSeek" min="0" max="1" value="0" aria-label="Week"><span id="simDate"></span></div>
     </section>
     <aside class="panel">
       <nav class="stepper" id="stepper">
@@ -107,7 +109,7 @@
   <script src="sim/engine.js"></script>
   <script src="js/common.js"></script>
   <script src="js/scanmap.js"></script>
-  <script src="js/fork.js"></script>
+  <script src="js/twin.js"></script>
   <script src="js/platform.js"></script>
 </body>
 </html>
