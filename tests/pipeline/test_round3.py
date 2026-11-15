@@ -27,6 +27,8 @@ from farmdrought.prob_calibration import (brier, calibrate_by_past, calibration_
 from farmdrought.trigger import run_trigger, run_trigger_annual
 from farmdrought import seepage_calibration as seepage
 from farmdrought import prospective
+from farmdrought import boosting
+from farmdrought.features import FEATURES_E, FEATURES_H, FEATURES_L
 from farmdrought.uncertainty import direction, excludes_zero, resample_years, year_block_bootstrap
 
 YEARS = list(range(2008, 2020))
@@ -1965,3 +1967,76 @@ def test_prospective_log_only_appends_and_never_rewrites_a_week(tmp_path):
     assert path.read_bytes() == before
     assert json.loads(path.read_text())["counties"][0]["p_season"] == 0.31
     assert sorted(p.name for p in tmp_path.iterdir()) == ["2027-01-05.json", "2027-01-12.json"]
+
+
+# ---------------------------------------------------------------------------------------------
+# boosting.py (the cheap model comparison). Made-up tables only.
+# ---------------------------------------------------------------------------------------------
+def made_up_issue_rows():
+    """Monthly rows for 8 counties, 2003 to 2025, with every input column the 6-month models read.
+    One input ("cls") carries the answer; the rest are fixed patterns. No random numbers."""
+    rows = []
+    for year in range(2003, 2026):
+        for month in range(1, 13):
+            for county in range(8):
+                dryness = (5 * year + 3 * month + 7 * county) % 12
+                row = {name: float((dryness + i) % 5) for i, name in enumerate(FEATURES_H + FEATURES_L + FEATURES_E)}
+                row.update({"date": pd.Timestamp(year=year, month=month, day=3), "fips": f"990{county:02d}",
+                            "river": "Rio Grande", "cls": float(dryness // 3), "y_season": float(dryness >= 8)})
+                rows.append(row)
+    return pd.DataFrame(rows)
+
+
+def test_boosting_uses_default_settings_seed_zero_and_the_forests_inputs():
+    # Arrange / Act
+    model = boosting.make_boosting()
+    defaults = type(model)().get_params()
+
+    # Assert: nothing but the seed differs from scikit-learn's defaults
+    assert type(model).__name__ == "HistGradientBoostingClassifier"
+    assert {k: v for k, v in model.get_params().items() if defaults[k] != v} == {"random_state": 0}
+
+
+def test_boosting_forecasts_cover_the_test_years_and_never_learn_from_their_own_year():
+    # Arrange
+    table = made_up_issue_rows()
+    year = table["date"].dt.year
+    rewritten = table.copy()
+    rewritten.loc[year == 2015, "y_season"] = 1 - rewritten.loc[year == 2015, "y_season"]     # 2015's answers turned round
+
+    # Act
+    original = boosting.boosting_forecasts(table)
+    after = boosting.boosting_forecasts(rewritten)
+
+    # Assert: a forecast for 2008 to 2025 only, all probabilities
+    assert original[year < 2008].isna().all() and original[year >= 2008].notna().all()
+    assert original.dropna().between(0, 1).all()
+    # 2015 and every earlier year are forecast exactly as before; later years change
+    assert original[year <= 2015].equals(after[year <= 2015])
+    assert not original[year >= 2017].equals(after[year >= 2017])
+    # and the same seed gives the same forecasts
+    assert original.equals(boosting.boosting_forecasts(table))
+
+
+def test_boosting_item_scores_all_three_on_the_same_rows():
+    # Arrange: scored rows with a forest forecast and the D1 rule; boosting is given as perfect
+    table = made_up_issue_rows()
+    scored = table[table["date"].dt.year >= 2008].assign(p_season=lambda t: t["cls"] / 4,
+                                                         alarm_season_d1=lambda t: t["cls"] >= 2)
+    perfect = scored["y_season"]
+
+    # Act
+    item = boosting.boosting_item(scored, perfect)
+    by_name = {entry["b"]: entry for entry in item["comparisons"]}
+
+    # Assert: a perfect forecast costs nothing; the other two costs are the cost rule on the same rows
+    assert item["rows"] == len(scored) and item["years"] == 18
+    assert item["cost"]["boosting"] == 0.0
+    assert item["cost"]["forest"] == tally_cost(scored["y_season"], scored["p_season"] >= 0.25)
+    assert item["cost"]["D1 now"] == tally_cost(scored["y_season"], scored["cls"] >= 2)
+    assert by_name["forest"]["difference"] == -item["cost"]["forest"]
+    assert by_name["forest"]["block1"]["n_years"] == 18 and by_name["forest"]["block2"]["block"] == 2
+    assert by_name["D1 now"]["block1"]["direction"] in ("boosting better", "D1 now better", "not separated")
+    # a scored row with no boosting forecast is an error, not a silent drop
+    with pytest.raises(ValueError, match="no boosting forecast"):
+        boosting.boosting_item(scored, perfect.where(scored["date"].dt.year > 2008))
