@@ -315,9 +315,9 @@
     /* The advice that goes with a chance of a drought season (the same cut-offs as the canal plan). */
     function actionFor(p) {
       if (p >= HG.threshold) return { key: "seal", title: "Seal and repair before the season",
-        text: "The chance of a drought season is over the warning line. Walk the top canals, confirm they are unlined, and seal before the first irrigation." };
+        text: "The chance of a drought season is over the warning line. Walk the canals at the top of the list, confirm they are unlined, and seal before the first irrigation." };
       if (p >= HG.threshold / 2) return { key: "inspect", title: "Inspect and prepare",
-        text: "Not over the warning line yet. Inspect the top canals and line up sealant so you can act quickly if the forecast rises." };
+        text: "Not over the warning line yet. Inspect the canals at the top of the list and line up sealant so you can act quickly if the forecast rises." };
       return { key: "none", title: "No extra action",
         text: "The chance of a drought season is low. In a normal year canal leakage also refills groundwater, so sealing is not needed." };
     }

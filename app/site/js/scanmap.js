@@ -448,7 +448,7 @@
       });
       flying--; S.risk = 1; await wt(600);
 
-      say("Which canals first", "forecast and soil combined, canal by canal"); bar(6);
+      say("A modelled sealing order", "forecast and soil combined, canal by canal"); bar(6);
       await fl(canalBox, 2600);
       await tw(S, { lev: 1 }, 2200, ease.io, (e) => live(fmt(Math.round(mine.length * e)) + " segments ranked"));
       for (let i = 0; i < 2; i++) { await tw(S, { pulse: 1 }, 500, ease.out); await tw(S, { pulse: 0 }, 700, ease.io); }

@@ -297,6 +297,22 @@ test("actionFor uses the same two cut-offs as tierFor: seal, inspect, none", () 
   for (const p of [0.9, 0.2, 0]) { const a = actionFor(p); assert.ok(a.title.length > 0 && a.text.length > 0); }
 });
 
+test("actionFor's advice points at the top of the list, not at canals called the top ones", () => {
+  const { actionFor } = logic();
+  assert.strictEqual(actionFor(0.9).text, "The chance of a drought season is over the warning line. Walk the canals at the top of the list, confirm they are unlined, and seal before the first irrigation.");
+  assert.strictEqual(actionFor(0.2).text, "Not over the warning line yet. Inspect the canals at the top of the list and line up sealant so you can act quickly if the forecast rises.");
+  for (const p of [0.9, 0.2, 0]) assert.ok(actionFor(p).text.indexOf("the top canals") < 0);
+});
+
+test("the scan caption and the home page do not present the canal order or the leak figure as findings", () => {
+  const scan = fs.readFileSync(path.join(__dirname, "scanmap.js"), "utf8"), home = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
+  assert.ok(scan.indexOf('say("A modelled sealing order", "forecast and soil combined, canal by canal");') >= 0);
+  assert.ok(scan.indexOf("Which canals first") < 0);
+  // The home page's leak figure is followed, in the same block, by the line that says what it is.
+  const block = home.slice(home.indexOf('id="nGal"'), home.indexOf("</section>", home.indexOf('id="nGal"')));
+  assert.ok(block.indexOf("<p class=\"src\">An upper estimate from published leak rates. Our own test could not confirm the model's volumes.</p>") >= 0);
+});
+
 test("tierFor and actionFor follow the warning line in the data, not a fixed number", () => {
   const data = fake(); data.HG.threshold = 0.6;
   const { tierFor, actionFor } = logic(data);
@@ -1057,6 +1073,9 @@ test("the picture's caption is fixed wording and is shown whenever the picture i
   assert.ok(/#twinCaption \{ position: absolute;[^}]*bottom: 52px;/.test(css));
   assert.strictEqual((css.match(/#twinCaption/g) || []).length, 1);
   // These are the single figures the caption covers; if the picture gains another, this list must be looked at again.
-  for (const label of ["Crops lost so far", "Crops saved so far", "Water saved from leaking", "Water leaked out of canals", "Sealing early "]) assert.ok(twin.indexOf(label) >= 0, label);
-  assert.strictEqual((twin.match(/money\(/g) || []).length, 3, "three dollar figures are drawn on the picture: crops lost, crops saved, the closing line");
+  for (const label of ["Crops lost so far", "Crops saved so far", "Water saved from leaking", "Water leaked out of canals", "In this illustrative run, sealing early kept "]) assert.ok(twin.indexOf(label) >= 0, label);
+  assert.strictEqual((twin.match(/money\(/g) || []).length, 4, "four dollar figures are drawn on the picture: crops lost, crops saved, and the closing line's crops kept and sealant bill");
+  // The closing line reports this one run; it does not state a saving as a fact.
+  assert.ok(twin.indexOf('"In this illustrative run, sealing early kept " + money(kept) + " of crops"') >= 0);
+  assert.ok(!/Sealing early "? ?\+? ?\(?.{0,20}saves/.test(twin) && twin.indexOf("saves ") < 0, "no \"saves\" on the picture");
 });

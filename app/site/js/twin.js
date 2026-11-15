@@ -185,10 +185,16 @@
       panels.forEach((p, k) => drawPanel(p, k, w, dt));
       // The result, once the run has finished.
       if (i >= data.weeks.length - 1) {
-        const diff = (w.sumL.loss + w.sumL.spend) - (w.sumR.loss + w.sumR.spend), small = Math.abs(diff) < 1000;
-        const label = small ? "No measurable difference" : "Sealing early " + (diff > 0 ? "saves " : "costs ") + money(Math.abs(diff)) + (diff > 0 ? "" : " more");
-        const size = narrow ? 15 : 20, color = small ? C.muted : diff > 0 ? C.low : C.warning;
+        // Said as what happened in this one run, not as a saving: the crops kept, and the sealant
+        // bill too when it was the larger of the two. The page's caption on the picture says the
+        // run is illustrative; it is shown whenever the picture is.
+        const kept = w.sumL.loss - w.sumR.loss, spend = w.sumR.spend - w.sumL.spend, small = kept < 1000;
+        const label = small ? "In this illustrative run, sealing early kept no measurable amount of crops."
+          : "In this illustrative run, sealing early kept " + money(kept) + " of crops" + (spend > kept ? " and cost " + money(spend) + " in sealant." : ".");
+        const color = small ? C.muted : spend > kept ? C.warning : C.low;
+        let size = narrow ? 15 : 20;
         ctx.font = "600 " + size + "px " + C.serif;
+        while (ctx.measureText(label).width + 30 > W - 16 && size > 10) { size -= 1; ctx.font = "600 " + size + "px " + C.serif; }   // keep the line inside the picture
         const tw = ctx.measureText(label).width + 30, ty = narrow ? panels[1].y - 6 : panels[0].y + 62;
         ctx.globalAlpha = 1; ctx.fillStyle = C.map; ctx.strokeStyle = color; ctx.lineWidth = 2;
         ctx.fillRect(W / 2 - tw / 2, ty - 20, tw, 40); ctx.strokeRect(W / 2 - tw / 2, ty - 20, tw, 40);
