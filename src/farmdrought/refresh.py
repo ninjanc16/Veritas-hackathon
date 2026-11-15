@@ -11,10 +11,13 @@ So running this every day gives a new reservoir reading daily and a new forecast
 WHAT IT DOES:
   1. Download the fresh files. A download is checked BEFORE it replaces the saved file.
      If a source fails, the saved file is kept and the failure is reported.
-  2. If the drought map or the El Nino index changed, rerun version 2 (about 11 minutes).
-  3. Rerun the export (every forecast, the canal levels and the sealant plan).
-  4. Rebuild the demo's data file.
-  5. Write reports/refresh.json: what was fetched, how new it is, and what failed.
+  2. If anything changed, rerun version 2 (about 11 minutes on a laptop), then the export
+     (every forecast, the canal levels and the sealant plan). Version 2 is rerun every time,
+     even when only a reservoir changed, so that its report and the export's columns always
+     come from the same computer. (A forest retrained on a different computer can differ by
+     a few cost points, because of rounding. See reports/decision.md.)
+  3. Rebuild the demo's data file.
+  4. Write reports/refresh.json: what was fetched, how new it is, and what failed.
 
 HONEST NOTE: each new week also gives a few more weeks their real answer, so the test
 scores in metrics.json can move slightly from one refresh to the next. The models, inputs,
@@ -156,13 +159,13 @@ def main():
         print(name, report["sources"][name], flush=True)
 
     changed = lambda name: report["sources"][name]["changed"]
-    # Only the drought map, El Nino and weather feed the models. Reservoirs feed the second
-    # 6-month forecast and the reservoir tiles, which the export alone rebuilds.
-    report["models_rerun"] = changed("drought_monitor") or changed("el_nino_index") or changed("county_weather")
+    # Did the inputs of the main forecasts change? (Reservoirs only feed the second 6-month
+    # forecast and the reservoir tiles.) This is recorded so a reader knows what kind of day it was.
+    report["forecast_inputs_changed"] = (changed("drought_monitor") or changed("el_nino_index")
+                                         or changed("county_weather"))
     report["outputs_rebuilt"] = "--download-only" not in sys.argv and any(changed(name) for name in sources)
     if report["outputs_rebuilt"]:
-        if report["models_rerun"]:
-            run("-m", "farmdrought.v2")      # version 2 first: the export reads its report
+        run("-m", "farmdrought.v2")          # version 2 first: the export reads its report
         run("-m", "farmdrought.export")
         if (ROOT / "demo" / "build_data.py").exists():
             run("demo/build_data.py")

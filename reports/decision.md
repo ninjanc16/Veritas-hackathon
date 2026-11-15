@@ -155,3 +155,10 @@ A rule, not a trained model. It adds two links to the canal chain: which irrigat
 - **Sealant rule:** canals inside a district are ranked by seepage rate x chance of a drought season. The budget pays for canals from the top down. Drains and canals on soil with no published rate are left out.
 - **Assumptions, none measured:** every canal is bare earth, has 20 feet of wetted width and carries water for 90 days. The budget ($100,000) is an example. The sealant price ($0.004 per square foot, materials only), its effect (28% to 87% less seepage) and its life (about 3 months) are the same published figures the app's calculator uses.
 - **Not tested:** there are no measured leaks or lining records to check the plan against. The rule and its figures were fixed before the first run and not changed after it.
+
+## Live refresh (added Nov 14, 2026)
+
+A daily job downloads the newest drought map, El Nino index, reservoir readings and (monthly) weather, then reruns everything with the same code and settings. Two honest notes:
+
+- **Scores can move.** Each new week gives a few more weeks their real answer, so test-year numbers can shift slightly from one refresh to the next. No model, input, threshold or rule is changed by a refresh.
+- **Different computers give slightly different forests.** The first run on GitHub's computer gave version 2 of the 4-week alert a cost of 1,739, against 1,742 on the laptop that produced the numbers above. The cause is rounding inside the forest training, not a change in data or code. The job's own check caught the mismatch and saved nothing. Since then a refresh always reruns version 2 and the export on the same computer, so every published number comes from one run.
