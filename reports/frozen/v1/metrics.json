@@ -1,0 +1,1599 @@
+{
+  "contract_version": 2,
+  "is_final": true,
+  "focus_river": "Rio Grande",
+  "training_scope": "Rio Grande counties only",
+  "n_rows": 177452,
+  "n_focus_rows": 12617,
+  "n_counties": 436,
+  "n_focus_counties": 31,
+  "horizon_weeks": 4,
+  "train_years": [
+    2000,
+    2014
+  ],
+  "val_years": [
+    2015,
+    2018
+  ],
+  "test_years": [
+    2019,
+    2026
+  ],
+  "miss_cost": 3,
+  "policies": [
+    {
+      "name": "Our system",
+      "column": "alarm_system",
+      "cost": 1912,
+      "alarms": 7269,
+      "caught": 6773,
+      "missed": 472,
+      "false_alarms": 496,
+      "precision": 0.932,
+      "recall": 0.935,
+      "auc": 0.975
+    },
+    {
+      "name": "Persistence",
+      "column": "alarm_persistence",
+      "cost": 2403,
+      "alarms": 6680,
+      "caught": 6503,
+      "missed": 742,
+      "false_alarms": 177,
+      "precision": 0.974,
+      "recall": 0.898,
+      "auc": null
+    },
+    {
+      "name": "D1 now",
+      "column": "alarm_d1_now",
+      "cost": 2333,
+      "alarms": 9118,
+      "caught": 7130,
+      "missed": 115,
+      "false_alarms": 1988,
+      "precision": 0.782,
+      "recall": 0.984,
+      "auc": null
+    },
+    {
+      "name": "Worsening",
+      "column": "alarm_worsening",
+      "cost": 1971,
+      "alarms": 7236,
+      "caught": 6750,
+      "missed": 495,
+      "false_alarms": 486,
+      "precision": 0.933,
+      "recall": 0.932,
+      "auc": null
+    },
+    {
+      "name": "Calendar",
+      "column": "alarm_calendar",
+      "cost": 21735,
+      "alarms": 0,
+      "caught": 0,
+      "missed": 7245,
+      "false_alarms": 0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "auc": null
+    }
+  ],
+  "headline": {
+    "system_cost": 1912,
+    "persistence_cost": 2403,
+    "pct_cheaper_than_persistence": 20.4,
+    "cheapest_baseline_on_test": "Worsening",
+    "cheapest_baseline_cost": 1971,
+    "honesty_check_pass": true
+  },
+  "onset": {
+    "rows": 5937,
+    "positives": 742,
+    "system_cost": 1735,
+    "best_rule": "Worsening",
+    "best_rule_cost": 1794,
+    "never_warn_cost": 2226,
+    "precision": 0.458,
+    "recall": 0.364,
+    "auc": 0.832
+  },
+  "events": {
+    "n": 175,
+    "warned_within_4_weeks": 100,
+    "median_lead_weeks": 3.0
+  },
+  "cost_sensitivity": [
+    {
+      "miss_cost": 2,
+      "system_cost": 1537,
+      "best_baseline_cost": 1476
+    },
+    {
+      "miss_cost": 3,
+      "system_cost": 1912,
+      "best_baseline_cost": 1971
+    },
+    {
+      "miss_cost": 5,
+      "system_cost": 2603,
+      "best_baseline_cost": 2563
+    },
+    {
+      "miss_cost": 10,
+      "system_cost": 3097,
+      "best_baseline_cost": 3138
+    }
+  ],
+  "year_by_year": [
+    {
+      "year": 2019,
+      "positives": 512,
+      "system_cost": 248,
+      "persistence_cost": 341
+    },
+    {
+      "year": 2020,
+      "positives": 1069,
+      "system_cost": 284,
+      "persistence_cost": 427
+    },
+    {
+      "year": 2021,
+      "positives": 1098,
+      "system_cost": 223,
+      "persistence_cost": 267
+    },
+    {
+      "year": 2022,
+      "positives": 999,
+      "system_cost": 138,
+      "persistence_cost": 165
+    },
+    {
+      "year": 2023,
+      "positives": 752,
+      "system_cost": 356,
+      "persistence_cost": 410
+    },
+    {
+      "year": 2024,
+      "positives": 667,
+      "system_cost": 165,
+      "persistence_cost": 147
+    },
+    {
+      "year": 2025,
+      "positives": 1125,
+      "system_cost": 242,
+      "persistence_cost": 335
+    },
+    {
+      "year": 2026,
+      "positives": 1023,
+      "system_cost": 256,
+      "persistence_cost": 311
+    }
+  ],
+  "per_river": [
+    {
+      "river": "Rio Grande",
+      "counties": 31,
+      "system_cost": 1912,
+      "persistence_cost": 2403,
+      "best_rule": "Worsening",
+      "best_rule_cost": 1971,
+      "pct_cheaper_than_best_rule": 3.0,
+      "own_river_cost": 1912,
+      "all_rivers_cost": 1760,
+      "precision": 0.932,
+      "recall": 0.935,
+      "auc": 0.975
+    },
+    {
+      "river": "Mississippi",
+      "counties": 164,
+      "system_cost": 9232,
+      "persistence_cost": 10382,
+      "best_rule": "Worsening",
+      "best_rule_cost": 8677,
+      "pct_cheaper_than_best_rule": -6.4,
+      "own_river_cost": 8190,
+      "all_rivers_cost": 8087,
+      "precision": 0.811,
+      "recall": 0.779,
+      "auc": 0.955
+    },
+    {
+      "river": "Missouri",
+      "counties": 103,
+      "system_cost": 5455,
+      "persistence_cost": 6100,
+      "best_rule": "Worsening",
+      "best_rule_cost": 5358,
+      "pct_cheaper_than_best_rule": -1.8,
+      "own_river_cost": 5848,
+      "all_rivers_cost": 5093,
+      "precision": 0.877,
+      "recall": 0.875,
+      "auc": 0.972
+    },
+    {
+      "river": "Colorado",
+      "counties": 13,
+      "system_cost": 572,
+      "persistence_cost": 664,
+      "best_rule": "Worsening",
+      "best_rule_cost": 512,
+      "pct_cheaper_than_best_rule": -11.7,
+      "own_river_cost": 562,
+      "all_rivers_cost": 525,
+      "precision": 0.957,
+      "recall": 0.946,
+      "auc": 0.983
+    },
+    {
+      "river": "Ohio",
+      "counties": 125,
+      "system_cost": 4592,
+      "persistence_cost": 4470,
+      "best_rule": "Persistence",
+      "best_rule_cost": 4470,
+      "pct_cheaper_than_best_rule": -2.7,
+      "own_river_cost": 4625,
+      "all_rivers_cost": 4615,
+      "precision": 0.582,
+      "recall": 0.598,
+      "auc": 0.935
+    }
+  ],
+  "season": {
+    "horizon_weeks": 26,
+    "target": "8 or more consecutive weeks at D2 or worse inside the next 26 weeks",
+    "test_years": [
+      2008,
+      2025
+    ],
+    "threshold": 0.25,
+    "focus": {
+      "rows": 6665,
+      "base_rate": 0.489,
+      "precision": 0.733,
+      "recall": 0.868,
+      "auc": 0.868,
+      "system_cost": 2324,
+      "persistence_cost": 3133,
+      "d1_rule_cost": 2382,
+      "usual_cost": 3871,
+      "always_warn_cost": 3403,
+      "never_warn_cost": 9786,
+      "pct_cheaper_than_persistence": 25.8,
+      "beats_every_baseline": true,
+      "years_better_than_usual": "16/18"
+    },
+    "per_river": [
+      {
+        "river": "Rio Grande",
+        "system_cost": 2324,
+        "persistence_cost": 3133,
+        "best_rule": "D1 now",
+        "best_rule_cost": 2382,
+        "pct_cheaper_than_best_rule": 2.4,
+        "own_river_cost": 2324
+      },
+      {
+        "river": "Mississippi",
+        "system_cost": 13807,
+        "persistence_cost": 9208,
+        "best_rule": "Persistence",
+        "best_rule_cost": 9208,
+        "pct_cheaper_than_best_rule": -49.9,
+        "own_river_cost": 10086
+      },
+      {
+        "river": "Missouri",
+        "system_cost": 8142,
+        "persistence_cost": 6220,
+        "best_rule": "Persistence",
+        "best_rule_cost": 6220,
+        "pct_cheaper_than_best_rule": -30.9,
+        "own_river_cost": 6162
+      },
+      {
+        "river": "Colorado",
+        "system_cost": 1059,
+        "persistence_cost": 1215,
+        "best_rule": "D1 now",
+        "best_rule_cost": 1048,
+        "pct_cheaper_than_best_rule": -1.0,
+        "own_river_cost": 1072
+      },
+      {
+        "river": "Ohio",
+        "system_cost": 5258,
+        "persistence_cost": 2488,
+        "best_rule": "Persistence",
+        "best_rule_cost": 2488,
+        "pct_cheaper_than_best_rule": -111.3,
+        "own_river_cost": 2658
+      }
+    ]
+  },
+  "year": {
+    "horizon_weeks": 52,
+    "target": "number of weeks at D2 or worse in the next 52 weeks",
+    "test_years": [
+      2008,
+      2025
+    ],
+    "focus": {
+      "rows": 6665,
+      "mean_weeks": 22.1,
+      "mae_system": 14.0,
+      "mae_same_as_now": 14.52,
+      "mae_last_year": 15.18,
+      "mae_usual": 17.39,
+      "beats_every_baseline": true,
+      "years_better_than_last_year": "11/18",
+      "years_better_than_usual": "14/18"
+    },
+    "per_river": [
+      {
+        "river": "Rio Grande",
+        "mae_system": 14.0,
+        "best_baseline": "same as now",
+        "mae_best_baseline": 14.52,
+        "mae_own_river": 14.0
+      },
+      {
+        "river": "Mississippi",
+        "mae_system": 12.31,
+        "best_baseline": "usual",
+        "mae_best_baseline": 6.49,
+        "mae_own_river": 5.83
+      },
+      {
+        "river": "Missouri",
+        "mae_system": 12.83,
+        "best_baseline": "same as now",
+        "mae_best_baseline": 8.63,
+        "mae_own_river": 7.64
+      },
+      {
+        "river": "Colorado",
+        "mae_system": 13.55,
+        "best_baseline": "same as now",
+        "mae_best_baseline": 13.21,
+        "mae_own_river": 12.79
+      },
+      {
+        "river": "Ohio",
+        "mae_system": 11.78,
+        "best_baseline": "usual",
+        "mae_best_baseline": 2.63,
+        "mae_own_river": 2.71
+      }
+    ]
+  },
+  "failure_examples": [
+    {
+      "product": "4-week alert",
+      "date": "2023-04-04",
+      "county": "Hidalgo",
+      "state": "Texas",
+      "what_happened": "False alarm: the system warned with a risk score of 1.00, but the county did not reach severe drought in the next 4 weeks."
+    },
+    {
+      "product": "4-week alert",
+      "date": "2024-12-31",
+      "county": "Rio Grande",
+      "state": "Colorado",
+      "what_happened": "Miss: the risk score was only 0.00, so there was no warning, but the county reached severe drought within 4 weeks."
+    },
+    {
+      "product": "6-month outlook",
+      "date": "2021-06-01",
+      "county": "Hudspeth",
+      "state": "Texas",
+      "what_happened": "False alarm: the outlook gave a 100% chance of 8 or more severe-drought weeks in a row within 6 months, but it did not happen."
+    },
+    {
+      "product": "12-month outlook",
+      "date": "2011-03-01",
+      "county": "Santa Fe",
+      "state": "New Mexico",
+      "what_happened": "The outlook estimated 3 weeks of severe drought in the next 52, but there were 49. The largest errors fall on forecasts issued in 2011. The deepest drought followed forecasts issued in 2012."
+    }
+  ],
+  "shuffled_auc_mean": 0.44,
+  "ablations": [
+    {
+      "name": "4-week forest trained on all five rivers",
+      "product": "4-week alert",
+      "result": "Cost 1760 on the Rio Grande, against 1912 for the Rio Grande-trained system."
+    },
+    {
+      "name": "Logistic regression in place of the forest",
+      "product": "4-week alert",
+      "result": "Cost 2535 on the Rio Grande, against 1912 for the forest."
+    },
+    {
+      "name": "6-month forest without the El Nino inputs",
+      "product": "6-month outlook",
+      "result": "Cost 2489 on the Rio Grande, against 2324 with them."
+    },
+    {
+      "name": "6-month forest trained on all five rivers",
+      "product": "6-month outlook",
+      "result": "Cost 2708 on the Rio Grande, against 2324 for the Rio Grande-trained system."
+    },
+    {
+      "name": "12-month forest trained on all five rivers",
+      "product": "12-month outlook",
+      "result": "Average error 13.38 weeks on the Rio Grande, against 14.0 for the Rio Grande-trained system."
+    },
+    {
+      "name": "River flow added as an input",
+      "product": "6-month outlook",
+      "result": "Cost 2378 with it, against 2272 without it, on the same 6577 Rio Grande rows."
+    },
+    {
+      "name": "River flow added as an input",
+      "product": "12-month outlook",
+      "result": "Average error 14.64 weeks with it, against 14.07 without it, on the same 6577 Rio Grande rows."
+    },
+    {
+      "name": "Snowpack (snowmelt supply) added as an input",
+      "product": "6-month outlook",
+      "result": "Cost 2338 with it, against 2324 without it, on the same 6665 Rio Grande rows."
+    },
+    {
+      "name": "Snowpack (snowmelt supply) added as an input",
+      "product": "12-month outlook",
+      "result": "Average error 13.75 weeks with it, against 14.0 without it, on the same 6665 Rio Grande rows."
+    },
+    {
+      "name": "River flow and snowpack together added as an input",
+      "product": "6-month outlook",
+      "result": "Cost 2342 with it, against 2272 without it, on the same 6577 Rio Grande rows."
+    },
+    {
+      "name": "River flow and snowpack together added as an input",
+      "product": "12-month outlook",
+      "result": "Average error 14.18 weeks with it, against 14.07 without it, on the same 6577 Rio Grande rows."
+    }
+  ],
+  "feature_importance": [
+    {
+      "feature": "cls",
+      "importance": 0.172
+    },
+    {
+      "feature": "since_d2",
+      "importance": 0.1564
+    },
+    {
+      "feature": "l1",
+      "importance": 0.1293
+    },
+    {
+      "feature": "nb_d2",
+      "importance": 0.1133
+    },
+    {
+      "feature": "mean12",
+      "importance": 0.0749
+    },
+    {
+      "feature": "nb_mean",
+      "importance": 0.0677
+    },
+    {
+      "feature": "l2",
+      "importance": 0.0606
+    },
+    {
+      "feature": "max12",
+      "importance": 0.0574
+    },
+    {
+      "feature": "l4",
+      "importance": 0.0533
+    },
+    {
+      "feature": "mean26",
+      "importance": 0.027
+    },
+    {
+      "feature": "nb_max",
+      "importance": 0.024
+    },
+    {
+      "feature": "l8",
+      "importance": 0.0174
+    },
+    {
+      "feature": "nb_chg4",
+      "importance": 0.0096
+    },
+    {
+      "feature": "max26",
+      "importance": 0.0064
+    },
+    {
+      "feature": "chg8",
+      "importance": 0.0059
+    },
+    {
+      "feature": "nb_minus_self",
+      "importance": 0.0052
+    },
+    {
+      "feature": "sin",
+      "importance": 0.0044
+    },
+    {
+      "feature": "max52",
+      "importance": 0.0038
+    },
+    {
+      "feature": "chg4",
+      "importance": 0.0037
+    },
+    {
+      "feature": "run",
+      "importance": 0.0033
+    },
+    {
+      "feature": "l26",
+      "importance": 0.0015
+    },
+    {
+      "feature": "cos",
+      "importance": 0.0012
+    },
+    {
+      "feature": "l52",
+      "importance": 0.0012
+    },
+    {
+      "feature": "l12",
+      "importance": 0.0004
+    }
+  ],
+  "limits": [
+    "The cost rule (a miss costs 3 false alarms) is our assumption. Results at other costs are in cost_sensitivity.",
+    "The 4-week risk score is not a calibrated probability.",
+    "On the Rio Grande the 4-week system (cost 1912) is close to a tie with the best simple rule, Worsening (cost 1971).",
+    "Onset is the hard part. For counties not yet in severe drought, the system caught 36% of the weeks that led to it, with precision 46%. Its cost was 1735, against 1794 for the best simple rule (Worsening) and 2226 for never warning.",
+    "The 6-month outlook costs 2324, against 2382 for the 'D1 or worse now' rule. That is close to a tie.",
+    "The 12-month outlook is off by 14.0 weeks on average, against an average of 22.1 weeks. It is a planning range, not a precise forecast.",
+    "Transfer of the Rio Grande-trained 4-week system: it did not beat the best simple rule on: Mississippi, Missouri, Colorado, Ohio. It did not beat persistence on: Ohio.",
+    "Transfer of the Rio Grande-trained 6-month outlook: it did not beat the best simple rule on: Mississippi, Missouri, Colorado, Ohio.",
+    "Transfer of the Rio Grande-trained 12-month outlook: it did not beat the best baseline on: Mississippi, Missouri, Colorado, Ohio.",
+    "The 31 Rio Grande counties move together, so the real sample is about 18 years, not thousands of rows.",
+    "Design choices were made after exploratory runs on the same test years.",
+    "Counties are chosen by a 50 km rule from the river's main line. A different width gives a different set.",
+    "The Drought Monitor map is drawn by people each week, so the target includes their judgment.",
+    "A warning is not a payment decision. The grazing-period rule of the aid program is not modeled.",
+    "The 6-month target (8 weeks in a row at D2) matches the aid rule for years up to 2025. For 2026 USDA lowered the trigger to 4 weeks in a row (FSA Notice LFP-8).",
+    "The damage figure on the map is an estimate, not a tested forecast. It assumes every week of severe drought is a week of bought feed, priced at USDA's 2026 monthly feed cost for an adult beef cow. It was not checked against real losses, and it inherits the 12-month outlook's error.",
+    "Nothing here measures crop yields.",
+    "River flow and snowpack were tested as extra inputs and are not part of the system. See ablations. The El Paso gauge had no daily flow data and was dropped. The Del Norte gauge ends in 2024.",
+    "Weather inputs (rain, temperature, soil moisture) were not tested.",
+    "A random forest cannot predict a drought longer or deeper than any it saw in training.",
+    "Seed check: retrained with 10 random seeds, the system beat the best simple rule in 8/10 runs for the 4-week alert, 3/10 for the 6-month outlook and 10/10 for the 12-month outlook.",
+    "Buffer check: with a 100 km county rule (53 counties), the 4-week system cost 3269 against 3243 for the best simple rule (Worsening).",
+    "An outside review suggested two simple rules that were not in our baseline list. They were scored after the final run. 4-week rule 'D2 now, or D1 and worse than 4 or 8 weeks ago': cost 1840 on the test years, against 1912 for the system. 12-month rule 'average of 'same as now' and 'same as the last 52 weeks'': average error 13.21 weeks, against 14.0 for the system.",
+    "The 6-month outlook uses an El Nino value that NOAA publishes a few days into the month, around the same days the outlook is issued. A real-time forecast might have to use the value from a month earlier.",
+    "Pre-season trigger (outlooks issued January to March): our forecast caught 790 of 852 drought seasons with 271 false alarms. The simple rule 'D1 or worse now' caught 780 with 243. At a cost ratio of 0.25 the forecast is worth 0.3135 per decision against 0.3132 for the rule. That is a tie, not a win.",
+    "Reservoir storage did not help. The 6-month outlook costs 2452 with reservoir inputs, against 2324 without them. As a pre-season trigger the reservoir forecast caught 771 drought seasons with 261 false alarms.",
+    "Only 14 of the 31 Rio Grande counties are matched to a reservoir, and that matching is our assumption.",
+    "County drought is not the same as water supply. Water in the canals also depends on reservoir releases and on Mexico's deliveries under the 1944 water treaty, which are not modeled.",
+    "The loss figures are insured crop losses only, not all drought losses, and are not adjusted for inflation.",
+    "The canal map shows where canals and ditches are. It does not say which are irrigation canals, which are lined, how much any canal leaks or which district owns it.",
+    "The canal priority levels are an estimate of where leaks are likely, not measured leaks. They combine the 6-month forecast with a published seepage rate for the soil under each canal. They assume bare-earth canals, because we do not know which canals are lined. No canal was inspected or measured by us.",
+    "Version 2 was built after version 1's test results were known, so its list of candidates is not blind. Only the choice among candidates is protected: it never uses a year it is then scored on.",
+    "Version 2, 4-week alert: cost 1742 against 1912 for version 1 and 1840 for the best simple rule. It won with 5/5 random seeds. The recipe (deep + weather, forest 75% + worsening 4 or 8 weeks) was chosen on only 4 validation years, and it leans on a simple rule that an outside review found after the test.",
+    "Version 2, 6-month outlook: cost 2433 against 2324 for version 1. It did not improve (it won with 3/5 seeds). Version 1 stays.",
+    "Version 2, 12-month outlook: 13.46 weeks off against 14.0 for version 1, but the simple rule alone is 13.21. In most years version 2 simply chose that rule over the forest.",
+    "Weather inputs alone (rain and temperature) did not help: 4-week 2050, 6-month 2559, 12-month 14.12, each worse than version 1.",
+    "The district map and sealant plan cover Texas districts only. We found no public boundary file for districts in New Mexico or Colorado.",
+    "The sealant plan is a ranking, not a measurement. It assumes every canal is bare earth, has 20 feet of wetted width and carries water for 90 days. We do not know which canals are already lined. The budget is an example figure, and the sealant price is materials only."
+  ],
+  "alert_threshold": 0.36,
+  "map_fields": {
+    "columns": {
+      "risk_level": "Overall level for the map: the worse of the 4-week tier and the 6-month tier",
+      "weeks_low": "Low end of the 12-month estimate: weeks_model minus the average error measured on that river",
+      "weeks_high": "High end of the 12-month estimate: weeks_model plus that average error, at most 52",
+      "typical_drought_weeks": "Median length of the county's past severe-drought spells, in weeks (0 if none)",
+      "longest_drought_weeks": "The county's longest severe-drought spell on record, in weeks",
+      "damage_months": "Months of bought feed if every expected severe-drought week needs bought feed",
+      "damage_usd_per_100_head": "damage_months x monthly feed cost per head x 100 cattle, in dollars"
+    },
+    "feed_cost_per_head_month": 35.66,
+    "feed_cost_source": "USDA Farm Service Agency, Notice LFP-7, 2026 LFP Payment Rates, adult beef cattle",
+    "length_range_coverage_focus": 0.557,
+    "tested": "risk_level and the length range come from tested forecasts. The damage columns are untested estimates."
+  },
+  "seed_check": {
+    "runs": [
+      {
+        "seed": 0,
+        "alert_cost": 1912,
+        "season_cost": 2324,
+        "year_mae": 14.0
+      },
+      {
+        "seed": 1,
+        "alert_cost": 1940,
+        "season_cost": 2453,
+        "year_mae": 14.14
+      },
+      {
+        "seed": 2,
+        "alert_cost": 1899,
+        "season_cost": 2407,
+        "year_mae": 13.95
+      },
+      {
+        "seed": 3,
+        "alert_cost": 1888,
+        "season_cost": 2429,
+        "year_mae": 14.02
+      },
+      {
+        "seed": 4,
+        "alert_cost": 1883,
+        "season_cost": 2446,
+        "year_mae": 13.94
+      },
+      {
+        "seed": 5,
+        "alert_cost": 2005,
+        "season_cost": 2432,
+        "year_mae": 13.93
+      },
+      {
+        "seed": 6,
+        "alert_cost": 2063,
+        "season_cost": 2391,
+        "year_mae": 14.03
+      },
+      {
+        "seed": 7,
+        "alert_cost": 1915,
+        "season_cost": 2380,
+        "year_mae": 14.11
+      },
+      {
+        "seed": 8,
+        "alert_cost": 1922,
+        "season_cost": 2421,
+        "year_mae": 14.05
+      },
+      {
+        "seed": 9,
+        "alert_cost": 1931,
+        "season_cost": 2378,
+        "year_mae": 13.96
+      }
+    ],
+    "summary": {
+      "alert_cost": {
+        "lowest": 1883,
+        "highest": 2063,
+        "best_baseline": 1971,
+        "seeds_beating_best_baseline": "8/10"
+      },
+      "season_cost": {
+        "lowest": 2324,
+        "highest": 2453,
+        "best_baseline": 2382,
+        "seeds_beating_best_baseline": "3/10"
+      },
+      "year_mae": {
+        "lowest": 13.93,
+        "highest": 14.14,
+        "best_baseline": 14.52,
+        "seeds_beating_best_baseline": "10/10"
+      }
+    }
+  },
+  "buffer_check": {
+    "buffer_km": 100,
+    "n_focus_counties": 53,
+    "alert": {
+      "system_cost": 3269,
+      "best_baseline": "Worsening",
+      "best_baseline_cost": 3243,
+      "beats_every_baseline": false
+    },
+    "season": {
+      "system_cost": 4081,
+      "d1_rule_cost": 4168,
+      "persistence_cost": 5423,
+      "beats_every_baseline": true
+    },
+    "year": {
+      "mae_system": 13.99,
+      "mae_same_as_now": 14.39,
+      "mae_last_year": 14.94,
+      "beats_every_baseline": true
+    }
+  },
+  "extra_rules_check": {
+    "alert_rule": "D2 now, or D1 and worse than 4 or 8 weeks ago",
+    "alert_rule_cost_validation": 622,
+    "system_cost_validation": 636,
+    "alert_rule_cost_test": 1840,
+    "system_cost_test": 1912,
+    "year_rule": "average of 'same as now' and 'same as the last 52 weeks'",
+    "year_rule_mae": 13.21,
+    "system_mae": 14.0
+  },
+  "frozen": {
+    "score_through": "2026-11-10",
+    "evaluated_at": "2026-11-15T05:54:13-08:00",
+    "manifest_sha256": "f353768186ac5af41c19a0be285fa209498745e3ae8369e8f434e90042689221",
+    "git_commit": "35396bd52359c461be9a770acb02dc19b8b1547e",
+    "git_dirty_source": false,
+    "git_dirty_source_paths": [],
+    "git_dirty_source_means": "a file under src/ or a Python file in app/ differed from git_commit",
+    "seeds": {
+      "alert_forest": 0,
+      "outlook_forests": 0,
+      "shuffled_answer_check": [
+        0,
+        1,
+        2
+      ]
+    },
+    "python": "3.13.12",
+    "platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+    "library_versions": {
+      "pandas": "3.0.5",
+      "numpy": "2.5.3",
+      "scikit-learn": "1.9.1",
+      "pyarrow": "26.0.1"
+    },
+    "robustness_json_sha256": "2a1ea1527ebf4d1b03aec1841457355abd7fc65c081f4aa2a680da83771d9b24",
+    "v2_json_sha256": "64571fb47665b338c847e04387ef4c614ae99a64edbd8f4ef22e38ac3ee1c0c8",
+    "note": "reports/robustness.json and reports/v2.json were produced by earlier runs and were read as they are. evaluate() did not rerun the robustness checks or version 2's candidate search, so their numbers may come from a different computer than the rest of this file.",
+    "machine_note": "Random forests in this project are not identical across computers. Same code and data: the 6-month system cost was 2324 here and 2328 on the GitHub runner; a comparison model (the 4-week forest trained on all five rivers) cost 1760 here and 1883 there. Differences between machines can be as large as the margins between the system and the simple rules, so no margin smaller than that should be read as a result."
+  },
+  "trigger": {
+    "issue_months": [
+      1,
+      2,
+      3
+    ],
+    "threshold": 0.25,
+    "rows": 1674,
+    "drought_seasons": 852,
+    "rules": [
+      {
+        "name": "Our forecast",
+        "fires": 1061,
+        "caught": 790,
+        "missed": 62,
+        "false_alarms": 271,
+        "recall": 0.927,
+        "precision": 0.745
+      },
+      {
+        "name": "Our forecast with reservoirs",
+        "fires": 1032,
+        "caught": 771,
+        "missed": 81,
+        "false_alarms": 261,
+        "recall": 0.905,
+        "precision": 0.747
+      },
+      {
+        "name": "D1 or worse now",
+        "fires": 1023,
+        "caught": 780,
+        "missed": 72,
+        "false_alarms": 243,
+        "recall": 0.915,
+        "precision": 0.762
+      },
+      {
+        "name": "D2 or worse now",
+        "fires": 661,
+        "caught": 591,
+        "missed": 261,
+        "false_alarms": 70,
+        "recall": 0.694,
+        "precision": 0.894
+      },
+      {
+        "name": "Seal every year",
+        "fires": 1674,
+        "caught": 852,
+        "missed": 0,
+        "false_alarms": 822,
+        "recall": 1.0,
+        "precision": 0.509
+      }
+    ],
+    "value_sweep": [
+      {
+        "cost_ratio": 0.02,
+        "forecast": 0.4893,
+        "forecast_reservoir": 0.4896,
+        "d1_rule": 0.4537,
+        "persistence": 0.3451,
+        "seal_every_year": 0.489
+      },
+      {
+        "cost_ratio": 0.05,
+        "forecast": 0.4628,
+        "forecast_reservoir": 0.4632,
+        "d1_rule": 0.4354,
+        "persistence": 0.3333,
+        "seal_every_year": 0.459
+      },
+      {
+        "cost_ratio": 0.1,
+        "forecast": 0.4216,
+        "forecast_reservoir": 0.4179,
+        "d1_rule": 0.4048,
+        "persistence": 0.3136,
+        "seal_every_year": 0.409
+      },
+      {
+        "cost_ratio": 0.18,
+        "forecast": 0.3612,
+        "forecast_reservoir": 0.3599,
+        "d1_rule": 0.3559,
+        "persistence": 0.282,
+        "seal_every_year": 0.329
+      },
+      {
+        "cost_ratio": 0.25,
+        "forecast": 0.3135,
+        "forecast_reservoir": 0.3065,
+        "d1_rule": 0.3132,
+        "persistence": 0.2543,
+        "seal_every_year": 0.259
+      },
+      {
+        "cost_ratio": 0.5,
+        "forecast": 0.158,
+        "forecast_reservoir": 0.1679,
+        "d1_rule": 0.1604,
+        "persistence": 0.1556,
+        "seal_every_year": 0.009
+      }
+    ],
+    "forecast_beats_d1_rule": true,
+    "reservoir_forecast_beats_d1_rule": false,
+    "reservoir_counties_only": {
+      "counties": 14,
+      "rows": 756,
+      "drought_seasons": 402,
+      "rules": [
+        {
+          "name": "Our forecast",
+          "fires": 493,
+          "caught": 379,
+          "missed": 23,
+          "false_alarms": 114,
+          "recall": 0.943,
+          "precision": 0.769
+        },
+        {
+          "name": "Our forecast with reservoirs",
+          "fires": 513,
+          "caught": 381,
+          "missed": 21,
+          "false_alarms": 132,
+          "recall": 0.948,
+          "precision": 0.743
+        },
+        {
+          "name": "D1 or worse now",
+          "fires": 477,
+          "caught": 369,
+          "missed": 33,
+          "false_alarms": 108,
+          "recall": 0.918,
+          "precision": 0.774
+        },
+        {
+          "name": "D2 or worse now",
+          "fires": 308,
+          "caught": 285,
+          "missed": 117,
+          "false_alarms": 23,
+          "recall": 0.709,
+          "precision": 0.925
+        },
+        {
+          "name": "Seal every year",
+          "fires": 756,
+          "caught": 402,
+          "missed": 0,
+          "false_alarms": 354,
+          "recall": 1.0,
+          "precision": 0.532
+        }
+      ],
+      "value_sweep": [
+        {
+          "cost_ratio": 0.02,
+          "forecast": 0.5121,
+          "forecast_reservoir": 0.512,
+          "d1_rule": 0.4755,
+          "persistence": 0.3688,
+          "seal_every_year": 0.5117
+        },
+        {
+          "cost_ratio": 0.05,
+          "forecast": 0.487,
+          "forecast_reservoir": 0.4861,
+          "d1_rule": 0.4565,
+          "persistence": 0.3566,
+          "seal_every_year": 0.4817
+        },
+        {
+          "cost_ratio": 0.1,
+          "forecast": 0.4497,
+          "forecast_reservoir": 0.4472,
+          "d1_rule": 0.425,
+          "persistence": 0.3362,
+          "seal_every_year": 0.4317
+        },
+        {
+          "cost_ratio": 0.18,
+          "forecast": 0.3891,
+          "forecast_reservoir": 0.3828,
+          "d1_rule": 0.3745,
+          "persistence": 0.3037,
+          "seal_every_year": 0.3517
+        },
+        {
+          "cost_ratio": 0.25,
+          "forecast": 0.3383,
+          "forecast_reservoir": 0.3343,
+          "d1_rule": 0.3304,
+          "persistence": 0.2751,
+          "seal_every_year": 0.2817
+        },
+        {
+          "cost_ratio": 0.5,
+          "forecast": 0.1799,
+          "forecast_reservoir": 0.1971,
+          "d1_rule": 0.1726,
+          "persistence": 0.1733,
+          "seal_every_year": 0.0317
+        }
+      ]
+    }
+  },
+  "reservoir": {
+    "systems": [
+      {
+        "name": "Amistad-Falcon",
+        "counties": 10,
+        "first_date": "1990-01-01",
+        "last_date": "2026-11-14"
+      },
+      {
+        "name": "Elephant Butte",
+        "counties": 4,
+        "first_date": "1990-01-01",
+        "last_date": "2026-11-14"
+      }
+    ],
+    "counties_without_reservoir": 17,
+    "note": "Counties were matched to reservoirs by us, not from a published list. The ten Texas counties from Val Verde to Cameron use Amistad-Falcon (the two lakes added together). Sierra, Dona Ana, El Paso and Hudspeth use Elephant Butte. Counties upstream of a reservoir cannot draw from it, so they get no reservoir input. Storage data: Texas Water Development Board, waterdatafortexas.org.",
+    "season_cost_without": 2324,
+    "season_cost_with": 2452,
+    "helped": false
+  },
+  "losses": {
+    "source": "USDA Risk Management Agency, Cause of Loss files",
+    "years": [
+      2000,
+      2025
+    ],
+    "causes_included": [
+      "Drought"
+    ],
+    "total_usd": 361225400,
+    "by_year": [
+      {
+        "year": 2000,
+        "usd": 8803452
+      },
+      {
+        "year": 2001,
+        "usd": 31484632
+      },
+      {
+        "year": 2002,
+        "usd": 33054222
+      },
+      {
+        "year": 2003,
+        "usd": 1589818
+      },
+      {
+        "year": 2004,
+        "usd": 9421
+      },
+      {
+        "year": 2005,
+        "usd": 8306741
+      },
+      {
+        "year": 2006,
+        "usd": 33664730
+      },
+      {
+        "year": 2007,
+        "usd": 262393
+      },
+      {
+        "year": 2008,
+        "usd": 10746466
+      },
+      {
+        "year": 2009,
+        "usd": 18496014
+      },
+      {
+        "year": 2010,
+        "usd": 24238
+      },
+      {
+        "year": 2011,
+        "usd": 20864908
+      },
+      {
+        "year": 2012,
+        "usd": 5325326
+      },
+      {
+        "year": 2013,
+        "usd": 60813172
+      },
+      {
+        "year": 2014,
+        "usd": 1751048
+      },
+      {
+        "year": 2015,
+        "usd": 45642
+      },
+      {
+        "year": 2016,
+        "usd": 706208
+      },
+      {
+        "year": 2017,
+        "usd": 5483716
+      },
+      {
+        "year": 2018,
+        "usd": 40572558
+      },
+      {
+        "year": 2019,
+        "usd": 2963112
+      },
+      {
+        "year": 2020,
+        "usd": 20049947
+      },
+      {
+        "year": 2021,
+        "usd": 21878262
+      },
+      {
+        "year": 2022,
+        "usd": 8544004
+      },
+      {
+        "year": 2023,
+        "usd": 12155007
+      },
+      {
+        "year": 2024,
+        "usd": 9577369
+      },
+      {
+        "year": 2025,
+        "usd": 4052994
+      }
+    ],
+    "by_county": [
+      {
+        "fips": "48489",
+        "county": "Willacy",
+        "state": "Texas",
+        "usd": 149710654
+      },
+      {
+        "fips": "48215",
+        "county": "Hidalgo",
+        "state": "Texas",
+        "usd": 88326018
+      },
+      {
+        "fips": "48061",
+        "county": "Cameron",
+        "state": "Texas",
+        "usd": 85659348
+      },
+      {
+        "fips": "48427",
+        "county": "Starr",
+        "state": "Texas",
+        "usd": 29831166
+      },
+      {
+        "fips": "08109",
+        "county": "Saguache",
+        "state": "Colorado",
+        "usd": 2794237
+      },
+      {
+        "fips": "48271",
+        "county": "Kinney",
+        "state": "Texas",
+        "usd": 1737209
+      },
+      {
+        "fips": "48505",
+        "county": "Zapata",
+        "state": "Texas",
+        "usd": 1149666
+      },
+      {
+        "fips": "48127",
+        "county": "Dimmit",
+        "state": "Texas",
+        "usd": 842424
+      },
+      {
+        "fips": "48229",
+        "county": "Hudspeth",
+        "state": "Texas",
+        "usd": 584419
+      },
+      {
+        "fips": "48141",
+        "county": "El Paso",
+        "state": "Texas",
+        "usd": 417930
+      },
+      {
+        "fips": "48323",
+        "county": "Maverick",
+        "state": "Texas",
+        "usd": 53322
+      },
+      {
+        "fips": "35053",
+        "county": "Socorro",
+        "state": "New Mexico",
+        "usd": 32759
+      },
+      {
+        "fips": "08003",
+        "county": "Alamosa",
+        "state": "Colorado",
+        "usd": 32594
+      },
+      {
+        "fips": "08021",
+        "county": "Conejos",
+        "state": "Colorado",
+        "usd": 26023
+      },
+      {
+        "fips": "35013",
+        "county": "Do\u00f1a Ana",
+        "state": "New Mexico",
+        "usd": 14722
+      },
+      {
+        "fips": "08105",
+        "county": "Rio Grande",
+        "state": "Colorado",
+        "usd": 12908
+      },
+      {
+        "fips": "08023",
+        "county": "Costilla",
+        "state": "Colorado",
+        "usd": 0
+      },
+      {
+        "fips": "08053",
+        "county": "Hinsdale",
+        "state": "Colorado",
+        "usd": 0
+      },
+      {
+        "fips": "08079",
+        "county": "Mineral",
+        "state": "Colorado",
+        "usd": 0
+      },
+      {
+        "fips": "08111",
+        "county": "San Juan",
+        "state": "Colorado",
+        "usd": 0
+      },
+      {
+        "fips": "35001",
+        "county": "Bernalillo",
+        "state": "New Mexico",
+        "usd": 0
+      },
+      {
+        "fips": "35028",
+        "county": "Los Alamos",
+        "state": "New Mexico",
+        "usd": 0
+      },
+      {
+        "fips": "35043",
+        "county": "Sandoval",
+        "state": "New Mexico",
+        "usd": 0
+      },
+      {
+        "fips": "35049",
+        "county": "Santa Fe",
+        "state": "New Mexico",
+        "usd": 0
+      },
+      {
+        "fips": "35051",
+        "county": "Sierra",
+        "state": "New Mexico",
+        "usd": 0
+      },
+      {
+        "fips": "35055",
+        "county": "Taos",
+        "state": "New Mexico",
+        "usd": 0
+      },
+      {
+        "fips": "35061",
+        "county": "Valencia",
+        "state": "New Mexico",
+        "usd": 0
+      },
+      {
+        "fips": "48043",
+        "county": "Brewster",
+        "state": "Texas",
+        "usd": 0
+      },
+      {
+        "fips": "48377",
+        "county": "Presidio",
+        "state": "Texas",
+        "usd": 0
+      },
+      {
+        "fips": "48465",
+        "county": "Val Verde",
+        "state": "Texas",
+        "usd": 0
+      },
+      {
+        "fips": "48479",
+        "county": "Webb",
+        "state": "Texas",
+        "usd": 0
+      }
+    ],
+    "note": "Insured crop losses only, paid for the cause 'Drought'. Not all drought losses: uninsured crops and most pasture and cattle losses are missing. Dollars are not adjusted for inflation. The latest year may still be incomplete. Losses for the separate cause 'Failure of Irrigation Supply' are not in the total. They were $375,345,508 over the same years.",
+    "irrigation_supply_usd": 375345508,
+    "top_crops": [
+      {
+        "crop": "Cotton",
+        "usd": 203254495
+      },
+      {
+        "crop": "Grain Sorghum",
+        "usd": 125747507
+      },
+      {
+        "crop": "Corn",
+        "usd": 13859527
+      },
+      {
+        "crop": "Sunflowers",
+        "usd": 4971454
+      },
+      {
+        "crop": "Sesame",
+        "usd": 4366448
+      }
+    ]
+  },
+  "v2": {
+    "season": {
+      "rows": 6665,
+      "v2": 2433,
+      "v1": 2324,
+      "simple_rule": 2382,
+      "v2_beats_v1": false,
+      "v2_beats_simple_rule": false,
+      "weather_alone": 2559,
+      "chosen_each_year": {
+        "2008": "v1 settings + weather, forest 50%",
+        "2009": "v1 settings + weather, forest 50%",
+        "2010": "more trees, forest 75%",
+        "2011": "more trees, forest 75%",
+        "2012": "v1 settings, forest 75%",
+        "2013": "v1 settings, forest 75%",
+        "2014": "v1 settings, forest 75%",
+        "2015": "v1 settings, forest 75%",
+        "2016": "v1 settings, forest 100%",
+        "2017": "v1 settings, forest 100%",
+        "2018": "v1 settings, forest 100%",
+        "2019": "v1 settings, forest 100%",
+        "2020": "v1 settings, forest 100%",
+        "2021": "v1 settings, forest 100%",
+        "2022": "v1 settings, forest 100%",
+        "2023": "v1 settings, forest 100%",
+        "2024": "v1 settings, forest 100%",
+        "2025": "v1 settings, forest 75%"
+      },
+      "every_candidate_on_test": {
+        "v1 settings, forest 100%": 2324,
+        "v1 settings, forest 75%": 2345,
+        "v1 settings, forest 50%": 2383,
+        "v1 settings + weather, forest 100%": 2559,
+        "v1 settings + weather, forest 75%": 2363,
+        "v1 settings + weather, forest 50%": 2380,
+        "more trees, forest 100%": 2374,
+        "more trees, forest 75%": 2354,
+        "more trees, forest 50%": 2383,
+        "more trees + weather, forest 100%": 2535,
+        "more trees + weather, forest 75%": 2380,
+        "more trees + weather, forest 50%": 2379,
+        "shallow, forest 100%": 2451,
+        "shallow, forest 75%": 2372,
+        "shallow, forest 50%": 2383,
+        "shallow + weather, forest 100%": 2492,
+        "shallow + weather, forest 75%": 2391,
+        "shallow + weather, forest 50%": 2383,
+        "deep, forest 100%": 2481,
+        "deep, forest 75%": 2375,
+        "deep, forest 50%": 2373,
+        "deep + weather, forest 100%": 2563,
+        "deep + weather, forest 75%": 2388,
+        "deep + weather, forest 50%": 2369,
+        "simple rule alone": 2382
+      }
+    },
+    "year": {
+      "rows": 6665,
+      "v2": 13.46,
+      "v1": 14.0,
+      "simple_rule": 13.21,
+      "v2_beats_v1": true,
+      "v2_beats_simple_rule": false,
+      "weather_alone": 14.12,
+      "chosen_each_year": {
+        "2008": "shallow, forest 75%",
+        "2009": "shallow, forest 50%",
+        "2010": "simple rule alone",
+        "2011": "simple rule alone",
+        "2012": "simple rule alone",
+        "2013": "simple rule alone",
+        "2014": "simple rule alone",
+        "2015": "simple rule alone",
+        "2016": "simple rule alone",
+        "2017": "simple rule alone",
+        "2018": "simple rule alone",
+        "2019": "simple rule alone",
+        "2020": "simple rule alone",
+        "2021": "simple rule alone",
+        "2022": "simple rule alone",
+        "2023": "simple rule alone",
+        "2024": "shallow, forest 50%",
+        "2025": "shallow, forest 50%"
+      },
+      "every_candidate_on_test": {
+        "v1 settings, forest 100%": 14.0,
+        "v1 settings, forest 75%": 13.37,
+        "v1 settings, forest 50%": 13.02,
+        "v1 settings + weather, forest 100%": 14.12,
+        "v1 settings + weather, forest 75%": 13.48,
+        "v1 settings + weather, forest 50%": 13.09,
+        "more trees, forest 100%": 14.0,
+        "more trees, forest 75%": 13.38,
+        "more trees, forest 50%": 13.02,
+        "more trees + weather, forest 100%": 14.13,
+        "more trees + weather, forest 75%": 13.49,
+        "more trees + weather, forest 50%": 13.09,
+        "shallow, forest 100%": 13.86,
+        "shallow, forest 75%": 13.3,
+        "shallow, forest 50%": 12.98,
+        "shallow + weather, forest 100%": 14.0,
+        "shallow + weather, forest 75%": 13.42,
+        "shallow + weather, forest 50%": 13.06,
+        "deep, forest 100%": 14.14,
+        "deep, forest 75%": 13.44,
+        "deep, forest 50%": 13.03,
+        "deep + weather, forest 100%": 14.32,
+        "deep + weather, forest 75%": 13.61,
+        "deep + weather, forest 50%": 13.15,
+        "simple rule alone": 13.21
+      }
+    },
+    "alert": {
+      "rows": 12617,
+      "chosen": "deep + weather, forest 75% + worsening 4 or 8 weeks",
+      "chosen_validation_cost": 593,
+      "v1_validation_cost": 636,
+      "v2": 1742,
+      "v1": 1912,
+      "simple_rule": 1840,
+      "v2_beats_v1": true,
+      "v2_beats_simple_rule": true,
+      "weather_alone": 2050,
+      "every_candidate_on_validation": {
+        "v1 settings, forest 100%": 636,
+        "v1 settings, forest 75% + worsening": 625,
+        "v1 settings, forest 50% + worsening": 626,
+        "v1 settings, forest 75% + worsening 4 or 8 weeks": 608,
+        "v1 settings, forest 50% + worsening 4 or 8 weeks": 611,
+        "v1 settings + weather, forest 100%": 621,
+        "v1 settings + weather, forest 75% + worsening": 633,
+        "v1 settings + weather, forest 50% + worsening": 626,
+        "v1 settings + weather, forest 75% + worsening 4 or 8 weeks": 603,
+        "v1 settings + weather, forest 50% + worsening 4 or 8 weeks": 602,
+        "more trees, forest 100%": 634,
+        "more trees, forest 75% + worsening": 631,
+        "more trees, forest 50% + worsening": 625,
+        "more trees, forest 75% + worsening 4 or 8 weeks": 609,
+        "more trees, forest 50% + worsening 4 or 8 weeks": 610,
+        "more trees + weather, forest 100%": 613,
+        "more trees + weather, forest 75% + worsening": 627,
+        "more trees + weather, forest 50% + worsening": 621,
+        "more trees + weather, forest 75% + worsening 4 or 8 weeks": 603,
+        "more trees + weather, forest 50% + worsening 4 or 8 weeks": 601,
+        "shallow, forest 100%": 639,
+        "shallow, forest 75% + worsening": 631,
+        "shallow, forest 50% + worsening": 631,
+        "shallow, forest 75% + worsening 4 or 8 weeks": 601,
+        "shallow, forest 50% + worsening 4 or 8 weeks": 603,
+        "shallow + weather, forest 100%": 640,
+        "shallow + weather, forest 75% + worsening": 626,
+        "shallow + weather, forest 50% + worsening": 629,
+        "shallow + weather, forest 75% + worsening 4 or 8 weeks": 615,
+        "shallow + weather, forest 50% + worsening 4 or 8 weeks": 618,
+        "deep, forest 100%": 640,
+        "deep, forest 75% + worsening": 612,
+        "deep, forest 50% + worsening": 628,
+        "deep, forest 75% + worsening 4 or 8 weeks": 599,
+        "deep, forest 50% + worsening 4 or 8 weeks": 601,
+        "deep + weather, forest 100%": 618,
+        "deep + weather, forest 75% + worsening": 614,
+        "deep + weather, forest 50% + worsening": 615,
+        "deep + weather, forest 75% + worsening 4 or 8 weeks": 593,
+        "deep + weather, forest 50% + worsening 4 or 8 weeks": 600,
+        "worsening alone": 655,
+        "worsening 4 or 8 weeks alone": 622
+      },
+      "every_candidate_on_test": {
+        "v1 settings, forest 100%": 1912,
+        "v1 settings, forest 75% + worsening": 2054,
+        "v1 settings, forest 50% + worsening": 2051,
+        "v1 settings, forest 75% + worsening 4 or 8 weeks": 1931,
+        "v1 settings, forest 50% + worsening 4 or 8 weeks": 1925,
+        "v1 settings + weather, forest 100%": 2050,
+        "v1 settings + weather, forest 75% + worsening": 2166,
+        "v1 settings + weather, forest 50% + worsening": 2022,
+        "v1 settings + weather, forest 75% + worsening 4 or 8 weeks": 1752,
+        "v1 settings + weather, forest 50% + worsening 4 or 8 weeks": 1771,
+        "more trees, forest 100%": 1935,
+        "more trees, forest 75% + worsening": 2172,
+        "more trees, forest 50% + worsening": 2020,
+        "more trees, forest 75% + worsening 4 or 8 weeks": 1771,
+        "more trees, forest 50% + worsening 4 or 8 weeks": 1869,
+        "more trees + weather, forest 100%": 2074,
+        "more trees + weather, forest 75% + worsening": 2069,
+        "more trees + weather, forest 50% + worsening": 2058,
+        "more trees + weather, forest 75% + worsening 4 or 8 weeks": 1763,
+        "more trees + weather, forest 50% + worsening 4 or 8 weeks": 1756,
+        "shallow, forest 100%": 2008,
+        "shallow, forest 75% + worsening": 2107,
+        "shallow, forest 50% + worsening": 2107,
+        "shallow, forest 75% + worsening 4 or 8 weeks": 1837,
+        "shallow, forest 50% + worsening 4 or 8 weeks": 1853,
+        "shallow + weather, forest 100%": 1972,
+        "shallow + weather, forest 75% + worsening": 2115,
+        "shallow + weather, forest 50% + worsening": 2104,
+        "shallow + weather, forest 75% + worsening 4 or 8 weeks": 1825,
+        "shallow + weather, forest 50% + worsening 4 or 8 weeks": 1838,
+        "deep, forest 100%": 1927,
+        "deep, forest 75% + worsening": 1874,
+        "deep, forest 50% + worsening": 2015,
+        "deep, forest 75% + worsening 4 or 8 weeks": 1781,
+        "deep, forest 50% + worsening 4 or 8 weeks": 1797,
+        "deep + weather, forest 100%": 1923,
+        "deep + weather, forest 75% + worsening": 2065,
+        "deep + weather, forest 50% + worsening": 2081,
+        "deep + weather, forest 75% + worsening 4 or 8 weeks": 1742,
+        "deep + weather, forest 50% + worsening 4 or 8 weeks": 1723,
+        "worsening alone": 1971,
+        "worsening 4 or 8 weeks alone": 1840
+      }
+    },
+    "seed_check": {
+      "runs": [
+        {
+          "seed": 0,
+          "alert_v1": 1912,
+          "alert_v2": 1742,
+          "season_v1": 2324,
+          "season_v2": 2433,
+          "year_v1": 14.0,
+          "year_v2": 13.46
+        },
+        {
+          "seed": 1,
+          "alert_v1": 1940,
+          "alert_v2": 1733,
+          "season_v1": 2453,
+          "season_v2": 2388,
+          "year_v1": 14.14,
+          "year_v2": 13.47
+        },
+        {
+          "seed": 2,
+          "alert_v1": 1899,
+          "alert_v2": 1739,
+          "season_v1": 2407,
+          "season_v2": 2415,
+          "year_v1": 13.95,
+          "year_v2": 13.47
+        },
+        {
+          "seed": 3,
+          "alert_v1": 1888,
+          "alert_v2": 1738,
+          "season_v1": 2429,
+          "season_v2": 2414,
+          "year_v1": 14.02,
+          "year_v2": 13.46
+        },
+        {
+          "seed": 4,
+          "alert_v1": 1883,
+          "alert_v2": 1711,
+          "season_v1": 2446,
+          "season_v2": 2410,
+          "year_v1": 13.94,
+          "year_v2": 13.45
+        }
+      ],
+      "seeds_where_v2_beats_v1": {
+        "alert": "5/5",
+        "season": "3/5",
+        "year": "5/5"
+      }
+    }
+  }
+}
