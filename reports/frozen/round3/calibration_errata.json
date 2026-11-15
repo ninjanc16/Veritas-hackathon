@@ -1,0 +1,17 @@
+{
+  "added": true,
+  "erratum_for": "reports/frozen/round3/calibration.json",
+  "written": "2026-11-15",
+  "what_is_wrong": "The 'coverage' block of calibration.json describes three years wrongly. These years have issue rows but no chained forecast at all (the forecast chain runs from 2005 to 2025), so there was nothing to calibrate in them.",
+  "wrong_fields": [
+    "coverage.years: the entry for 2026 says \"calibrated\": true. It should say there was no forecast in 2026.",
+    "coverage.years_left_raw lists 2003 and 2004. They were not left raw; they had no forecast. The years truly left raw are 2005, 2006 and 2007."
+  ],
+  "correct_coverage": {
+    "years_left_raw": [2005, 2006, 2007],
+    "years_without_forecast": [2003, 2004, 2026]
+  },
+  "effect_on_results": "None. Every number in calibration.json (the Brier scores, skill, reliability tables, intervals and costs) is computed on the scored rows, 2008 to 2025, and every one of those years was calibrated, as the file says. The past_years and past_rows counts in the coverage block are correct.",
+  "why_a_separate_file": "Frozen result files are not rewritten. calibration.json is left exactly as the scoring run wrote it.",
+  "fixed_in_code": "prob_calibration.calibration_coverage now reports a year with no forecast as \"no forecast\" and lists it under years_without_forecast."
+}

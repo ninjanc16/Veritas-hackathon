@@ -11,13 +11,14 @@ import numpy as np
 import pandas as pd
 
 from farmdrought.config import (ALERT_WEEKS, BUFFER_KM, D2_CLASS, NEIGHBOR_KM, ONI_TXT, SEASON_RUN,
-                                SEASON_WEEKS, USDM_JSON, YEAR_WEEKS)
+                                SEASON_WEEKS, USDM_JSON, YEAR_WEEKS, raw_path)
 from farmdrought.counties import km, load_county_centers, load_river_points, nearest_river
 from farmdrought.features import FEATURES_H, enso_features, history_features, load_oni, long_memory_features
 
 
-def load_usdm(path=USDM_JSON):
-    """Read the U.S. Drought Monitor file.
+def load_usdm(path=None):
+    """Read the U.S. Drought Monitor file (the snapshot in data/raw, unless a path is given or
+    the caller is inside config.live_data(), where a newer copy in data/live is preferred).
 
     Returns a dict with:
       fips, county, state : one entry per county
@@ -25,7 +26,7 @@ def load_usdm(path=USDM_JSON):
       classes             : array (counties, weeks), the worst drought class in the county
                             that week. NaN where the county has no data.
     """
-    with open(path) as f:
+    with open(raw_path(USDM_JSON) if path is None else path) as f:
         raw = json.load(f)
     # Each county's history is one string with one character per week.
     # "0" to "5" is the drought class. "." means missing.
@@ -153,7 +154,7 @@ def build_panel(buffer_km=BUFFER_KM, score_through=None):
     panel["lon"] = np.repeat(lon[chosen], n_weeks)
     panel["date"] = np.tile(usdm["dates"], len(chosen))
     # Set E (El Nino index) is the same for every county, so its weekly values tile too
-    for name, values in enso_features(usdm["dates"], load_oni(ONI_TXT)).items():
+    for name, values in enso_features(usdm["dates"], load_oni(raw_path(ONI_TXT))).items():
         panel[name] = np.tile(values, len(chosen))
 
     # 6. Drop rows where an input is missing (the first 52 weeks of the record).

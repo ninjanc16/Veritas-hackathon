@@ -26,6 +26,7 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
 RAW = ROOT / "data" / "raw"
+LIVE = ROOT / "data" / "live"        # the daily refresh saves its downloads here; data/raw is a fixed snapshot
 PROCESSED = ROOT / "data" / "processed"
 SITE = ROOT / "app" / "site"
 OUT = SITE / "data"
@@ -60,6 +61,12 @@ def rings_of(geometry, digits):
 
 def load_json(path):
     return json.loads(Path(path).read_text(encoding="utf-8"))
+
+
+def newest(relative):
+    """The newest copy of a file the daily refresh downloads: data/live if it has one, else the
+    snapshot in data/raw. The website shows this week, so it reads the newest data."""
+    return LIVE / relative if (LIVE / relative).exists() else RAW / relative
 
 
 def texas_counties(usdm, profiles, photo_files):
@@ -231,7 +238,7 @@ def lakes():
     """The three reservoirs: where the dam is and how full it was at the last saved reading."""
     out = []
     for name, file, lon, lat in LAKES:
-        last = pd.read_csv(RAW / "reservoirs" / file, comment="#").dropna(subset=["conservation_storage"]).iloc[-1]
+        last = pd.read_csv(newest(Path("reservoirs") / file), comment="#").dropna(subset=["conservation_storage"]).iloc[-1]
         out.append({"name": name, "lon": lon, "lat": lat, "date": str(last["date"])[:10],
                     "pct": round(100 * float(last["conservation_storage"]) / float(last["conservation_capacity"]), 1)})
     return out
@@ -413,7 +420,7 @@ def weekly_history(usdm, fips_list):
     def percent_full(files):
         storage = capacity = None
         for name in files:
-            lake = pd.read_csv(RAW / "reservoirs" / name, comment="#", parse_dates=["date"]).set_index("date")
+            lake = pd.read_csv(newest(Path("reservoirs") / name), comment="#", parse_dates=["date"]).set_index("date")
             lake = lake[~lake.index.duplicated()].reindex(pd.date_range("1999-12-01", weeks[-1])).ffill()
             storage = lake["conservation_storage"] if storage is None else storage + lake["conservation_storage"]
             capacity = lake["conservation_capacity"] if capacity is None else capacity + lake["conservation_capacity"]
@@ -451,7 +458,7 @@ def write_js(path, variable, data):
 
 def build():
     metrics = load_json(ROOT / "reports" / "metrics.json")
-    usdm = load_json(RAW / "usdm-counties.json")
+    usdm = load_json(newest("usdm-counties.json"))
     latest = pd.read_parquet(PROCESSED / "latest.parquet")
     profiles_file = SITE / "photos" / "profiles.json"
     profiles = load_json(profiles_file) if profiles_file.exists() else {}

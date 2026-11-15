@@ -24,7 +24,7 @@ import re
 import pandas as pd
 import requests
 
-from farmdrought.config import FOCUS_RIVER, RAW
+from farmdrought.config import FOCUS_RIVER, RAW, raw_path
 
 FEATURES_W = ["rain3", "rain6", "rain12", "heat3", "heat12"]
 NOAA_DIR = "https://www.ncei.noaa.gov/pub/data/cirs/climdiv/"
@@ -39,8 +39,11 @@ NOAA_STATE = {"08": "05",   # Colorado
               "48": "41"}   # Texas
 
 
-def download_weather(fips_list):
+def download_weather(fips_list, path=None):
     """Download NOAA's two county files (rain and temperature) and keep our counties.
+
+    path : where to save. The default is the snapshot file in data/raw; the daily refresh passes
+           the live copy's path instead, so the snapshot is never rewritten.
 
     Each line of a NOAA file is one county and one year:
         characters 1-2 state, 3-5 county, 6-7 what is measured, 8-11 year, then 12 monthly values.
@@ -64,8 +67,9 @@ def download_weather(fips_list):
         tables[column] = pd.DataFrame(rows, columns=["fips", "year", "month", column])
         print(f"{name}: {len(rows)} county-months")
     both = tables["rain_in"].merge(tables["temp_f"], on=["fips", "year", "month"])
-    WEATHER_CSV.parent.mkdir(parents=True, exist_ok=True)
-    both.sort_values(["fips", "year", "month"]).to_csv(WEATHER_CSV, index=False)
+    path = WEATHER_CSV if path is None else path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    both.sort_values(["fips", "year", "month"]).to_csv(path, index=False)
     print(f"saved {both['fips'].nunique()} counties, {both['year'].min()} to {both['year'].max()}")
 
 
@@ -73,7 +77,7 @@ def monthly_features():
     """Build the five numbers for every county and month. The row for month m describes the
     months UP TO AND INCLUDING m. The publication lag is applied later, in add_weather_features.
     """
-    data = pd.read_csv(WEATHER_CSV, dtype={"fips": str})
+    data = pd.read_csv(raw_path(WEATHER_CSV), dtype={"fips": str})
     data["period"] = pd.PeriodIndex.from_fields(year=data["year"], month=data["month"], freq="M")
     out = []
     for fips, county in data.groupby("fips"):

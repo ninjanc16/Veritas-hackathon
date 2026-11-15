@@ -9,12 +9,15 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from farmdrought import export, round3
+import inspect
+
+from farmdrought import alert as alert_module
+from farmdrought import config, export, refresh, robustness, round3, v2
 from farmdrought.allocation import model_minus_rule, run_allocation
 from farmdrought.config import (ALERT_WEEKS, COUNTY_RESERVOIR, FROZEN, METRICS, OUTLOOK, PREDICTIONS, SCORE_THROUGH,
                                 SEASON_WEEKS, YEAR_WEEKS)
-from farmdrought.drought import build_panel
-from farmdrought.manifest import build_manifest, check_manifest, sha256_of
+from farmdrought.drought import build_panel, load_usdm
+from farmdrought.manifest import build_manifest, check_manifest, guard_scored_writer, sha256_of
 from farmdrought.prob_calibration import (brier, calibrate_by_past, calibration_coverage, class_frequency_by_past,
                                           reliability)
 from farmdrought.trigger import run_trigger, run_trigger_annual
@@ -716,11 +719,12 @@ def test_calibration_coverage_names_the_years_left_raw():
 
     # Assert: 2001 has no past, 2002 one year (3 rows), 2003 two years (6 rows), 2005 three (8 rows)
     assert coverage["years"] == [
-        {"year": 2001, "calibrated": False, "past_years": 0, "past_rows": 0},
-        {"year": 2002, "calibrated": False, "past_years": 1, "past_rows": 3},
-        {"year": 2003, "calibrated": False, "past_years": 2, "past_rows": 6},
-        {"year": 2005, "calibrated": True, "past_years": 3, "past_rows": 8}]
+        {"year": 2001, "status": "raw", "calibrated": False, "forecasts": 3, "past_years": 0, "past_rows": 0},
+        {"year": 2002, "status": "raw", "calibrated": False, "forecasts": 3, "past_years": 1, "past_rows": 3},
+        {"year": 2003, "status": "raw", "calibrated": False, "forecasts": 2, "past_years": 2, "past_rows": 6},
+        {"year": 2005, "status": "calibrated", "calibrated": True, "forecasts": 6, "past_years": 3, "past_rows": 8}]
     assert coverage["years_left_raw"] == [2001, 2002, 2003] and coverage["min_years"] == 3
+    assert coverage["years_without_forecast"] == []
     # with a lower bar, 2003 is calibrated too, and the Series agrees with the coverage
     assert calibration_coverage(table, "p", "y", horizon=26, min_years=2)["years_left_raw"] == [2001, 2002]
     lower_bar = calibrate_by_past(table, "p", "y", horizon=26, min_years=2)
@@ -738,9 +742,15 @@ def test_calibration_passes_over_a_year_that_has_no_forecast_at_all():
     # Act
     calibrated = calibrate_by_past(table, "p", "y", horizon=26)
 
+    coverage = calibration_coverage(table, "p", "y", horizon=26)
+
     # Assert: the empty year stays missing and the year before it is calibrated as before
     assert calibrated[table["date"].dt.year == 2006].isna().all()
     assert calibrated[table["date"].dt.year == 2005].tolist() == pytest.approx([0.25, 0.25, 0.25, 0.5, 0.75, 0.75])
+    # and the coverage calls it "no forecast": not calibrated, and not left raw either
+    last = coverage["years"][-1]
+    assert (last["year"], last["status"], last["calibrated"], last["forecasts"]) == (2006, "no forecast", False, 0)
+    assert coverage["years_without_forecast"] == [2006] and 2006 not in coverage["years_left_raw"]
 
 
 def tiny_trigger_tables():
@@ -1220,3 +1230,181 @@ def test_evaluate_refuses_to_replace_frozen_results_unless_forced(tmp_path, monk
     with pytest.raises(RuntimeError, match="stopped here on purpose"):
         export.evaluate(force=True)
     assert (frozen / "metrics.json").read_text() == "{}"
+
+
+# ---------------------------------------------------------------------------------------------
+# Snapshot and live data, and guards on the manual writers (package G)
+# ---------------------------------------------------------------------------------------------
+def one_more_week(usdm_text):
+    """A Drought Monitor file with one extra week (class 0 everywhere), as a download would bring."""
+    usdm = json.loads(usdm_text)
+    usdm["weeks"] += 1
+    usdm["series"] = [series + "0" for series in usdm["series"]]
+    return json.dumps(usdm)
+
+
+def test_a_download_goes_to_the_live_folder_and_leaves_the_snapshot_alone(tmp_path, monkeypatch):
+    # Arrange: the "download" is the saved file with one more week; data/live is a temporary folder
+    monkeypatch.setattr(config, "LIVE_DATA", tmp_path)
+    snapshot_before = sha256_of(config.USDM_JSON)
+    newer = one_more_week(config.USDM_JSON.read_text())
+    monkeypatch.setattr(refresh, "fetch", lambda url: newer)
+
+    # Act: two refreshes, as on two days with the same file upstream
+    with config.live_data():
+        first = refresh.refresh_drought()
+        second = refresh.refresh_drought()
+
+    # Assert: the newer file is in the live folder; the snapshot and the manifest check are untouched,
+    # so the test that guards the frozen results still passes after a download
+    assert first == ("2026-11-17", True) and second == ("2026-11-17", False)
+    assert (tmp_path / "usdm-counties.json").read_text() == newer
+    assert sha256_of(config.USDM_JSON) == snapshot_before and check_manifest() == []
+
+
+def test_only_code_inside_live_data_sees_a_newer_download(tmp_path, monkeypatch):
+    # Arrange: a newer Drought Monitor file in the live folder
+    monkeypatch.setattr(config, "LIVE_DATA", tmp_path)
+    (tmp_path / "usdm-counties.json").write_text(one_more_week(config.USDM_JSON.read_text()))
+
+    # Act
+    scored_view = load_usdm()["dates"][-1]
+    with config.live_data():
+        forecast_view = load_usdm()["dates"][-1]
+    afterwards = load_usdm()["dates"][-1]
+
+    # Assert: scoring code reads the snapshot before and after; the forecast reads one week more
+    assert scored_view == afterwards == pd.Timestamp(SCORE_THROUGH)
+    assert forecast_view == pd.Timestamp(SCORE_THROUGH) + pd.Timedelta(weeks=1)
+    assert config.raw_path(config.USDM_JSON) == config.USDM_JSON
+
+
+def test_live_copies_keep_their_names_and_the_switch_always_goes_back(tmp_path, monkeypatch):
+    # Arrange
+    monkeypatch.setattr(config, "LIVE_DATA", tmp_path)
+
+    # Act / Assert: where each refreshed file goes
+    assert config.live_copy(config.ONI_TXT) == tmp_path / "oni.txt"
+    assert config.live_copy(config.RESERVOIR_DIR / "falcon.csv") == tmp_path / "reservoirs" / "falcon.csv"
+    # a file with no live copy is read from the snapshot even inside the block
+    with config.live_data():
+        assert config.raw_path(config.ONI_TXT) == config.ONI_TXT
+        (tmp_path / "oni.txt").write_text("1998 2.22\n")
+        assert config.raw_path(config.ONI_TXT) == tmp_path / "oni.txt"
+    assert config.raw_path(config.ONI_TXT) == config.ONI_TXT
+    # an error inside the block still switches it off
+    with pytest.raises(ZeroDivisionError):
+        with config.live_data():
+            1 / 0
+    assert config.raw_path(config.ONI_TXT) == config.ONI_TXT
+
+
+def test_predict_reads_live_data_and_nothing_that_scores_does(tmp_path, monkeypatch):
+    # Arrange: predict() with stand-ins; the panel builder notes whether the live switch was on
+    stand_in_for_the_heavy_steps(monkeypatch, tmp_path)
+    seen = []
+    week = pd.DataFrame({"date": pd.to_datetime(["2027-01-05"]), "fips": ["48061"], "river": ["Rio Grande"]})
+    monkeypatch.setattr(export, "build_panel", lambda: (seen.append(config._LIVE["on"]), week)[1])
+
+    # Act
+    export.predict()
+
+    # Assert: on while predicting, off again afterwards
+    assert seen == [True] and config._LIVE["on"] is False
+    # the scoring step and the scoring scripts never turn it on
+    assert "live_data" not in inspect.getsource(export.evaluate)
+    for module in (v2, robustness, round3, alert_module):
+        assert "live_data" not in inspect.getsource(module)
+
+
+def test_evaluate_scores_only_up_to_the_cut_off(monkeypatch):
+    # Arrange: stop evaluate() at its first scoring call and keep what it was asked for
+    asked = {}
+    class Stop(Exception):
+        pass
+    def fake_run_alert(*args, **kwargs):
+        asked["args"], asked["kwargs"] = args, kwargs
+        raise Stop
+    monkeypatch.setattr(export, "check_manifest", lambda: [])
+    monkeypatch.setattr(export, "run_alert", fake_run_alert)
+
+    # Act
+    with pytest.raises(Stop):
+        export.evaluate(force=True)
+
+    # Assert
+    assert asked == {"args": (), "kwargs": {"score_through": SCORE_THROUGH}}
+
+
+def test_run_alert_hands_the_cut_off_to_the_panel_builder(monkeypatch):
+    # Arrange
+    asked = []
+    class Stop(Exception):
+        pass
+    def fake_build_panel(*args, **kwargs):
+        asked.append((args, kwargs))
+        raise Stop
+    monkeypatch.setattr(alert_module, "build_panel", fake_build_panel)
+
+    # Act
+    with pytest.raises(Stop):
+        alert_module.run_alert(score_through="2020-01-07")
+    with pytest.raises(Stop):
+        alert_module.run_alert()
+
+    # Assert: the cut-off reaches build_panel, and the default is still "no cut-off"
+    assert asked == [((50, "2020-01-07"), {}), ((50, None), {})]
+    # the other writers of scored numbers build their panel with the cut-off too
+    for module in (v2, robustness, round3):
+        assert "score_through=SCORE_THROUGH" in inspect.getsource(module)
+    pre2020 = (config.ROOT / "app" / "forecast_pre2020.py").read_text()
+    assert "run_alert(score_through=SCORE_THROUGH)" in pre2020 and "guard_scored_writer(OUT" in pre2020
+
+
+def test_manual_writers_refuse_to_replace_a_scored_file_after_the_freeze(tmp_path):
+    # Arrange: a frozen metrics file and an existing output, both in a temporary folder
+    frozen = tmp_path / "metrics.json"
+    output = tmp_path / "v2.json"
+    frozen.write_text("{}")
+    output.write_text("old")
+
+    # Act / Assert: refused without the flag, allowed with it
+    with pytest.raises(RuntimeError, match="v2.json already exists.*--force"):
+        guard_scored_writer(output, frozen_metrics=frozen)
+    guard_scored_writer(output, force=True, frozen_metrics=frozen)
+    # a first run (no output yet) and a run before any freeze are allowed
+    guard_scored_writer(tmp_path / "new.json", frozen_metrics=frozen)
+    guard_scored_writer(output, frozen_metrics=tmp_path / "no_freeze_yet.json")
+    assert output.read_text() == "old"
+    # and each of the three scripts calls the guard before it does anything else
+    for module in (v2, robustness):
+        assert "guard_scored_writer(" in inspect.getsource(module)
+
+
+def test_manual_writers_refuse_when_a_raw_input_changed(tmp_path, monkeypatch):
+    # Arrange: the manifest check reports a changed file; even --force must not get past it
+    import farmdrought.manifest as manifest_module
+    monkeypatch.setattr(manifest_module, "check_manifest", lambda root=None: ["data/raw/usdm-counties.json (changed)"])
+
+    # Act / Assert
+    with pytest.raises(RuntimeError, match="usdm-counties.json"):
+        guard_scored_writer(tmp_path / "v2.json", force=True, frozen_metrics=tmp_path / "metrics.json")
+
+
+def test_machine_note_is_built_from_the_numbers_it_is_given():
+    # Arrange: made-up results in the shape evaluate() holds them
+    alert = {"headline": {"system_cost": 1912}, "per_river": [{"all_rivers_cost": 1760}]}
+    season = {"focus": {"system_cost": 2324, "persistence_cost": 3133, "d1_rule_cost": 2382, "usual_cost": 3871,
+                        "always_warn_cost": 3403, "never_warn_cost": 9786}}
+    year = {"focus": {"mae_system": 14.0}}
+    checks = {"seed_check": {"runs": [{}] * 10, "summary": {"season_cost": {"lowest": 2324, "highest": 2453}}}}
+
+    # Act
+    note = export.machine_note(alert, season, year, checks)
+    without_checks = export.machine_note(alert, season, year, None)
+
+    # Assert: 2324 against the runner's 2328 is 4; 1760 against 1883 is 123; 2382 - 2324 is 58
+    assert "moved by 0, 4 and 0" in note and "moved by 123 (1760 here, 1883 there)" in note
+    assert "ranges from 2324 to 2453 across 10 random seeds, against a margin of 58" in note
+    assert note.endswith("the random seed, more than the computer, is why a margin of that size is not a result.")
+    assert "random seeds" not in without_checks and "moved by 123" in without_checks

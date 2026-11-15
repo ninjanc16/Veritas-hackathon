@@ -6,6 +6,7 @@ module hides a "magic number" and a judge can see every setting at a glance.
 Honest note: the plan itself came from exploratory runs on the same test years (the scripts in
 notebooks/). See reports/decision.md.
 """
+from contextlib import contextmanager
 from pathlib import Path
 
 # ---------- 1. Rivers ----------
@@ -88,6 +89,44 @@ FROZEN = REPORTS / "frozen" / "v1"       # version 1's results, written by expor
 ROUND3 = REPORTS / "frozen" / "round3"   # one file per round-3 experiment
 LIVE = REPORTS / "live"                  # what the daily job writes (export.predict())
 MANIFEST = ROOT / "data" / "manifest.json"  # sha256 of every raw input, and the scoring cut-off
+
+# ---------- 7c. Raw snapshot and live downloads ----------
+# data/raw (and notebooks/oni.txt) is the SNAPSHOT the frozen results were scored on. Nothing
+# rewrites it: the daily refresh saves its downloads in data/live instead, under the same file
+# names (the El Nino file becomes data/live/oni.txt).
+# Everything that scores (evaluate, version 2, robustness, round 3) reads the snapshot. Only
+# this week's forecast (export.predict), the refresh and the issues list read the newer copy,
+# and only inside `with live_data():`. The switch is not an environment variable on purpose:
+# it cannot be left on by accident, because leaving the `with` block always puts it back.
+LIVE_DATA = ROOT / "data" / "live"
+_LIVE = {"on": False}
+
+
+def live_copy(path):
+    """Where the refresh saves its newer copy of a raw input."""
+    path = Path(path)
+    if path == ONI_TXT:
+        return LIVE_DATA / ONI_TXT.name
+    return LIVE_DATA / path.relative_to(RAW)
+
+
+def raw_path(path):
+    """The file to READ for a raw input: the snapshot, or inside `with live_data():` the newer
+    copy in data/live when there is one."""
+    if _LIVE["on"] and live_copy(path).exists():
+        return live_copy(path)
+    return Path(path)
+
+
+@contextmanager
+def live_data():
+    """Inside this block raw_path() prefers the copies in data/live. Outside it, never."""
+    before = _LIVE["on"]
+    _LIVE["on"] = True
+    try:
+        yield
+    finally:
+        _LIVE["on"] = before
 
 # ---------- 8. Pivot: should an irrigation district seal its canals before the season? ----------
 # 8a. Reservoir storage (Texas Water Development Board, waterdatafortexas.org, one CSV per lake)

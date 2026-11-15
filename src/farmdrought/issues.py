@@ -34,6 +34,7 @@ import pandas as pd
 import requests
 
 from farmdrought.config import COUNTY_RESERVOIR, D2_CLASS, FOCUS_RIVER, LATEST, METRICS, REPORTS, SEASON_THRESHOLD
+from farmdrought.config import live_data
 from farmdrought.drought import load_usdm
 from farmdrought.reservoirs import load_reservoirs, reservoir_features
 
@@ -250,7 +251,8 @@ def run_issues():
 
 
 if __name__ == "__main__":
-    report = run_issues()
+    with live_data():   # the issues list is about this week, so it reads the newest downloads
+        report = run_issues()
     print(report["counts"], "| not reached:", report["not_reached"] or "none", "\n")
     for i in report["issues"]:
         print(f"[{i['severity']}] {i['title']}\n    {i['detail']}\n    Who: {i['who']} | Source: {i['source']}, {i['as_of']}\n")

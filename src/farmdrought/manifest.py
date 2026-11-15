@@ -14,7 +14,7 @@ import json
 import sys
 from pathlib import Path
 
-from farmdrought.config import ROOT, SCORE_THROUGH
+from farmdrought.config import FROZEN, ROOT, SCORE_THROUGH
 
 MANIFEST_PATH = Path("data") / "manifest.json"   # relative to the repo root
 
@@ -73,6 +73,24 @@ def check_manifest(root=ROOT):
         elif recorded[name] != now[name]:
             problems.append(f"{name} (changed)")
     return problems
+
+
+def guard_scored_writer(output, force=False, frozen_metrics=None):
+    """Called by a script that writes scored numbers by hand (version 2, the robustness checks,
+    the pre-2020 forecast) BEFORE it does any work. Raises RuntimeError when:
+      - a raw input differs from data/manifest.json (always: scored numbers must come from the
+        snapshot the frozen results name), or
+      - the results are frozen, the output file exists, and force is False. Rewriting a scored
+        file after the freeze has to be asked for by name, with --force.
+    """
+    problems = check_manifest()
+    if problems:
+        raise RuntimeError("the raw inputs do not match data/manifest.json, so nothing was run:\n  "
+                           + "\n  ".join(problems))
+    frozen_metrics = FROZEN / "metrics.json" if frozen_metrics is None else frozen_metrics
+    if frozen_metrics.exists() and Path(output).exists() and not force:
+        raise RuntimeError(f"{Path(output).name} already exists and the results are frozen, so nothing was run. "
+                           "To replace it on purpose, run the same command again with --force")
 
 
 if __name__ == "__main__":

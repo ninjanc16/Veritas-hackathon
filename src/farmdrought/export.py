@@ -41,7 +41,7 @@ from farmdrought.alert import make_forest, run_alert, split_masks
 from farmdrought.config import (ALERT_WEEKS, COUNTY_RESERVOIR, D2_CLASS, FEED_COST_PER_HEAD_MONTH, FOCUS_RIVER, LATEST, METRICS, MISS_COST, OUTLOOK, OUTLOOK_TEST,
                                 PREDICTIONS, PROCESSED, REPORTS, SEASON_THRESHOLD, SEASON_WEEKS, TEST_START,
                                 TRAIN, VAL, YEAR_WEEKS)
-from farmdrought.config import FROZEN, LIVE, MANIFEST, ROOT, SCORE_THROUGH
+from farmdrought.config import FROZEN, LIVE, MANIFEST, ROOT, SCORE_THROUGH, live_data
 from farmdrought.drought import build_panel
 from farmdrought.features import FEATURES_H
 from farmdrought.leaks import run_leaks
@@ -441,8 +441,34 @@ DISTRICT_LIMITS = [
 
 # What the same code and data gave on the GitHub runner (reports/metrics.json at commit 1931ed5,
 # written by the daily job on 2026-11-15). Kept only so the frozen file can state the difference.
-RUNNER_SEASON_COST = 2328
-RUNNER_ALL_RIVERS_ALERT_COST = 1883
+RUNNER = {"alert_cost": 1912, "season_cost": 2328, "year_mae": 14.0, "all_rivers_alert_cost": 1883}
+
+
+def machine_note(alert, season, year, checks):
+    """The "machine_note" of the frozen block: how far the numbers moved between two computers,
+    and how far they move between random seeds on one. Every number is taken from this run,
+    from RUNNER above, or from the robustness checks (checks, None if they were not run)."""
+    s = season["focus"]
+    here = {"alert_cost": alert["headline"]["system_cost"], "season_cost": s["system_cost"],
+            "year_mae": year["focus"]["mae_system"], "all_rivers_alert_cost": alert["per_river"][0]["all_rivers_cost"]}
+    moved = {key: round(abs(here[key] - RUNNER[key]), 2) for key in here}
+    note = ("Random forests in this project are not identical across computers. Same code and data on two "
+            f"computers: the system's three headline numbers moved by {moved['alert_cost']:g}, "
+            f"{moved['season_cost']:g} and {moved['year_mae']:g} (4-week cost {here['alert_cost']} here and "
+            f"{RUNNER['alert_cost']} on the GitHub runner; 6-month cost {here['season_cost']} and "
+            f"{RUNNER['season_cost']}; 12-month error {here['year_mae']} and {RUNNER['year_mae']} weeks), and a "
+            f"comparison model (the 4-week forest trained on all five rivers) moved by "
+            f"{moved['all_rivers_alert_cost']:g} ({here['all_rivers_alert_cost']} here, "
+            f"{RUNNER['all_rivers_alert_cost']} there).")
+    if checks is not None:
+        seeds = checks["seed_check"]["summary"]["season_cost"]
+        best_rule = min(s[k] for k in ("persistence_cost", "d1_rule_cost", "usual_cost", "always_warn_cost",
+                                       "never_warn_cost"))
+        note += (f" On one computer the 6-month cost ranges from {seeds['lowest']} to {seeds['highest']} across "
+                 f"{len(checks['seed_check']['runs'])} random seeds, against a margin of "
+                 f"{best_rule - s['system_cost']} over the best simple rule. So the random seed, more than the "
+                 "computer, is why a margin of that size is not a result.")
+    return note
 
 
 def git_state():
@@ -463,10 +489,10 @@ def git_state():
                 "git_dirty_source_means": "git was not available"}
 
 
-def frozen_block(season_cost, all_rivers_alert_cost):
+def frozen_block(note_on_machines):
     """The "frozen" key: what the scored results were made from, so a reader can check them.
 
-    season_cost, all_rivers_alert_cost : two numbers from this run, quoted in machine_note.
+    note_on_machines : the text from machine_note().
     """
     block = {
         "score_through": SCORE_THROUGH,
@@ -485,12 +511,7 @@ def frozen_block(season_cost, all_rivers_alert_cost):
     block["note"] = ("The robustness checks and version 2's candidate search are not rerun by evaluate(). Their "
                      "numbers are read from reports/robustness.json and reports/v2.json as those files stood, and "
                      "the sha256 of each file as read is recorded above.")
-    block["machine_note"] = (
-        "Random forests in this project are not identical across computers. Same code and data: the 6-month "
-        f"system cost was {season_cost} here and {RUNNER_SEASON_COST} on the GitHub runner; a comparison model "
-        f"(the 4-week forest trained on all five rivers) cost {all_rivers_alert_cost} here and "
-        f"{RUNNER_ALL_RIVERS_ALERT_COST} there. Differences between machines can be as large as the margins "
-        "between the system and the simple rules, so no margin smaller than that should be read as a result.")
+    block["machine_note"] = note_on_machines
     return block
 
 
@@ -532,12 +553,13 @@ def evaluate(force=False):
 
     # 3. The keys that come after the contract's list (contract rule 2 allows additions at the end)
     # Add the robustness checks (seeds and county buffer) if they have been run.
+    checks = None
     if ROBUSTNESS.exists():
         with open(ROBUSTNESS) as f:
             checks = json.load(f)
         metrics.update(checks)
         metrics["limits"] += robustness_limits(checks)
-    metrics["frozen"] = frozen_block(season["focus"]["system_cost"], alert["per_river"][0]["all_rivers_cost"])
+    metrics["frozen"] = frozen_block(machine_note(alert, season, year, checks))
     # ---- Scored pivot keys (canal action) ----
     metrics.update(pivot_metrics(scored, season, panel, metrics["limits"]))
     # ---- Version 2 key (farmdrought.v2 writes v2.json; it is not rerun here) ----
@@ -590,7 +612,15 @@ def merge_metrics(frozen, live):
 
 
 def predict():
-    """This week's forecast and the live keys. Never scores, and never writes under reports/frozen/."""
+    """This week's forecast and the live keys. Never scores, and never writes under reports/frozen/.
+
+    It reads the newest downloads (data/live) where there are any, and the snapshot otherwise.
+    """
+    with live_data():
+        _predict()
+
+
+def _predict():
     frozen_metrics = FROZEN / METRICS.name
     if not frozen_metrics.exists():
         raise RuntimeError(f"{frozen_metrics.relative_to(ROOT)} does not exist. Run the scoring step once first: "

@@ -12,6 +12,7 @@
 
 Writes reports/robustness.json. Run it with:  PYTHONPATH=src python -m farmdrought.robustness
 (Run farmdrought.export first: the baseline numbers are read from reports/metrics.json.)
+Once the results are frozen it refuses to replace reports/robustness.json unless --force is added.
 """
 import json
 
@@ -21,6 +22,7 @@ from farmdrought.alert import fit_alert, make_forest, run_alert, split_masks
 from farmdrought.config import (D2_CLASS, FOCUS_RIVER, METRICS, OUTLOOK, REPORTS, SEASON_THRESHOLD, SEASON_WEEKS,
                                 YEAR_WEEKS)
 from farmdrought.config import SCORE_THROUGH
+from farmdrought.manifest import guard_scored_writer
 from farmdrought.drought import build_panel
 from farmdrought.evaluate import tally
 from farmdrought.features import FEATURES_H
@@ -127,6 +129,8 @@ def extra_rules_check(panel):
 
 
 if __name__ == "__main__":
+    import sys
+    guard_scored_writer(ROBUSTNESS, force="--force" in sys.argv)   # refuses to replace the file after the freeze
     with open(METRICS) as f:
         baselines = best_baselines(json.load(f))
     # Weeks after the scoring cut-off are left out, so a rerun after new data arrives scores the

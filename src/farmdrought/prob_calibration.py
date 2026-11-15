@@ -38,18 +38,26 @@ def calibration_coverage(table, p_column, label, horizon, min_years=3):
 
     A year with fewer than `min_years` past calendar years is returned RAW by calibrate_by_past.
     That is easy to miss, so every report that prints a calibrated number must print this too.
-    Returns {"min_years", "years": [{"year", "calibrated", "past_years", "past_rows"}, ...],
-    "years_left_raw": [...]}, with the same arguments as calibrate_by_past.
+    A year whose rows have no forecast at all is neither: its status is "no forecast".
+
+    Returns, with the same arguments as calibrate_by_past:
+      {"min_years",
+       "years": [{"year", "status" ("calibrated", "raw" or "no forecast"), "calibrated" (True only
+                  for status "calibrated"), "forecasts", "past_years", "past_rows"}, ...],
+       "years_left_raw": [...], "years_without_forecast": [...]}
     """
     year_of = table["date"].dt.year
     years = []
     for year in sorted(int(y) for y in year_of.unique()):
         past = _usable_past(table, p_column, label, horizon, year)
         past_years = int(year_of[past].nunique())
-        years.append({"year": year, "calibrated": past_years >= min_years,
+        forecasts = int(table.loc[year_of == year, p_column].notna().sum())
+        status = "no forecast" if forecasts == 0 else "calibrated" if past_years >= min_years else "raw"
+        years.append({"year": year, "status": status, "calibrated": status == "calibrated", "forecasts": forecasts,
                       "past_years": past_years, "past_rows": int(past.sum())})
     return {"min_years": int(min_years), "years": years,
-            "years_left_raw": [entry["year"] for entry in years if not entry["calibrated"]]}
+            "years_left_raw": [entry["year"] for entry in years if entry["status"] == "raw"],
+            "years_without_forecast": [entry["year"] for entry in years if entry["status"] == "no forecast"]}
 
 
 def calibrate_by_past(table, p_column, label, horizon, min_years=3):
