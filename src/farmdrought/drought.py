@@ -11,13 +11,14 @@ import numpy as np
 import pandas as pd
 
 from farmdrought.config import (ALERT_WEEKS, BUFFER_KM, D2_CLASS, NEIGHBOR_KM, ONI_TXT, SEASON_RUN,
-                                SEASON_WEEKS, USDM_JSON, YEAR_WEEKS)
+                                SEASON_WEEKS, USDM_JSON, YEAR_WEEKS, raw_path)
 from farmdrought.counties import km, load_county_centers, load_river_points, nearest_river
 from farmdrought.features import FEATURES_H, enso_features, history_features, load_oni, long_memory_features
 
 
-def load_usdm(path=USDM_JSON):
-    """Read the U.S. Drought Monitor file.
+def load_usdm(path=None):
+    """Read the U.S. Drought Monitor file (the snapshot in data/raw, unless a path is given or
+    the caller is inside config.live_data(), where a newer copy in data/live is preferred).
 
     Returns a dict with:
       fips, county, state : one entry per county
@@ -25,7 +26,7 @@ def load_usdm(path=USDM_JSON):
       classes             : array (counties, weeks), the worst drought class in the county
                             that week. NaN where the county has no data.
     """
-    with open(path) as f:
+    with open(raw_path(USDM_JSON) if path is None else path) as f:
         raw = json.load(f)
     # Each county's history is one string with one character per week.
     # "0" to "5" is the drought class. "." means missing.
@@ -96,8 +97,19 @@ def d2_streak(classes):
     return streak
 
 
-def build_panel(buffer_km=BUFFER_KM):
+def build_panel(buffer_km=BUFFER_KM, score_through=None, rivers=None, exclude=()):
     """Build the county-week table for the river counties (436 of them at the default 50 km).
+
+    score_through : None (the default) uses every week in the file, exactly as before. A date
+                    (for example config.SCORE_THROUGH) drops every later week BEFORE the inputs
+                    and the truths are built, so no answer window can reach past that date: a
+                    row whose window would cross it gets NaN, as if the file ended there.
+
+    rivers        : None (the default) uses the five rivers in config.RIVERS, exactly as before.
+                    A list of other river names builds the same table for those rivers instead
+                    (used only by the holdout test, holdout.py).
+    exclude       : county codes to leave out even if they are near one of the rivers (the
+                    holdout test passes the 436 counties already used). Empty by default.
 
     Columns: date, fips, county, state, river, lat, lon, d2_streak, the inputs (sets H, L
     and E), and the three truths: y (4-week), y_season (6-month) and y_weeks (12-month).
@@ -105,6 +117,9 @@ def build_panel(buffer_km=BUFFER_KM):
     Rows from each county's first year are dropped, because the inputs look back 52 weeks.
     """
     usdm = load_usdm()
+    if score_through is not None:
+        in_time = usdm["dates"] <= pd.Timestamp(score_through)
+        usdm = {**usdm, "dates": usdm["dates"][in_time], "classes": usdm["classes"][:, in_time]}
     centers = load_county_centers()
 
     # 1. Keep counties that have a shape on the map and no missing weeks at all,
@@ -116,8 +131,9 @@ def build_panel(buffer_km=BUFFER_KM):
     lat = np.array([centers[usdm["fips"][i]][1] for i in keep])
 
     # 2. A river county is one whose center is within 50 km of one of the five rivers.
-    river, distance = nearest_river(lon, lat, load_river_points())
-    chosen = np.where(distance <= buffer_km)[0]
+    river, distance = nearest_river(lon, lat, load_river_points(names=rivers))
+    left_out = set(exclude)
+    chosen = np.array([j for j in np.where(distance <= buffer_km)[0] if usdm["fips"][keep[j]] not in left_out])
 
     # 3. Neighbors of each river county: ALL counties within 150 km, except itself.
     neighbors = []
@@ -145,7 +161,7 @@ def build_panel(buffer_km=BUFFER_KM):
     panel["lon"] = np.repeat(lon[chosen], n_weeks)
     panel["date"] = np.tile(usdm["dates"], len(chosen))
     # Set E (El Nino index) is the same for every county, so its weekly values tile too
-    for name, values in enso_features(usdm["dates"], load_oni(ONI_TXT)).items():
+    for name, values in enso_features(usdm["dates"], load_oni(raw_path(ONI_TXT))).items():
         panel[name] = np.tile(values, len(chosen))
 
     # 6. Drop rows where an input is missing (the first 52 weeks of the record).

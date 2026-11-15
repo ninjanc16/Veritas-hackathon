@@ -1,0 +1,227 @@
+{
+  "added": true,
+  "declared_in": "reports/decision.md, section \"Round 4, leak model: a check against measured canal tests (declared Nov 15, 2026, before the measured rates were joined to any model figure)\"",
+  "score_through": "2026-11-10",
+  "computed_against_manifest_sha256": "f353768186ac5af41c19a0be285fa209498745e3ae8369e8f434e90042689221",
+  "computed_at": "2026-11-15T11:14:03-08:00",
+  "git_commit": "ba9b9d97afbe2c735fa9a0e090159165776453b3",
+  "git_dirty_source": true,
+  "git_dirty_source_paths": [
+    "app/build_site.py",
+    "src/farmdrought/districts.py"
+  ],
+  "git_dirty_source_means": "a file under src/ or a Python file in app/ differed from git_commit",
+  "draws": 10000,
+  "seed": 0,
+  "what": "Measured ponding tests on unlined canals against each model's rate for the test's soil texture. Rates in gallons per square foot per day.",
+  "unlined_tests": 16,
+  "dropped_no_texture_rate": {
+    "texture table": 1,
+    "permeability": 0
+  },
+  "primary": {
+    "texture table": {
+      "spearman": 0.248,
+      "lo": -0.23,
+      "hi": 0.634,
+      "n_tests": 15,
+      "draws_used": 10000,
+      "passes": false,
+      "median_measured_over_model": 0.425,
+      "median_model_rate": 2.24,
+      "median_measured_rate": 1.27
+    },
+    "permeability": {
+      "spearman": 0.578,
+      "lo": 0.234,
+      "hi": 0.775,
+      "n_tests": 16,
+      "draws_used": 9978,
+      "passes": true,
+      "median_measured_over_model": 0.073,
+      "median_model_rate": 19.08,
+      "median_measured_rate": 1.25
+    }
+  },
+  "seepage_only": {
+    "texture table": {
+      "spearman": 0.148,
+      "lo": -0.778,
+      "hi": 0.829,
+      "n_tests": 8,
+      "draws_used": 9992,
+      "passes": false,
+      "median_measured_over_model": 0.777,
+      "median_model_rate": 2.24,
+      "median_measured_rate": 1.56
+    },
+    "permeability": {
+      "spearman": 0.548,
+      "lo": 0.55,
+      "hi": 0.854,
+      "n_tests": 9,
+      "draws_used": 6499,
+      "passes": true,
+      "median_measured_over_model": 0.076,
+      "median_model_rate": 19.08,
+      "median_measured_rate": 1.44
+    }
+  },
+  "lined_against_unlined": {
+    "lined_tests": 38,
+    "lined_median": 1.94,
+    "unlined_tests": 16,
+    "unlined_median": 1.25,
+    "note": "Not tested. Most lined tests were on old, cracked concrete."
+  },
+  "tests": [
+    {
+      "district": "Valley Municipal Utility District No. 2 (Rancho Viejo)",
+      "soil": "silty clay",
+      "type": "seepage",
+      "measured": 0.15,
+      "texture_table": null,
+      "permeability": 2.12
+    },
+    {
+      "district": "Maverick County Water Control and Improvement District No. 1",
+      "soil": "silty clay loam (from S-RM2005 Table 11b)",
+      "type": "seepage",
+      "measured": 13.85,
+      "texture_table": 2.24,
+      "permeability": 19.08
+    },
+    {
+      "district": "Brownsville Irrigation District",
+      "soil": "silt loam",
+      "type": "seepage",
+      "measured": 3.14,
+      "texture_table": 4.49,
+      "permeability": 19.08
+    },
+    {
+      "district": "Cameron County Irrigation District No. 2 (San Benito)",
+      "soil": "fine sandy clay loam",
+      "type": "seepage",
+      "measured": 1.443,
+      "texture_table": 1.69,
+      "permeability": 19.08
+    },
+    {
+      "district": "Cameron County Irrigation District No. 2 (San Benito)",
+      "soil": "clay loam",
+      "type": "seepage",
+      "measured": 0.643,
+      "texture_table": 2.99,
+      "permeability": 19.08
+    },
+    {
+      "district": "Cameron County Irrigation District No. 2 (San Benito)",
+      "soil": "fine sandy clay loam",
+      "type": "seepage",
+      "measured": 1.674,
+      "texture_table": 1.69,
+      "permeability": 19.08
+    },
+    {
+      "district": "Cameron County Irrigation District No. 2 (San Benito)",
+      "soil": "fine sandy clay loam",
+      "type": "seepage",
+      "measured": 0.419,
+      "texture_table": 1.69,
+      "permeability": 19.08
+    },
+    {
+      "district": "Cameron County Irrigation District No. 2 (San Benito)",
+      "soil": "clay loam",
+      "type": "seepage",
+      "measured": 1.239,
+      "texture_table": 2.99,
+      "permeability": 19.08
+    },
+    {
+      "district": "Cameron County Irrigation District No. 2 (San Benito)",
+      "soil": "clay loam",
+      "type": "total (per summary tables)",
+      "measured": 1.27,
+      "texture_table": 2.99,
+      "permeability": 19.08
+    },
+    {
+      "district": "Cameron County Irrigation District No. 2 (San Benito) (inferred from SB prefix)",
+      "soil": "silty clay loam",
+      "type": "seepage",
+      "measured": 6.69,
+      "texture_table": 2.24,
+      "permeability": 19.08
+    },
+    {
+      "district": null,
+      "soil": "silty clay, silty clay loam",
+      "type": "total",
+      "measured": 0.15,
+      "texture_table": 2.24,
+      "permeability": 10.6
+    },
+    {
+      "district": null,
+      "soil": "fine sandy loam",
+      "type": "total",
+      "measured": 2.39,
+      "texture_table": 9.35,
+      "permeability": 59.85
+    },
+    {
+      "district": null,
+      "soil": "clay loam, sandy clay loam",
+      "type": "total",
+      "measured": 0.46,
+      "texture_table": 2.34,
+      "permeability": 19.08
+    },
+    {
+      "district": null,
+      "soil": "silty clay loam, sandy clay loam",
+      "type": "total",
+      "measured": 3.18,
+      "texture_table": 1.97,
+      "permeability": 19.08
+    },
+    {
+      "district": "Hidalgo County Irrigation District No. 2 (San Juan) (inferred from SJ prefix)",
+      "soil": "clay",
+      "type": "total",
+      "measured": 1.06,
+      "texture_table": 1.5,
+      "permeability": 0.45
+    },
+    {
+      "district": "Hidalgo County Irrigation District No. 2 (San Juan) (inferred from SJ prefix)",
+      "soil": "clay, silty clay",
+      "type": "total",
+      "measured": 0.45,
+      "texture_table": 1.5,
+      "permeability": 1.28
+    }
+  ],
+  "site_summary": [
+    {
+      "name": "Leak model against measured canal tests: rank agreement, texture table (15 unlined tests)",
+      "value": 0.248,
+      "lo": -0.23,
+      "hi": 0.634,
+      "n_years": null,
+      "verdict": "not shown",
+      "lower_is_better": false
+    },
+    {
+      "name": "Leak model against measured canal tests: rank agreement, permeability (16 unlined tests)",
+      "value": 0.578,
+      "lo": 0.234,
+      "hi": 0.775,
+      "n_years": null,
+      "verdict": "agrees",
+      "lower_is_better": false
+    }
+  ]
+}

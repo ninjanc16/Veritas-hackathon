@@ -42,7 +42,7 @@
     threshold:     { value: 0.25,   tag: "pipeline",   label: "Forecast warning line" },
     usdPerSqft:    { value: 0.004,  tag: "published",  label: "Sealant price per square foot ($, materials only)" },
     widthFt:       { value: 20,     tag: "assumption", label: "Wetted canal width (feet)" },
-    cut:           { value: 0.575,  tag: "published",  label: "Share of seepage the sealant stops (tests: 28% to 87%)" },
+    cut:           { value: 0.575,  tag: "assumption", label: "Share of seepage the sealant stops (the middle of the published range, 28% to 87%)" },
     daysLast:      { value: 90,     tag: "published",  label: "Days one application lasts" },
     seasonStart:   { value: 2,      tag: "assumption", label: "Irrigation season starts (month)" },
     seasonEnd:     { value: 10,     tag: "assumption", label: "Irrigation season ends (month)" },
@@ -57,6 +57,17 @@
     // One application lasts about 90 days and the season is about nine months, so three
     // applications keep the canals sealed for the whole season. Each one is paid for in full.
     applications:  { value: 3,      tag: "assumption", label: "Sealant applications in a season you act (each lasts about 90 days)" },
+    // The ranges samplePhysics() draws from (see PHYSICAL UNCERTAINTY below). Used only when a
+    // run asks for physics; a plain run never reads them.
+    cutLow:         { value: 0.28, tag: "published",  label: "Share of seepage the sealant stops: lowest in the published tests" },
+    cutHigh:        { value: 0.87, tag: "published",  label: "Share of seepage the sealant stops: highest in the published tests" },
+    seepShareLow:   { value: 0.5,  tag: "assumption", label: "Share of a district's canal loss that is seepage: lowest" },
+    seepShareHigh:  { value: 0.9,  tag: "assumption", label: "Share of a district's canal loss that is seepage: highest" },
+    widthMultLow:   { value: 0.5,  tag: "assumption", label: "Real wetted width as a multiple of the assumed width: lowest (no width is measured)" },
+    widthMultHigh:  { value: 1.5,  tag: "assumption", label: "Real wetted width as a multiple of the assumed width: highest (no width is measured)" },
+    linedShareLow:  { value: 0,    tag: "assumption", label: "Share of canal length already lined: lowest" },
+    linedShareMode: { value: 0.3,  tag: "assumption", label: "Share of canal length already lined: most likely" },
+    linedShareHigh: { value: 0.7,  tag: "assumption", label: "Share of canal length already lined: highest" },
   };
 
   /* Plain values out of DEFAULTS, with any overrides on top. */
@@ -97,6 +108,97 @@
     return gallonsPerDay * days * cut / GALLONS_PER_ACRE_FOOT;
   }
 
+  /* A draw from the standard Normal distribution (mean 0, standard deviation 1), by the
+     Box-Muller method. It always takes two numbers from rng. */
+  function normal(rng) {
+    const u = 1 - rng(), v = rng();                     // 1 - rng() is in (0, 1], so the logarithm is finite
+    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+  }
+
+  /*
+    PHYSICAL UNCERTAINTY. The plan's leak and cost figures rest on things nobody has measured:
+    how wide the canals are, how much of their length is already lined, how much of a district's
+    loss is seepage, and how well the sealant works here. samplePhysics() draws one possible
+    set of answers. Every range is in DEFAULTS; only the sealant range is published.
+
+    What is drawn:
+      cut         share of seepage the sealant stops: uniform 0.28 to 0.87, the published range.
+      widthMult   real wetted width / assumed width, one value for every canal: uniform 0.5 to
+                  1.5 (opts.widthLow, opts.widthHigh), so its middle is the assumed width.
+                  ASSUMPTION: no width is measured.
+      linedShare  share of canal length already lined: triangular on 0 to 0.7, most likely 0.3.
+                  ASSUMPTION.
+      s           share of a district's canal loss that is seepage (the rest is evaporation and
+                  spills): uniform 0.5 to 0.9. ASSUMPTION. Used only in the calibrated regime.
+      seepMult    see the two regimes.
+      widthMultByClass  only if opts.widthByClass = { class: [low ft, high ft] } is given: the same
+                  position in each class's range, as a multiple of opts.baseWidthFt (default: the
+                  assumed width). The engine does not use it yet; canals carry no class today.
+
+    THERE ARE TWO REGIMES, and the draw says which one it is (regime, calibrated).
+
+    "uncalibrated" (no opts.seepSd; this is today). Each canal's leak rate is a published rate
+      for its soil. It is a rate, not a share of anybody's total loss, so the seepage share s
+      has nothing to apply to: s is null and seepMult is 1. The water kept is scaled by
+      widthMult x (1 - linedShare), because a wider canal leaks over more area and a lined
+      stretch does not leak. The bill is scaled by widthMult.
+
+    "calibrated" (opts.seepSd given, with rates the pipeline has fitted to each district's
+      published loss). The district total already reflects whatever widths and lining really
+      exist, so scaling by them again would count the same doubt twice. The water kept is
+      scaled by seepMult = s x exp(Normal(0, sd)) only: s because the published loss also
+      includes evaporation and spills, and sd for the fit's leftover spread. widthMult and
+      linedShare are still drawn, but only widthMult is used, and only for the bill.
+
+    In both regimes the bill scales with widthMult and never with linedShare: sealant is bought
+    by area, for every stretch, because nobody knows which stretches are lined.
+
+    The same rng and the same opts always give the same draw. It always takes six numbers from
+    rng, in both regimes, so the other values do not depend on the regime.
+  */
+  function samplePhysics(rng, opts) {
+    const o = opts || {}, D = DEFAULTS;
+    const or = (v, fallback) => (v == null ? fallback : v);
+    const uniform = (low, high) => low + (high - low) * rng();
+    const calibrated = o.seepSd != null;
+    const share = uniform(D.seepShareLow.value, D.seepShareHigh.value), z = normal(rng);
+    const s = calibrated ? share : null;
+    const seepMult = calibrated ? share * Math.exp(o.seepSd * z) : 1;
+    const cut = uniform(D.cutLow.value, D.cutHigh.value);
+    const widthLow = or(o.widthLow, D.widthMultLow.value), widthHigh = or(o.widthHigh, D.widthMultHigh.value);
+    const where = rng();                                 // how far along the width range, shared by every class
+    const widthMult = widthLow + (widthHigh - widthLow) * where;
+    // Triangular distribution on [a, b] with its peak at c.
+    const a = D.linedShareLow.value, b = D.linedShareHigh.value, c = D.linedShareMode.value, u = rng();
+    const linedShare = u < (c - a) / (b - a) ? a + Math.sqrt(u * (b - a) * (c - a)) : b - Math.sqrt((1 - u) * (b - a) * (b - c));
+    const draw = { regime: calibrated ? "calibrated" : "uncalibrated", calibrated, s, seepMult, cut, widthMult, linedShare };
+    if (o.widthByClass) {
+      const base = or(o.baseWidthFt, D.widthFt.value);
+      draw.widthMultByClass = {};
+      for (const cls in o.widthByClass) draw.widthMultByClass[cls] = (o.widthByClass[cls][0] + (o.widthByClass[cls][1] - o.widthByClass[cls][0]) * where) / base;
+    }
+    return draw;
+  }
+
+  /*
+    The physics with every unknown at its MEDIAN: what "physics held fixed" means. Half of the
+    draws of each unknown fall below its value here and half above, so the fixed bands sit in
+    the middle of the sampled ones and differ from them in width, not in position.
+    (For the lined share the median is not the most likely value: the range runs further above
+    0.3 than below it. seepMult's median is taken as the median of s; the calibration spread
+    multiplies by a factor whose median is 1.)
+  */
+  function centralPhysics(opts) {
+    const o = opts || {}, D = DEFAULTS, calibrated = o.seepSd != null;
+    const or = (v, fallback) => (v == null ? fallback : v);
+    const s = (D.seepShareLow.value + D.seepShareHigh.value) / 2;
+    const a = D.linedShareLow.value, b = D.linedShareHigh.value, c = D.linedShareMode.value;
+    const linedShare = (c - a) / (b - a) >= 0.5 ? a + Math.sqrt(0.5 * (b - a) * (c - a)) : b - Math.sqrt(0.5 * (b - a) * (b - c));
+    return { regime: calibrated ? "calibrated" : "uncalibrated", calibrated, s: calibrated ? s : null, seepMult: calibrated ? s : 1,
+             cut: (D.cutLow.value + D.cutHigh.value) / 2,
+             widthMult: (or(o.widthLow, D.widthMultLow.value) + or(o.widthHigh, D.widthMultHigh.value)) / 2, linedShare };
+  }
+
   /*
     Run one policy through a list of weeks.
 
@@ -104,7 +206,8 @@
               canals: priority-ordered list for fundCanals (the policy's own order is chosen below)
               canalsUnranked: the same canals in map order (used when policy.ranked is false)
               demandAf: acre-feet of irrigation water the scope wants in a full year
-              revenueAtStake: crop revenue lost in a year with no irrigation water at all ($) }
+              revenueAtStake: crop revenue lost in a year with no irrigation water at all ($)
+              physics: optional, a draw from samplePhysics(). Left out, nothing below changes. }
     policy: { trigger: "never" | "declared" | "d1" | "forecast" | "always", ranked: true/false }
     Returns { years: [one summary per year], totals }.
   */
@@ -113,6 +216,22 @@
     const valuePerAf = scope.demandAf > 0 ? scope.revenueAtStake / scope.demandAf : 0;
     const plan = fundCanals(policy.ranked === false ? scope.canalsUnranked : scope.canals, p.budget, p);
     const weeksActive = Math.ceil(p.daysLast / 7);
+    // Physical uncertainty, only if the scope carries a draw. These rules are ASSUMPTIONS
+    // (the two regimes are explained above samplePhysics):
+    //   - The plan (which canals) is made at the assumed width; the real width changes the bill
+    //     in proportion. So a round can cost more than the budget.
+    //   - The bill does NOT shrink with the lined share: nobody knows which stretches are lined,
+    //     so sealant is bought for all of it, and what goes on lined stretches saves nothing.
+    //   - Water kept, uncalibrated: scales with widthMult x (1 - linedShare). The seepage share
+    //     is not applied, because the rates are published rates, not a share of a total loss.
+    //   - Water kept, calibrated: scales with seepMult only. Width and lining are already inside
+    //     the district totals the rates were fitted to.
+    //   - Either way the drawn sealant effect is used.
+    const physics = scope.physics || null;
+    const roundCost = physics ? plan.spent * physics.widthMult : plan.spent;
+    const keepMult = !physics ? 1 : physics.calibrated ? physics.seepMult : physics.widthMult * (1 - physics.linedShare);
+    const leakPerDay = physics ? plan.gallonsPerDay * keepMult : plan.gallonsPerDay;
+    const cut = physics ? physics.cut : p.cut;
 
     // Group the weeks by year, keeping their order.
     const byYear = [];
@@ -160,13 +279,13 @@
           }
         }
         if (act) {
-          out.acted = true; out.actedWeek = i; out.spend += plan.spent; applied = 1;
+          out.acted = true; out.actedWeek = i; out.spend += roundCost; applied = 1;
           sealedUntil = i + weeksActive - 1;
         }
         // A further application once the last one has worn off, if the plan allows it and the
         // season is still running. Each one is paid for in full.
         if (out.acted && !act && i === sealedUntil + 1 && applied < p.applications && inSeason(week)) {
-          applied += 1; out.spend += plan.spent; reapplied = true;
+          applied += 1; out.spend += roundCost; reapplied = true;
           sealedUntil = i + weeksActive - 1;
         }
 
@@ -175,7 +294,7 @@
         if (inSeason(week)) {
           demand = demandWeek;
           missing = demand * shortage(week.pct, p);
-          if (i <= sealedUntil) saved = savedAcreFeet(plan.gallonsPerDay, 7, p.cut);
+          if (i <= sealedUntil) saved = savedAcreFeet(leakPerDay, 7, cut);
           saved = Math.min(saved, demand - missing);   // a canal cannot keep more water than was released into it
           recovered = Math.min(saved, missing);     // saved water is only worth something in a shortage
           if (missing > 0) out.weeksShort += 1;
@@ -188,7 +307,7 @@
         out.loss += (missing - recovered) * valuePerAf;
         out.weekly.push({ date: week.date, month: week.month, pct: week.pct, cls: week.cls, forecast: week.forecast,
                           demand, missing, recovered, saved, sealed: i <= sealedUntil,
-                          spend: act || reapplied ? plan.spent : 0, loss: (missing - recovered) * valuePerAf });
+                          spend: act || reapplied ? roundCost : 0, loss: (missing - recovered) * valuePerAf });
       });
 
       out.relief = out.loss * p.reliefShare;                       // public money paid AFTER the loss
@@ -208,7 +327,12 @@
     }
     totals.cost = totals.spend + totals.loss;                      // what the region pays in all: sealing + lost crops
     totals.publicMoney = totals.spend + totals.relief;             // what the public purse pays: sealing + relief
-    return { policy, plan: { spent: plan.spent, km: plan.km, canals: plan.funded.length }, years, totals };
+    const result = { policy, plan: { spent: roundCost, km: plan.km, canals: plan.funded.length }, years, totals };
+    if (physics) {
+      result.physics = physics;                                    // the draw this run used
+      result.plan.overBudget = roundCost > p.budget;               // wider canals than assumed: a round costs more than the budget
+    }
+    return result;
   }
 
   /* A small seeded random number generator, so the same seed always gives the same futures. */
@@ -291,14 +415,34 @@
     Every policy is run through the same futures.
 
     options: { startDate "YYYY-MM-DD", pctNow, pNow, years, draws, seed, cutoffYear,
-               recall, falseAlarm, shocks: [{ year: 1.., month, points }], secondDryYear }
-    Returns { policies: [{ policy, draws, summary }], sample: [simulate() result per policy for
-              the middle future], cases: { best, likely, worst } (three futures to watch, each
-              { sample, sourceYears }), fan: weekly low / mid / high storage, libraryYears, dryYears }.
+               recall, falseAlarm, shocks: [{ year: 1.., month, points }], secondDryYear,
+               physics: true | false (default false), physicsOptions: passed to samplePhysics(),
+               withFixed: false leaves out the second run with physics held fixed (it halves the work) }
+    Returns { policies: [{ policy, draws, summary, losesToNothing }], sample: [simulate() result
+              per policy for the middle future], cases: { best, likely, worst } (three futures to
+              watch, each { sample, sourceYears }), fan: weekly low / mid / high storage,
+              libraryYears, dryYears }.
+    losesToNothing: in how many futures this policy cost more in total than doing nothing
+              (null if no policy in the list has the trigger "never").
+
+    WITH physics: true, each future also gets ONE draw of the physical unknowns, made before the
+    policy loop, so every policy in a future faces the same canals. The draws come from their
+    own random stream, so the weather of each future is the same as with physics off. Added to
+    the result:
+      physics: { regime, calibrated, central, draws: [the draw of each future] }
+      fixedPhysics: { policies: [{ policy, draws, summary, losesToNothing, overBudget }] }  the
+              same futures with the physics held at its median values. The gap between the two
+              sets of bands is the part of the spread that is physical uncertainty, not weather.
+      overBudget on each policy: in how many futures it sealed and a round cost more than the
+              budget, because the canals were wider than assumed.
+      cases[...].sampleFixed: the future to watch, run with the physics at its median values.
+    Note that the median physics is not the plain run. Uncalibrated, it takes about a third of
+    the length as lined, so it keeps about two thirds of the water a plain run does.
   */
   function fromToday(scope, policies, overrides, options) {
     const opt = Object.assign({ years: 5, draws: 300, seed: 11, pNow: 0.3, pctNow: 50, cutoffYear: 2020,
-                                recall: 0.9, falseAlarm: 0.3, shocks: [], secondDryYear: false }, options || {});
+                                recall: 0.9, falseAlarm: 0.3, shocks: [], secondDryYear: false,
+                                physics: false, physicsOptions: null, withFixed: true }, options || {});
     const rng = makeRng(opt.seed);
     const WEEK = 7 * 864e5;
 
@@ -330,7 +474,13 @@
                       weekOfYear: Math.min(51, Math.floor((t - jan1) / WEEK)) });
     }
 
-    const results = policies.map(() => []), futures = [];
+    // Physics has its own stream of random numbers, so switching it on does not change the weather.
+    const physicsRng = opt.physics ? makeRng((opt.seed ^ 0x9E3779B9) >>> 0) : null;
+    const central = opt.physics ? centralPhysics(opt.physicsOptions) : null;
+    const results = policies.map(() => []), resultsFixed = policies.map(() => []), futures = [], physicsDraws = [];
+    // In how many futures a policy sealed and a round cost more than the budget (physics on only).
+    const overBudget = policies.map(() => 0), overBudgetFixed = policies.map(() => 0);
+    const paidOver = (run) => (run.plan.overBudget && run.totals.yearsActed > 0 ? 1 : 0);
     for (let n = 0; n < opt.draws; n++) {
       const source = {}, warned = {};
       for (let y = startYear; y <= startYear + opt.years; y++) {
@@ -356,31 +506,49 @@
       });
       const future = Object.assign({}, scope, { weeks });
       future.sourceYears = Object.keys(source).map((y) => source[y]);   // the real years this future borrows, in order
+      if (opt.physics) {
+        future.physics = samplePhysics(physicsRng, opt.physicsOptions);   // once per future, before the policy loop
+        physicsDraws.push(future.physics);
+        if (opt.withFixed) {
+          const fixed = Object.assign({}, future, { physics: central });
+          policies.forEach((policy, i) => { const run = simulate(fixed, policy, overrides); resultsFixed[i].push(run.totals); overBudgetFixed[i] += paidOver(run); });
+        }
+      }
       futures.push(future);
-      policies.forEach((policy, i) => results[i].push(simulate(future, policy, overrides).totals));
+      policies.forEach((policy, i) => { const run = simulate(future, policy, overrides); results[i].push(run.totals); if (opt.physics) overBudget[i] += paidOver(run); });
     }
 
     const quantile = (values, q) => {
       const sorted = values.slice().sort((a, b) => a - b);
       return sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))];
     };
+    // Low, middle and high of each total across the futures, and how often a policy loses to doing nothing.
+    const nothing = policies.findIndex((policy) => policy.trigger === "never");
+    const summarise = (all, over) => policies.map((policy, i) => {
+      const summary = {};
+      for (const key of ["cost", "loss", "spend", "publicMoney", "recoveredAf"]) {
+        const values = all[i].map((t) => t[key]);
+        summary[key] = { low: quantile(values, 0.1), mid: quantile(values, 0.5), high: quantile(values, 0.9) };
+      }
+      const entry = { policy, draws: all[i], summary,
+                      losesToNothing: nothing < 0 ? null : all[i].filter((t, k) => t.cost > all[nothing][k].cost).length };
+      if (over) entry.overBudget = over[i];
+      return entry;
+    });
     // Line the futures up from mildest to harshest by what doing nothing costs, then pick three
     // to show: a mild one (9 in 10 are harsher), the middle one, and a harsh one (9 in 10 are milder).
     const order = results[0].map((t, i) => [t.cost, i]).sort((a, b) => a[0] - b[0]);
     const at = (q) => order[Math.min(order.length - 1, Math.floor(q * order.length))][1];
     const middle = at(0.5);
-    const showCase = (index) => ({ sample: policies.map((policy) => simulate(futures[index], policy, overrides)),
-                                   sourceYears: futures[index].sourceYears });
-    return {
+    const showCase = (index) => {
+      const shown = { sample: policies.map((policy) => simulate(futures[index], policy, overrides)), sourceYears: futures[index].sourceYears };
+      // With physics on, the same future again with every unknown at its median: one fixed thing to draw.
+      if (opt.physics && opt.withFixed) shown.sampleFixed = policies.map((policy) => simulate(Object.assign({}, futures[index], { physics: central }), policy, overrides));
+      return shown;
+    };
+    const out = {
       cases: { best: showCase(at(0.1)), likely: showCase(middle), worst: showCase(at(0.9)) },
-      policies: policies.map((policy, i) => {
-        const summary = {};
-        for (const key of ["cost", "loss", "spend", "publicMoney", "recoveredAf"]) {
-          const values = results[i].map((t) => t[key]);
-          summary[key] = { low: quantile(values, 0.1), mid: quantile(values, 0.5), high: quantile(values, 0.9) };
-        }
-        return { policy, draws: results[i], summary };
-      }),
+      policies: summarise(results, opt.physics ? overBudget : null),
       sample: policies.map((policy) => simulate(futures[middle], policy, overrides)),
       fan: calendar.map((c, i) => {
         const values = futures.map((f) => f.weeks[i].pct);
@@ -388,8 +556,13 @@
       }),
       libraryYears, dryYears,
     };
+    if (opt.physics) {
+      out.physics = { regime: central.regime, calibrated: central.calibrated, central, draws: physicsDraws };
+      if (opt.withFixed) out.fixedPhysics = { policies: summarise(resultsFixed, overBudgetFixed) };
+    }
+    return out;
   }
 
   return { DEFAULTS, makeParams, shortage, fundCanals, savedAcreFeet, simulate, forward, fromToday, makeRng,
-           GALLONS_PER_ACRE_FOOT, FEET_PER_KM };
+           normal, samplePhysics, centralPhysics, GALLONS_PER_ACRE_FOOT, FEET_PER_KM };
 });

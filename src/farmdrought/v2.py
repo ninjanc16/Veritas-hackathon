@@ -18,6 +18,7 @@ Honest note: the candidate LIST was written after seeing version 1's test result
 reports/decision.md). Only the choice among candidates is protected.
 
 Writes reports/v2.json. Run it with:  PYTHONPATH=src python -m farmdrought.v2
+Once the results are frozen it refuses to replace reports/v2.json unless --force is added.
 """
 import json
 
@@ -27,6 +28,8 @@ import pandas as pd
 from farmdrought.alert import make_forest, split_masks
 from farmdrought.config import (D2_CLASS, FOCUS_RIVER, OUTLOOK_TEST, REPORTS, SEASON_THRESHOLD, SEASON_WEEKS,
                                 YEAR_WEEKS)
+from farmdrought.config import SCORE_THROUGH
+from farmdrought.manifest import guard_scored_writer
 from farmdrought.drought import build_panel
 from farmdrought.evaluate import pick_threshold, tally
 from farmdrought.features import FEATURES_H
@@ -204,7 +207,11 @@ def run_v2(panel):
 
 
 if __name__ == "__main__":
-    results = run_v2(build_panel())
+    import sys
+    guard_scored_writer(V2_JSON, force="--force" in sys.argv)   # refuses to replace v2.json after the freeze
+    # Weeks after the scoring cut-off are left out, so a rerun after new data arrives scores the
+    # same weeks as the frozen results (ARCHITECTURE.md section 3.0).
+    results = run_v2(build_panel(score_through=SCORE_THROUGH))
     with open(V2_JSON, "w") as f:
         json.dump(results, f, indent=2)
     for product in ("alert", "season", "year"):

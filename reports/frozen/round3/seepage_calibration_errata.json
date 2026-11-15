@@ -1,0 +1,19 @@
+{
+  "added": true,
+  "erratum_for": "reports/frozen/round3/seepage_calibration.json",
+  "written": "2026-11-15",
+  "what_is_wrong": "Two counts in seepage_calibration.json describe the segment set of all 15 matched districts, not the 14 districts that were fitted. One matched district, HCWCID#18, has no authorised water in the 1998 table, so it has no loss and entered no fit and no test; its 4 segments (5.0 km) are counted all the same.",
+  "wrong_fields": [
+    "segments_kept says 3534. The fit and the held-out test used 3530 segments.",
+    "km_kept says 3488.4. The fit and the held-out test used 3483.4 km.",
+    "class_counts_in_the_set also includes those 4 segments."
+  ],
+  "correct_counts_for_the_fit": {"segments": 3530, "km": 3483.4, "districts": 14},
+  "also_stated_here": [
+    "The declaration in reports/decision.md and ARCHITECTURE.md expected 18 districts. 14 were fitted: 4 districts in the 1998 table could not be matched to a district in the map by name without guessing (Adams Garden, HCMUD, HCWID#3 (McAllen), Santa Maria), and 1 matched district has no authorised water (HCWCID#18). The 1998 table has 19 rows.",
+    "The pass statistic is the DIFFERENCE OF MEDIANS: the rival's median held-out error minus the model's median held-out error, recomputed on each resample of districts. It is not the median of the per-district differences."
+  ],
+  "effect_on_results": "None. Every fitted factor, held-out error, rank correlation, bootstrap interval and the pass or fail outcome was computed on the 14 fitted districts only and is unchanged.",
+  "why_a_separate_file": "Frozen result files are not rewritten. seepage_calibration.json is left exactly as the run wrote it.",
+  "fixed_in_code": "seepage_calibration.calibration_item now writes the fitted districts' own counts in segments_kept, km_kept and class_counts_in_the_set, and lists matched districts that have no loss separately."
+}

@@ -27,7 +27,7 @@
     // The name, in two parts so the second can be set differently. The map opens out of
     // the letter at `eye` (a position in the first part).
     name: ["Rio", "IQ"], eye: 2,
-    line: "A planning tool for the irrigation districts on the Texas Rio Grande. It forecasts drought six months ahead, maps every canal, and lists which ones to seal first.",
+    line: "A planning tool for the irrigation districts on the Texas Rio Grande. It forecasts drought six months ahead, maps every canal, and puts the canals in a modelled order for sealing.",
     cue: "Scroll to follow the river",
     photo: { src: "photos/opening-santa-elena.jpg", what: "Santa Elena Canyon, Big Bend, Texas. Mexico is on the left bank.",
              by: "Carol M. Highsmith, Library of Congress", url: "https://commons.wikimedia.org/wiki/File:The_sheer_faces_of_Santa_Elena_Canyon,_deep_in_Big_Bend_National_Park_in_Brewster_County,_Texas,_frame_the_Rio_Grande_River._Mexico_is_to_the_left,_the_United_States_to_the_right_LCCN2014630611.tif" },
@@ -74,7 +74,7 @@
       source: ["Christian Science Monitor, May 2001", "https://csmonitor.com/2001/0521/p3s1.html"] },
     { id: "texas", kicker: "Where RioIQ works", title: "RioIQ covers the Texas stretch",
       body: ["Fourteen Texas counties sit on the river. Their irrigation districts move its water to farms through canals, and unlined canals leak into the soil.",
-             "RioIQ shows each district which canals to seal first and what that costs."],
+             "RioIQ shows each district a modelled order for sealing its canals and what that would cost."],
       ghost: "RIOIQ",
       links: [["See this week’s numbers", "#texas", ""], ["Open the platform", "app.html", "ghost"]] },
   ];
@@ -129,7 +129,7 @@
     h("span", { "aria-hidden": "true" }, [first.slice(0, TITLE.eye), eye, first.slice(TITLE.eye + 1)]),
     h("em", { "aria-hidden": "true" }, TITLE.name[1]),
   ]);
-  const backdrop = h("img", { class: "backdrop", src: TITLE.photo.src, alt: TITLE.photo.what, width: 1800, height: 1201 });
+  const backdrop = h("img", { class: "backdrop", src: TITLE.photo.src, alt: TITLE.photo.what, width: 1800, height: 1201, decoding: "async" });
   const wordWrap = h("div", { class: "wordWrap" }, [h("p", { class: "lbl titleLabel" }, TITLE.label), word]);
   const rest = h("div", { class: "rest" }, [
     h("p", { class: "line" }, TITLE.line),
@@ -217,7 +217,7 @@
   // A round window onto the ground at the stops we hold an aerial photo for, tied to the
   // river's head by a thin line.
   const lensImgs = CHAPTERS.map((c) => c.photo
-    ? h("img", { src: "photos/" + c.photo[0], alt: c.photo[1], loading: "lazy" }) : null);
+    ? h("img", { src: "photos/" + c.photo[0], alt: c.photo[1], loading: "lazy", decoding: "async" }) : null);
   const lensCap = h("figcaption", { class: "lbl" });
   const lens = h("figure", { class: "lens" }, [h("div", { class: "glass" }, lensImgs.filter(Boolean)), lensCap]);
   const leader = h("div", { class: "leader", "aria-hidden": "true" });

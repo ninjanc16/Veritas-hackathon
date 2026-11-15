@@ -47,6 +47,21 @@ main { position: relative; z-index: 5; }
 .say { font-size: clamp(1.05rem, 1.5vw, 1.3rem); line-height: 1.45; margin: 22px 0 14px; max-width: 30em; text-shadow: 0 1px 14px var(--ground), 0 0 30px var(--ground); }
 .say b { color: var(--blue); font-weight: 600; }
 .src { font-size: .66rem; color: var(--muted); margin: 0; letter-spacing: .07em; }
+/* A text block that sits over the canal drawing gets a near-solid backing, so the lines do not
+   run through its words. The one exception to "no boxes": a caveat nobody can read is not one. */
+/* This first rule is for browsers without color-mix(): the same colour, written out. */
+.beat .copy.backed { background: rgba(5, 9, 11, .92); }
+.beat .copy.backed { background: color-mix(in srgb, var(--ground) 92%, transparent); padding: 4px 24px 22px; border-radius: 4px; }
+/* The last beat keeps its open look (no box), but the river and the westernmost canals reach
+   under its words. A soft patch of the ground colour sits behind the copy and fades out towards
+   the map (and at its top and bottom), so the lines dim away instead of crossing the text. */
+.beat .copy.scrim { position: relative; z-index: 0; }
+.beat .copy.scrim::before { content: ""; position: absolute; z-index: -1; top: -90px; bottom: -90px; left: -100vw; right: -170px;
+  background: linear-gradient(90deg, var(--ground) 0, var(--ground) calc(100% - 230px), transparent 100%);
+  -webkit-mask-image: linear-gradient(180deg, transparent, #000 90px, #000 calc(100% - 90px), transparent);
+  mask-image: linear-gradient(180deg, transparent, #000 90px, #000 calc(100% - 90px), transparent); }
+/* A caveat about a headline figure: body-size text in the ink colour, marked at the side. */
+.caveat { font: 400 1rem/1.5 var(--sans); color: var(--ink); margin: 0 0 12px; padding-left: 12px; border-left: 3px solid var(--watch); }
 /* Each beat's copy slides up and sharpens when it comes into view. */
 .beat .copy > * { opacity: 0; transform: translateY(34px); filter: blur(6px); transition: opacity .9s cubic-bezier(.2, .7, .2, 1), transform .9s cubic-bezier(.2, .7, .2, 1), filter .9s; }
 .beat.in .copy > * { opacity: 1; transform: none; filter: none; }
@@ -99,10 +114,14 @@ footer p { margin: 0 0 8px; }
   .beat, .beat.right { align-items: flex-end; justify-content: flex-start; padding-bottom: 12vh; min-height: 120vh; }
   .hero { min-height: 100vh; padding-bottom: 14vh; }
   .cols, .stories { grid-template-columns: 1fr; }
+  /* On a phone the map is above the copy, so the patch behind the last beat fades upwards instead of sideways. */
+  .beat .copy.scrim::before { top: -40px; bottom: -40vh; left: -100vw; right: -100vw; -webkit-mask-image: none; mask-image: none;
+    background: linear-gradient(180deg, transparent 0, var(--ground) 40px); }
   .enter { padding: 8px 10px; font-size: .68rem; }
 }
 /* People who ask for less motion get the page without the moving parts. */
 @media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
   h1 .line span { animation: none; transform: none; }
   .beat .copy > * { opacity: 1; transform: none; filter: none; transition: none; }
   .ticker div, .scrollCue i { animation: none; }

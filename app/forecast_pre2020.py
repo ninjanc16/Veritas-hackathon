@@ -6,8 +6,10 @@ answers that were fully known before January 1, 2020. Then it does two things:
 
   1. TEST   predicts every month from 2020 on, years the model never saw, and counts how
             often its warnings were right.
-  2. LIVE   predicts this week, from the newest Drought Monitor and El Nino data the daily
-            refresh downloaded. The model is old; the data it reads is new.
+  2. LIVE   predicts the last week up to the scoring cut-off (config.SCORE_THROUGH), from the
+            snapshot in data/raw. The model is old; that week is newer than anything it saw.
+            (It no longer follows the daily downloads: this file holds scored numbers, so it is
+            built from the same weeks as the frozen results.)
 
 It imports the pipeline's own functions and writes one small file. It changes nothing in
 the pipeline.
@@ -15,14 +17,18 @@ the pipeline.
 Run it with:   PYTHONPATH=src python -m app.forecast_pre2020     (takes about a minute;
                needs scikit-learn, so use the pipeline's Python environment)
 Output:        app/data/pre2020.json
+Once the results are frozen it refuses to replace that file unless --force is added, and it
+always checks the raw inputs against data/manifest.json first.
 """
 import json
+import sys
 from pathlib import Path
 
 import pandas as pd
 
 from farmdrought.alert import run_alert
-from farmdrought.config import FOCUS_RIVER, SEASON_THRESHOLD, SEASON_WEEKS
+from farmdrought.config import FOCUS_RIVER, SCORE_THROUGH, SEASON_THRESHOLD, SEASON_WEEKS
+from farmdrought.manifest import guard_scored_writer
 from farmdrought.outlook import FEATURES_SEASON, issue_rows, make_classifier
 
 CUTOFF = pd.Timestamp("2020-01-01")     # nothing whose answer came after this date is used for training
@@ -41,8 +47,9 @@ def tally(warned, happened):
     }
 
 
-def main():
-    panel, _ = run_alert()                                   # the pipeline's weekly table, all rivers
+def main(force=False):
+    guard_scored_writer(OUT, force=force)                    # refuses to replace the file after the freeze
+    panel, _ = run_alert(score_through=SCORE_THROUGH)        # the pipeline's weekly table, up to the cut-off
     monthly = issue_rows(panel)                              # one row per county per month
     river = monthly[monthly["river"] == FOCUS_RIVER]
 
@@ -88,4 +95,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main(force="--force" in sys.argv)

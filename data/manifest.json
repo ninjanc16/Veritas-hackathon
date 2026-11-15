@@ -1,0 +1,23 @@
+{
+  "score_through": "2026-11-10",
+  "files": {
+    "data/raw/canals/canal_soil.csv": "15620dc79f7a13e0f13435f013f650fed0f0463d3eff92546801d018f17c85c0",
+    "data/raw/canals/canals_rio_grande.csv": "72d91a9d5b218280edc469596b6591e32bdbb9f3e6682b00ab450e4aaa93ed39",
+    "data/raw/districts/tx_districts.geojson": "0bfff7376539590685130e6ade9780df9ecd113f51178afca5dccc8ebd7a4fb1",
+    "data/raw/flow_USGS-08220000.csv": "38ed8ab5013e7d87f7eeb88fa373990bdce889db63b912d354cc4f979493c202",
+    "data/raw/flow_USGS-08313000.csv": "fd4d74586a69dbaa47f12c48dfbe35ecd220ea74db0857c1dfbdcd8d57ef3b4d",
+    "data/raw/flow_USGS-08330000.csv": "38af7855e6216453a7d1fc9b4a5599713ce7423f84f26f01d5d7b25f10885155",
+    "data/raw/flow_gauges.csv": "ac7f23f6753eee9e2ec4b72a760f022e549bef30a6d5070e7bf2bfa8e02c9542",
+    "data/raw/geojson-counties-fips.json": "e540149b7525e71ee6b6cab6dea2a95205f11e0c3e7374d27a7c9c47ea96e8c0",
+    "data/raw/ne_10m_rivers_lake_centerlines.geojson": "bb854a900ecbd3b408df46d5e16e3e0f974ba55993f9d8b5c26e855273c0905a",
+    "data/raw/reservoirs/amistad.csv": "939d686467b0d30ed4366dcc134d63eefef9e328b637d5f118b63f78d6377604",
+    "data/raw/reservoirs/elephant-butte.csv": "ef03516d77f0d01f099d8c4e20cdeea8d58cc65eda5cdbad30d4cb30b6335f32",
+    "data/raw/reservoirs/falcon.csv": "9dc131d56d4bb989f9108e83682c9dd04802699cbdb8dc4fb97c956dcfd4eea7",
+    "data/raw/rma/colsom_rio_grande.csv": "8768d3974cff688fe8ae81d8bb9163d6b29d757eae7136cb7f56ab84bbbad567",
+    "data/raw/snow_stations.csv": "21a4763510c0238e1fc2865d4cd3beca253960811e5c27472f864b12b0cc2d31",
+    "data/raw/snow_swe.csv": "9236a6d77d90f7cee4a89e7f6d17fd9bf5d814bc06c8ee5e4d549a75cebfc3a1",
+    "data/raw/usdm-counties.json": "641bee099c4db15389eeb07b80e9547b482b88d98b46e43d67b6a2d3437d2f5f",
+    "data/raw/weather/climate_rio_grande.csv": "55745c2ee49110199cf40530876cfe341202cd4aee9a6d7de33f9dfa5bce638a",
+    "notebooks/oni.txt": "b51f916434c333b7312d957973df33fb0bf89c484a785ba180d57afbaf067eca"
+  }
+}

@@ -27,6 +27,8 @@ So the output is a list of canals to INSPECT FIRST, not a list of proven leaks.
 
 Run it with:  PYTHONPATH=src python -m farmdrought.leaks            (summarize)
               PYTHONPATH=src python -m farmdrought.leaks download   (ask the soil service again)
+              PYTHONPATH=src python -m farmdrought.leaks download-ksat   (ADDED: permeability and
+                            water-table depth for the same soil layer, into canal_ksat.csv)
 """
 import json
 import sys
@@ -34,8 +36,10 @@ import sys
 import pandas as pd
 import requests
 
-from farmdrought.config import (CANAL_SOIL_CSV, CANALS_CSV, CANALS_GEOJSON, LATEST, LEAKY_SOIL_RATE,
-                                SEASON_THRESHOLD, SEEPAGE_GAL_SQFT_DAY)
+from farmdrought.config import NOT_IRRIGATION_NAMES
+from farmdrought.config import (CANAL_KSAT_CSV, CANAL_SOIL_CSV, CANALS_CSV, CANALS_GEOJSON, KSAT_TO_GAL_SQFT_DAY, LATEST,
+                                LEAKY_SOIL_RATE, SEASON_THRESHOLD, SEEPAGE_GAL_SQFT_DAY, WATER_TABLE_DEEP_CM,
+                                WATER_TABLE_MIN_FACTOR, WATER_TABLE_SHALLOW_CM)
 
 SOIL_SERVICE = "https://sdmdataaccess.sc.egov.usda.gov/Tabular/post.rest"
 SOIL_SOURCE = "USDA NRCS Soil Survey (SSURGO), through the Soil Data Access service"
@@ -43,7 +47,7 @@ RATE_SOURCE = ("Fipps (Texas A&M), 1998: Table 7 (quoting the Texas Board of Wat
                "Table 6 for sands, and one measured canal in Table 8 for sandy clay loam")
 BED_DEPTH_CM = 100  # we read the soil about 1 meter down
 # Segments whose name says they carry water AWAY (drains) are not irrigation canals.
-NOT_IRRIGATION = "Drain|Wasteway|Floodway"
+NOT_IRRIGATION = NOT_IRRIGATION_NAMES   # "Drain|Wasteway|Floodway", now kept in config.py and shared
 LEVELS = ["Inspect first", "Watch", "Low", "Unknown soil", "Drain"]
 
 
@@ -69,18 +73,40 @@ def download_soil(batch=200):
         print(f"soil map units: {min(start + batch, len(canals))} of {len(canals)} segments")
     units = pd.concat(units).drop_duplicates("id")  # a point on a border can match two units: keep one
 
-    # Step 2: the soil layers of each map unit. A unit holds several soils ("components"),
-    # each with layers ("horizons") from the surface down, each layer with a texture.
+    # Step 2: the layer at canal-bed depth in the main soil of each map unit
+    texture = bed_layer(soil_layers(sorted(units["mukey"].unique()), batch)).set_index("mukey")["texcl"]
+
+    canals = canals[["id"]].astype(str).merge(units, on="id", how="left")
+    canals["soil"] = canals["mukey"].map(texture)
+    canals.to_csv(CANAL_SOIL_CSV, index=False)
+
+
+def soil_layers(keys, batch=200):
+    """The soil layers of each map unit. A unit holds several soils ("components"), each with
+    layers ("horizons") from the surface down, each layer with a texture.
+
+    ADDED in round 3: the same question also returns each layer's permeability (saturated
+    hydraulic conductivity, Ksat, in micrometres per second): low, typical and high.
+    """
     layers = []
-    keys = sorted(units["mukey"].unique())
     for start in range(0, len(keys), batch):
         layers.append(ask(
-            "SELECT c.mukey, c.cokey, c.comppct_r, h.hzdept_r, h.hzdepb_r, t.texcl "
+            "SELECT c.mukey, c.cokey, c.comppct_r, h.hzdept_r, h.hzdepb_r, t.texcl, h.ksat_l, h.ksat_r, h.ksat_h "
             "FROM component c JOIN chorizon h ON h.cokey = c.cokey "
             "JOIN chtexturegrp g ON g.chkey = h.chkey AND g.rvindicator = 'Yes' "
             "JOIN chtexture t ON t.chtgkey = g.chtgkey "
             f"WHERE c.mukey IN ({', '.join(keys[start : start + batch])})"))
-    layers = pd.concat(layers).dropna(subset=["texcl"])
+        print(f"soil layers: {min(start + batch, len(keys))} of {len(keys)} map units")
+    return pd.concat(layers)
+
+
+def bed_layer(layers):
+    """One row per map unit: the layer at canal-bed depth in the unit's main soil.
+
+    This is the rule the texture has always been picked by; the permeability columns (if the
+    table has them) simply come along from the same row.
+    """
+    layers = layers.dropna(subset=["texcl"]).copy()
     for column in ["comppct_r", "hzdept_r", "hzdepb_r"]:
         layers[column] = pd.to_numeric(layers[column])
 
@@ -90,12 +116,66 @@ def download_soil(batch=200):
     # ...and of its layers, the one that contains the 1 meter depth. If the soil is shallower
     # than that, take its deepest layer.
     layers["reaches_bed"] = (layers["hzdept_r"] <= BED_DEPTH_CM) & (layers["hzdepb_r"] > BED_DEPTH_CM)
-    layers = layers.sort_values(["reaches_bed", "hzdept_r"], ascending=False).drop_duplicates("mukey")
-    texture = layers.set_index("mukey")["texcl"]
+    return layers.sort_values(["reaches_bed", "hzdept_r"], ascending=False).drop_duplicates("mukey")
 
-    canals = canals[["id"]].astype(str).merge(units, on="id", how="left")
-    canals["soil"] = canals["mukey"].map(texture)
-    canals.to_csv(CANAL_SOIL_CSV, index=False)
+
+def download_ksat(batch=200):
+    """ADDED in round 3. For every canal segment: the permeability of the same soil layer the
+    texture was read from, and the depth to the water table. Saves canal_ksat.csv with
+    id, mukey, ksat_low, ksat_typ, ksat_high (micrometres per second) and wt_cm (centimetres).
+
+    It starts from the map unit of each segment as saved in canal_soil.csv and NEVER rewrites
+    that file, which belongs to the frozen snapshot. Returns (the table, the texture the service
+    gives today for each map unit), so a caller can check today's texture against the saved one.
+    """
+    soil = pd.read_csv(CANAL_SOIL_CSV, dtype={"id": str, "mukey": str})
+    keys = sorted(soil["mukey"].dropna().unique())
+    layer = bed_layer(soil_layers(keys, batch)).set_index("mukey")
+
+    # Depth to the water table: the shallowest in a normal year, one value per map unit.
+    tables = []
+    for start in range(0, len(keys), batch):
+        tables.append(ask(f"SELECT mukey, wtdepannmin FROM muaggatt WHERE mukey IN ({', '.join(keys[start : start + batch])})"))
+    water = pd.concat(tables).drop_duplicates("mukey").set_index("mukey")["wtdepannmin"]
+
+    out = soil[["id", "mukey"]].copy()
+    for column, source in (("ksat_low", "ksat_l"), ("ksat_typ", "ksat_r"), ("ksat_high", "ksat_h")):
+        out[column] = pd.to_numeric(out["mukey"].map(layer[source]))
+    out["wt_cm"] = pd.to_numeric(out["mukey"].map(water))
+    out.to_csv(CANAL_KSAT_CSV, index=False)
+    return out, layer["texcl"]
+
+
+def water_table_factor(wt_cm):
+    """g: how much a shallow water table holds seepage back. ASSUMPTION (see config.py).
+
+    1 when the depth is unknown or more than 300 cm; a straight line from 1 at 300 cm down to
+    0.1 at 100 cm; 0.1 for anything shallower.
+    """
+    if wt_cm is None or pd.isna(wt_cm) or wt_cm >= WATER_TABLE_DEEP_CM:
+        return 1.0
+    if wt_cm <= WATER_TABLE_SHALLOW_CM:
+        return WATER_TABLE_MIN_FACTOR
+    share = (wt_cm - WATER_TABLE_SHALLOW_CM) / (WATER_TABLE_DEEP_CM - WATER_TABLE_SHALLOW_CM)
+    return WATER_TABLE_MIN_FACTOR + (1 - WATER_TABLE_MIN_FACTOR) * share
+
+
+def seepage_rate(ksat, wt_cm, c=1.0):
+    """ADDED in round 3. Seepage rate in gallons per square foot of wetted canal per day, from
+    the soil's permeability:  q = ksat x 2.1205 x g x c.
+
+    ksat  : saturated hydraulic conductivity of the soil at canal-bed depth, micrometres per second
+    wt_cm : depth to the water table in centimetres (None or NaN if unknown)
+    c     : the calibration factor (1.0 = not calibrated)
+    A missing ksat gives NaN: no permeability, no rate.
+
+    ASSUMPTION: this treats the hydraulic gradient as 1 and ignores any silt layer on the canal
+    bed. It is a modelled rate, not a measured one. Nothing uses it for ranking or pricing yet;
+    the texture-table rate stays beside it for comparison.
+    """
+    if ksat is None or pd.isna(ksat):
+        return float("nan")
+    return float(ksat) * KSAT_TO_GAL_SQFT_DAY * water_table_factor(wt_cm) * c
 
 
 def rate_canals(latest):
@@ -186,6 +266,10 @@ if __name__ == "__main__":
 
     if sys.argv[1:] == ["download"]:
         download_soil()
+    if sys.argv[1:] == ["download-ksat"]:
+        table, _ = download_ksat()
+        print(f"saved {len(table)} segments, {int(table['ksat_typ'].notna().sum())} with a permeability")
+        sys.exit(0)
     latest = pd.read_parquet(LATEST)
     counties = latest.loc[latest["river"] == FOCUS_RIVER, ["fips", "county", "state"]]
     result = run_leaks(latest, counties)

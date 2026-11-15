@@ -1,10 +1,15 @@
-# Live data: fetch the newest data every day, rebuild every output, and save the result.
+# Live data: fetch the newest data every day, rebuild this week's forecast and the site data,
+# and save the result.
 #
 # What changes how often:
 #   reservoir storage     daily   -> a new reservoir reading every day
 #   U.S. Drought Monitor  weekly  -> a new forecast, canal levels and sealant plan (Thursdays)
 #   El Nino, weather      monthly
 # The steps are in src/farmdrought/refresh.py. If a source is down, its saved file is kept.
+#
+# What this job never does: score. The test results were scored once and are kept in
+# reports/frozen/. The downloads go to data/live; data/raw and notebooks/oni.txt are the
+# snapshot those results were scored on and are never written here (the tests check that).
 # If the tests fail, nothing is saved, so a bad download can never reach the repo.
 name: Refresh live data
 
@@ -16,31 +21,44 @@ on:
 permissions:
   contents: write           # the job saves the refreshed files back to the repo
 
+concurrency:
+  group: refresh-live-data  # two runs must never push at the same time
+  cancel-in-progress: false
+
 jobs:
   refresh:
     runs-on: ubuntu-latest
-    timeout-minutes: 150   # version 2 retrains every candidate with 5 seeds, which is slow on a small runner
+    timeout-minutes: 30    # downloads, one forecast and the site build; no model is re-scored
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
           cache: pip
-          cache-dependency-path: requirements-pipeline.txt
-      - run: pip install -r requirements-pipeline.txt
-      - name: Fetch new data and rebuild the outputs
+          cache-dependency-path: |
+            requirements-pipeline.txt
+            requirements-app.txt
+      - run: pip install -r requirements-pipeline.txt -r requirements-app.txt
+      - name: Fetch new data and rebuild this week's forecast
         run: PYTHONPATH=src python -m farmdrought.refresh
+      - name: Rebuild the website's data files
+        run: python app/build_site.py
       - name: Check the outputs before saving them
         run: PYTHONPATH=src python -m pytest tests/pipeline -q
       - name: Save the refreshed files
         run: |
           git config user.name "Sam"
-          git config user.email "samr.ramos1316@gmail.com"
-          git add data/raw data/processed reports notebooks/oni.txt demo/data.js
-          # commit only if a data file changed (refresh.json alone changes on every run)
-          if git diff --cached --quiet -- data notebooks demo; then
+          git config user.email "Sam@users.noreply.github.com"
+          if [ -d data/live ]; then git add data/live; fi
+          if [ -d reports/live ]; then git add reports/live; fi
+          if [ -d reports/prospective ]; then git add reports/prospective reports/prospective.sha256; fi
+          git add data/processed/latest.parquet data/processed/canals.geojson data/processed/districts.geojson
+          git add reports/metrics.json reports/refresh.json reports/issues.json app/site/data
+          # commit only if a data file changed (refresh.json and issues.json change on every run)
+          if git diff --cached --quiet -- data; then
             echo "No new data today."
           else
             git commit -m "data: refresh $(date -u +%Y-%m-%d)"
+            git pull --rebase
             git push
           fi

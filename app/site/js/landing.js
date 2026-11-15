@@ -122,25 +122,28 @@
 
   const smooth = (v, a, b) => { const u = Math.max(0, Math.min(1, (v - a) / (b - a))); return u * u * (3 - 2 * u); };
   /* Fit a box into the part of the screen the text leaves free (text sits left on even beats, right on odd). */
-  function fit(box, side) {
+  function fit(box, side, high) {
     const wide = W > 760, free = wide ? 0.56 : 1, w = W * free, h = H * (wide ? 0.8 : 0.5);
     const k = Math.min(w / (box[2] - box[0]), h / (box[3] - box[1])) * 0.92;
-    const cx = wide ? (side > 0 ? W * (1 - free / 2) - W * 0.02 : W * free / 2 + W * 0.02) : W / 2, cy = wide ? H / 2 : H * 0.32;
+    const cx = wide ? (side > 0 ? W * (1 - free / 2) - W * 0.02 : W * free / 2 + W * 0.02) : W / 2, cy = wide ? H / 2 : H * (high || 0.32);
     return { k, x: (box[0] + box[2]) / 2 - (cx - W / 2) / k, y: (box[1] + box[3]) / 2 - (cy - H / 2) / k };
   }
   const SIDE = [1, -1, 1];      // +1 = map on the right (text on the left)
+  const HIGH = [0.32, 0.32, 0.27];   // on a phone: how far down the screen the map's middle sits. The last beat has the most text, so its map sits higher.
 
   /* Scroll position as a beat number: 0 at the top of the hero, 5 at the last beat. */
   const beats = Array.from(document.querySelectorAll(".beat"));
+  const main = document.getElementById("texas");
   function readScroll() {
-    const mid = scrollY + innerHeight / 2;
+    // A beat's offsetTop is measured from the top of <main>, not of the page (the opening sits
+    // above it), so the same amount is taken off the scroll position before the two are compared.
+    const mid = scrollY + innerHeight / 2 - main.offsetTop;
     let b = 0;
     beats.forEach((el, i) => { const top = el.offsetTop, c = top + el.offsetHeight / 2; if (mid >= c) b = i; });
     const here = beats[b], next = beats[b + 1];
     if (next) { const c0 = here.offsetTop + here.offsetHeight / 2, c1 = next.offsetTop + next.offsetHeight / 2; b += Math.max(0, Math.min(1, (mid - c0) / (c1 - c0))); }
     beat = b;
     // The map is only on screen between the end of the opening and the stories section.
-    const main = document.getElementById("texas");
     onScreen = scrollY + innerHeight > main.offsetTop && scrollY < main.offsetTop + main.offsetHeight;
   }
   addEventListener("scroll", readScroll, { passive: true }); readScroll();
@@ -168,7 +171,7 @@
     if (!onScreen) { requestAnimationFrame(frame); return; }           // nothing to draw while the opening or the stories are showing
     // Camera: glide between the two beats we are between, holding still near each one.
     const i = Math.min(CAMERA.length - 2, Math.floor(beat)), u = smooth(beat - i, 0.2, 0.8);
-    const a = fit(CAMERA[i], SIDE[i]), b = fit(CAMERA[i + 1], SIDE[i + 1]);
+    const a = fit(CAMERA[i], SIDE[i], HIGH[i]), b = fit(CAMERA[i + 1], SIDE[i + 1], HIGH[i + 1]);
     const target = { k: a.k * Math.pow(b.k / a.k, u), x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) * u };
     const ease = reduced ? 1 : Math.min(1, dt * 5);                  // a little lag, so the camera feels weighted
     cam.k += (target.k - cam.k) * ease; cam.x += (target.x - cam.x) * ease; cam.y += (target.y - cam.y) * ease;

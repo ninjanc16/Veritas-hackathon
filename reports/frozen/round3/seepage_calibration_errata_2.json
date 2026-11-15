@@ -1,0 +1,13 @@
+{
+  "added": true,
+  "erratum_for": "reports/frozen/round3/seepage_calibration.json",
+  "written": "2026-11-15",
+  "what_is_wrong": "The field 'sentence' in seepage_calibration.json reads: \"The model did not predict held-out district losses better than canal length. Volumes are not reliable; only the ranking order is shown.\" The last clause suggests the ranking order is supported. It is not: the held-out test compared district totals and does not support the ranking either (see reports/decision.md, section \"Seepage test: result and what follows\").",
+  "wrong_fields": [
+    "sentence: the clause \"only the ranking order is shown\"."
+  ],
+  "sentence_as_it_should_read": "The model did not predict held-out district losses better than canal length. Volumes are not reliable, and the test does not support the ranking either; the order is an illustration.",
+  "effect_on_results": "None. No number changes. The test still did not pass.",
+  "why_a_separate_file": "Frozen files are not rewritten, and that includes the first erratum (seepage_calibration_errata.json), so this is a second erratum beside it.",
+  "fixed_in_code": "seepage_calibration.FAIL_SENTENCE now holds the corrected sentence, so a future run would write it."
+}

@@ -6,6 +6,7 @@ module hides a "magic number" and a judge can see every setting at a glance.
 Honest note: the plan itself came from exploratory runs on the same test years (the scripts in
 notebooks/). See reports/decision.md.
 """
+from contextlib import contextmanager
 from pathlib import Path
 
 # ---------- 1. Rivers ----------
@@ -80,6 +81,53 @@ OUTLOOK = PROCESSED / "outlook.parquet"
 LATEST = PROCESSED / "latest.parquet"
 METRICS = REPORTS / "metrics.json"
 
+# ---------- 7b. The freeze (ARCHITECTURE.md section 3.0) ----------
+# The last Drought Monitor week that version 1's results are scored on. Answers that were not
+# fully known by this week are never used to score, however much newer data is downloaded later.
+SCORE_THROUGH = "2026-11-10"
+FROZEN = REPORTS / "frozen" / "v1"       # version 1's results, written by export.evaluate()
+ROUND3 = REPORTS / "frozen" / "round3"   # one file per round-3 experiment
+LIVE = REPORTS / "live"                  # what the daily job writes (export.predict())
+MANIFEST = ROOT / "data" / "manifest.json"  # sha256 of every raw input, and the scoring cut-off
+
+# ---------- 7c. Raw snapshot and live downloads ----------
+# data/raw (and notebooks/oni.txt) is the SNAPSHOT the frozen results were scored on. Nothing
+# rewrites it: the daily refresh saves its downloads in data/live instead, under the same file
+# names (the El Nino file becomes data/live/oni.txt).
+# Everything that scores (evaluate, version 2, robustness, round 3) reads the snapshot. Only
+# this week's forecast (export.predict), the refresh and the issues list read the newer copy,
+# and only inside `with live_data():`. The switch is not an environment variable on purpose:
+# it cannot be left on by accident, because leaving the `with` block always puts it back.
+LIVE_DATA = ROOT / "data" / "live"
+_LIVE = {"on": False}
+
+
+def live_copy(path):
+    """Where the refresh saves its newer copy of a raw input."""
+    path = Path(path)
+    if path == ONI_TXT:
+        return LIVE_DATA / ONI_TXT.name
+    return LIVE_DATA / path.relative_to(RAW)
+
+
+def raw_path(path):
+    """The file to READ for a raw input: the snapshot, or inside `with live_data():` the newer
+    copy in data/live when there is one."""
+    if _LIVE["on"] and live_copy(path).exists():
+        return live_copy(path)
+    return Path(path)
+
+
+@contextmanager
+def live_data():
+    """Inside this block raw_path() prefers the copies in data/live. Outside it, never."""
+    before = _LIVE["on"]
+    _LIVE["on"] = True
+    try:
+        yield
+    finally:
+        _LIVE["on"] = before
+
 # ---------- 8. Pivot: should an irrigation district seal its canals before the season? ----------
 # 8a. Reservoir storage (Texas Water Development Board, waterdatafortexas.org, one CSV per lake)
 RESERVOIR_DIR = RAW / "reservoirs"
@@ -127,6 +175,10 @@ CANALS_CSV = CANALS_DIR / "canals_rio_grande.csv"          # one row per mapped 
 # The same segments as map lines. It sits with the handoff files because the App draws it.
 CANALS_GEOJSON = PROCESSED / "canals.geojson"
 CANAL_SOIL_CSV = CANALS_DIR / "canal_soil.csv"             # soil texture under each canal segment
+# ADDED in round 3: permeability and water-table depth for the same soil layer. A separate file,
+# because canal_soil.csv is part of the frozen snapshot and is never rewritten. It is not an
+# input to any version 1 score, so the manifest does not list it (manifest.NOT_SCORED_INPUTS).
+CANAL_KSAT_CSV = CANALS_DIR / "canal_ksat.csv"
 
 # 8e. Canal seepage rate by soil type, in gallons per square foot of wetted canal per day.
 # Source: Fipps (Texas A&M), 1998, "Potential Water Savings in Irrigation Districts ... Lower
@@ -153,6 +205,43 @@ SEEPAGE_GAL_SQFT_DAY = {
 # Our rule: a soil counts as "leaky" from loam upward (7.48 or more). In the source's own
 # summary table (Table 6), clay soils top out at 2.99 and loam starts at 4.49 to 7.48.
 LEAKY_SOIL_RATE = 7.48
+
+# 8e-2. ADDED in round 3: seepage from the soil's measured permeability (leaks.seepage_rate).
+# The old texture table above stays, as a comparison only.
+#   rate (gal / sq ft / day) = Ksat (micrometres per second) x KSAT_TO_GAL_SQFT_DAY x g x c
+# Unit conversion, not an assumption: 1 micrometre per second = 0.0864 m/day = 0.2835 ft/day,
+# and one cubic foot holds 7.48052 gallons, so 0.2835 x 7.48052 = 2.1205.
+KSAT_TO_GAL_SQFT_DAY = 2.1205
+# ASSUMPTION: using Ksat as the seepage rate treats the hydraulic gradient as 1 (water sinking
+# straight down under its own weight) and ignores any layer of silt on the canal bed, which
+# slows real seepage. So the raw rate is an upper-end figure until it is calibrated (factor c).
+# ASSUMPTION (g, the water-table factor): a canal whose bed is close to the water table leaks
+# less, because the ground below is already full. g is 1 when the water table is deeper than
+# WATER_TABLE_DEEP_CM or unknown, falls in a straight line to WATER_TABLE_MIN_FACTOR at
+# WATER_TABLE_SHALLOW_CM, and stays there for anything shallower. These three numbers are our
+# own choice, not measurements; they carry the same unit-gradient and no-silt-layer caveat.
+WATER_TABLE_DEEP_CM = 300
+WATER_TABLE_SHALLOW_CM = 100
+WATER_TABLE_MIN_FACTOR = 0.1
+
+# 8e-3. ADDED in round 3: canal classes (canal_class.py). Fixed in reports/decision.md on
+# Nov 15, 2026, before any fit. The sealant plan below does not use them yet.
+# A segment whose name says it carries water AWAY is not an irrigation canal (used by leaks.py
+# for its "Drain" level, and by canal_class.fundable).
+NOT_IRRIGATION_NAMES = "Drain|Wasteway|Floodway"
+# Wetted width in feet as (low, middle, high) for each class. ALL ASSUMPTIONS: the repo holds no
+# measured width for any canal. "unknown" is the class of a segment whose name and map kind say
+# nothing (about 93% of district segments); its middle, 20 ft, is the width the project used
+# for every canal before. A fit uses the middle of the range.
+CANAL_WIDTH_FT = {"main": (20, 30, 40), "lateral": (8, 14, 20), "ditch": (3, 5.5, 8), "unknown": (8, 20, 40)}
+# Share of a district's canal length that is lined, as (low, middle, high). ASSUMPTION: nobody
+# publishes which canals are lined. The same middle value is used for every district.
+LINED_SHARE = (0.0, 0.3, 0.7)
+# Days a canal carries water in a season. ASSUMPTION.
+SEEPAGE_SEASON_DAYS = 273
+# A segment is not fundable when this share or more of its length is tagged as running
+# underground on OpenStreetMap. That tag marks tunnels and culverts; it does not mean "lined".
+PIPED_SHARE_NOT_FUNDABLE = 0.5
 
 # 8f. Irrigation districts and the sealant plan (districts.py)
 DISTRICTS_RAW = RAW / "districts" / "tx_districts.geojson"   # district boundaries as downloaded

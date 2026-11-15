@@ -18,7 +18,7 @@ Run it with:  PYTHONPATH=src python -m farmdrought.reservoirs
 """
 import pandas as pd
 
-from farmdrought.config import COUNTY_RESERVOIR, RESERVOIR_DIR, RESERVOIR_FILES
+from farmdrought.config import COUNTY_RESERVOIR, RESERVOIR_DIR, RESERVOIR_FILES, raw_path
 
 # Set R: four reservoir inputs plus a flag saying whether the county has a reservoir at all
 FEATURES_R = ["res_pct", "res_chg12", "res_chg52", "res_pctile", "has_res"]
@@ -36,7 +36,7 @@ def load_reservoirs():
     systems = {}
     for name, files in RESERVOIR_FILES.items():
         # comment="#" skips the long disclaimer at the top of each file
-        lakes = [pd.read_csv(RESERVOIR_DIR / f, comment="#", index_col="date", parse_dates=True) for f in files]
+        lakes = [pd.read_csv(raw_path(RESERVOIR_DIR / f), comment="#", index_col="date", parse_dates=True) for f in files]
         storage = sum(lake["conservation_storage"] for lake in lakes)
         capacity = sum(lake["conservation_capacity"] for lake in lakes)
         systems[name] = 100 * storage / capacity

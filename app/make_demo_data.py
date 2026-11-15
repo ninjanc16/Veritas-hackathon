@@ -1,12 +1,12 @@
 """
-make_demo_data.py - builds FAKE handoff files so the app can be built before real data arrives.
+make_demo_data.py - builds FAKE handoff files. It is a test helper: tests/app/test_contract.py
+uses it to build a fixture that has every column and key the contract requires.
 
 Everything here is made up (random, seeded so it is repeatable). The files follow the
-contract exactly, so the app can't tell the difference between fake and real - except
-metrics.json says DEMO DATA and the app shows a red banner.
+contract exactly - except metrics.json says DEMO DATA.
 
-Run:  python app/make_demo_data.py
-It only ever writes into app/demo_data/ .
+Run:  python app/make_demo_data.py [folder]
+It only ever writes into the folder it is given (app/demo_data/ when no folder is given).
 """
 import json
 import sys
@@ -439,27 +439,29 @@ def native(o):
     raise TypeError(f"cannot save {type(o)}")
 
 
-def main():
+def main(out_dir=None):
+    """Write the four fake files into out_dir (app/demo_data/ when no folder is given)."""
+    out_dir = DEMO_DIR if out_dir is None else Path(out_dir)
     full = build_full_table()
     pred = build_predictions(full)
     outlook = build_outlook(full)
     latest = build_latest(full, outlook)
     metrics = build_metrics(pred, outlook, latest)
 
-    # Safety: only ever write inside app/demo_data/.
-    DEMO_DIR.mkdir(parents=True, exist_ok=True)
-    pred.to_parquet(DEMO_DIR / "predictions.parquet", index=False)
-    outlook.to_parquet(DEMO_DIR / "outlook.parquet", index=False)
-    latest.to_parquet(DEMO_DIR / "latest.parquet", index=False)
-    with open(DEMO_DIR / "metrics.json", "w", encoding="utf-8") as f:
+    # Safety: only ever write inside the one folder.
+    out_dir.mkdir(parents=True, exist_ok=True)
+    pred.to_parquet(out_dir / "predictions.parquet", index=False)
+    outlook.to_parquet(out_dir / "outlook.parquet", index=False)
+    latest.to_parquet(out_dir / "latest.parquet", index=False)
+    with open(out_dir / "metrics.json", "w", encoding="utf-8") as f:
         json.dump(metrics, f, indent=2, default=native)
 
     # Check our own fake files against the contract before declaring victory.
-    problems = validate_all(*[pd.read_parquet(DEMO_DIR / f"{n}.parquet") for n in ("predictions", "outlook", "latest")],
-                            json.load(open(DEMO_DIR / "metrics.json", encoding="utf-8")))
+    problems = validate_all(*[pd.read_parquet(out_dir / f"{n}.parquet") for n in ("predictions", "outlook", "latest")],
+                            json.load(open(out_dir / "metrics.json", encoding="utf-8")))
     print(f"predictions {len(pred)} rows | outlook {len(outlook)} rows | latest {len(latest)} rows")
     print("contract problems:", problems if problems else "none")
 
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv[1] if len(sys.argv) > 1 else None)

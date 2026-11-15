@@ -1,4 +1,4 @@
-"""export.py: run everything and write the four handoff files the App track reads.
+"""export.py: score the system ONCE, forecast every week, and write the four handoff files.
 
   data/processed/predictions.parquet : 4-week alert, test years, with the truth
   data/processed/outlook.parquet     : 6- and 12-month outlooks, test years, with the truth
@@ -8,10 +8,29 @@
 The exact columns and keys are fixed by the contract (architecture doc, section P2).
 Each table is checked against the contract BEFORE it is written.
 
-Run it with:  PYTHONPATH=src python -m farmdrought.export
+TWO STEPS, kept apart on purpose (ARCHITECTURE.md section 3.0):
+  evaluate()  SCORES version 1 on the weeks up to config.SCORE_THROUGH and writes the result to
+              reports/frozen/v1/ (metrics.json, predictions.parquet, outlook.parquet). It refuses
+              to run if any raw input differs from data/manifest.json. Run it once; the daily
+              job never runs it.
+  predict()   THIS WEEK's forecast from the newest data, the canal levels and the sealant plan.
+              It writes data/processed/latest.parquet and reports/live/latest.json, then rebuilds
+              reports/metrics.json as the frozen results plus the live keys, and copies the two
+              frozen tables to data/processed/. It never writes anything under reports/frozen/,
+              so new data can no longer move a reported score.
+
+Run it with:  PYTHONPATH=src python -m farmdrought.export                     (predict)
+              PYTHONPATH=src python -m farmdrought.export evaluate            (score and freeze, once)
+              PYTHONPATH=src python -m farmdrought.export evaluate --force    (score again, replacing the frozen files)
 """
+import hashlib
 import json
+import platform
+import shutil
+import subprocess
+import sys
 from datetime import datetime
+from importlib.metadata import version
 
 import numpy as np
 import pandas as pd
@@ -22,10 +41,13 @@ from farmdrought.alert import make_forest, run_alert, split_masks
 from farmdrought.config import (ALERT_WEEKS, COUNTY_RESERVOIR, D2_CLASS, FEED_COST_PER_HEAD_MONTH, FOCUS_RIVER, LATEST, METRICS, MISS_COST, OUTLOOK, OUTLOOK_TEST,
                                 PREDICTIONS, PROCESSED, REPORTS, SEASON_THRESHOLD, SEASON_WEEKS, TEST_START,
                                 TRAIN, VAL, YEAR_WEEKS)
+from farmdrought.config import FROZEN, LIVE, MANIFEST, ROOT, SCORE_THROUGH, live_data
+from farmdrought.drought import build_panel
 from farmdrought.features import FEATURES_H
 from farmdrought.leaks import run_leaks
 from farmdrought.flow import FEATURES_F, add_flow_features
 from farmdrought.losses import run_losses
+from farmdrought.manifest import check_manifest, sha256_of
 from farmdrought.mapfields import MAP_COLUMNS, add_map_fields, range_coverage
 from farmdrought.outlook import (FEATURES_SEASON, FEATURES_SEASON_RES, FEATURES_YEAR, extra_inputs_test, issue_rows, make_classifier,
                                  make_regressor, run_outlook)
@@ -35,7 +57,11 @@ from farmdrought.snow import FEATURES_S, add_snow_features
 from farmdrought.trigger import run_trigger
 from farmdrought.v2 import V2_JSON, alert_v2
 
-IS_FINAL = True  # the numbers are locked: reports/decision.md was committed before this run
+# The keys of reports/metrics.json that describe THIS WEEK, not a score. predict() writes them
+# (and reports/live/latest.json holds the same). Every other key comes from the frozen file.
+# One more live piece sits inside a scored key: reservoir["systems"] (how new the reservoir
+# readings are), which predict() also refreshes.
+LIVE_KEYS = ["generated_at", "latest_week", "canals", "canal_priority", "districts"]
 
 # Column order of each file, exactly as in the contract
 PREDICTION_COLUMNS = ["date", "fips", "county", "state", "river", "lat", "lon", "y", "cls", "d2_streak",
@@ -189,7 +215,7 @@ def build_metrics(alert, season, year, predictions, scored, panel):
     return {
         "contract_version": 2,
         "generated_at": datetime.now().astimezone().isoformat(timespec="seconds"),
-        "is_final": IS_FINAL,
+        "is_final": True,  # written only by evaluate(), into the frozen file
         "focus_river": FOCUS_RIVER,
         "training_scope": "Rio Grande counties only",
         "n_rows": len(predictions),
@@ -309,20 +335,18 @@ def v2_metrics(metrics_limits):
     return {"limits": metrics_limits + limits, "v2": v2}
 
 
-def pivot_metrics(scored, season, panel, metrics_limits, latest):
-    """The five pivot keys (trigger, reservoir, losses, canals, canal_priority), plus their limit sentences added to the
-    existing list of limits (metrics_limits)."""
+def pivot_metrics(scored, season, panel, metrics_limits):
+    """The scored pivot keys (trigger, reservoir, losses), plus the pivot's limit sentences added to the
+    existing list of limits (metrics_limits). The live pivot keys (canals, canal_priority) are in live_metrics."""
     trigger = run_trigger(scored)
-    rg = panel[panel["river"] == FOCUS_RIVER]
-    counties = rg[["fips", "county", "state"]].drop_duplicates()
-    losses = run_losses(counties)
+    losses = run_losses(river_counties(panel))
     rule = {r["name"]: r for r in trigger["rules"]}
     ours, with_res, d1 = rule["Our forecast"], rule["Our forecast with reservoirs"], rule["D1 or worse now"]
     at_threshold = next(v for v in trigger["value_sweep"] if v["cost_ratio"] == SEASON_THRESHOLD)
     cost, cost_res = season["focus"]["system_cost"], season["reservoir_cost"]
     reservoir = {
         "systems": reservoir_summary(),
-        "counties_without_reservoir": int(counties["fips"].nunique() - len(COUNTY_RESERVOIR)),
+        "counties_without_reservoir": int(river_counties(panel)["fips"].nunique() - len(COUNTY_RESERVOIR)),
         "note": "Counties were matched to reservoirs by us, not from a published list. The ten Texas counties "
                 "from Val Verde to Cameron use Amistad-Falcon (the two lakes added together). Sierra, Dona Ana, "
                 "El Paso and Hudspeth use Elephant Butte. Counties upstream of a reservoir cannot draw from it, "
@@ -351,34 +375,21 @@ def pivot_metrics(scored, season, panel, metrics_limits, latest):
         "the 6-month forecast with a published seepage rate for the soil under each canal. They assume bare-earth "
         "canals, because we do not know which canals are lined. No canal was inspected or measured by us.",
     ]
-    return {"limits": metrics_limits + limits, "trigger": trigger, "reservoir": reservoir, "losses": losses,
-            "canals": run_canals(counties),
-            # the chain: AI forecast (when) + canal map (where) + soil under the canal (how leaky)
-            "canal_priority": run_leaks(latest, counties)}
+    return {"limits": metrics_limits + limits, "trigger": trigger, "reservoir": reservoir, "losses": losses}
 
 
-def main():
-    # 1. Run the three experiments
-    panel, alert = run_alert()
-    scored, season, year = run_outlook(panel)
+def river_counties(panel):
+    """The Rio Grande counties (fips, county, state), one row each."""
+    rg = panel[panel["river"] == FOCUS_RIVER]
+    return rg[["fips", "county", "state"]].drop_duplicates()
 
-    # 2. Build the three tables in contract shape
-    _, _, test = split_masks(panel)
-    predictions = panel[test].copy()
-    predictions["tier"] = tiers(predictions["p_model"], alert["threshold"])
-    metrics = build_metrics(alert, season, year, predictions, scored, panel)
-    # Version 2 of the 4-week alert (Rio Grande only): its alarm goes in as a last column
-    _, v2_alarm = alert_v2(panel)
-    predictions = finish(add_v2_alarm(predictions, v2_alarm), PREDICTION_COLUMNS + V2_COLUMNS, ["date", "fips"])
-    outlook = finish(scored, OUTLOOK_COLUMNS + PIVOT_OUTLOOK_COLUMNS, ["date", "fips"])
-    # This week's rows, plus the extra columns for the risk map (added at the end, which
-    # contract rule 2 allows). The length range uses each river's measured 12-month error.
-    error_by_river = {entry["river"]: entry["mae_system"] for entry in year["per_river"]}
-    latest = add_map_fields(latest_table(panel, alert["threshold"]), panel, error_by_river)
-    latest = finish(add_v2_alarm(latest, v2_alarm), LATEST_COLUMNS + MAP_COLUMNS + PIVOT_LATEST_COLUMNS + V2_COLUMNS,
-                    ["fips"])
+
+def map_fields_block(scored, error_by_river):
+    """The "map_fields" key: what the map columns of the latest file mean, and how the length
+    range did in testing. The only computed number in it comes from the scored rows, so the
+    block belongs to the frozen file."""
     rg_scored = scored[scored["river"] == FOCUS_RIVER]
-    metrics["map_fields"] = {
+    return {
         "columns": {
             "risk_level": "Overall level for the map: the worse of the 4-week tier and the 6-month tier",
             "weeks_low": "Low end of the 12-month estimate: weeks_model minus the average error measured on that river",
@@ -395,55 +406,262 @@ def main():
         "tested": "risk_level and the length range come from tested forecasts. The damage columns are untested estimates.",
     }
 
-    # 3. Write the four files
-    PROCESSED.mkdir(parents=True, exist_ok=True)
-    REPORTS.mkdir(parents=True, exist_ok=True)
-    predictions.to_parquet(PREDICTIONS, index=False)
-    outlook.to_parquet(OUTLOOK, index=False)
-    latest.to_parquet(LATEST, index=False)
+
+def robustness_limits(checks):
+    """The limit sentences built from reports/robustness.json."""
+    seeds, wide, extra = checks["seed_check"]["summary"], checks["buffer_check"], checks["extra_rules_check"]
+    return [
+        f"Seed check: retrained with {len(checks['seed_check']['runs'])} random seeds, the system beat the best simple rule in "
+        f"{seeds['alert_cost']['seeds_beating_best_baseline']} runs for the 4-week alert, "
+        f"{seeds['season_cost']['seeds_beating_best_baseline']} for the 6-month outlook and "
+        f"{seeds['year_mae']['seeds_beating_best_baseline']} for the 12-month outlook.",
+        f"Buffer check: with a {wide['buffer_km']} km county rule ({wide['n_focus_counties']} counties), the 4-week "
+        f"system cost {wide['alert']['system_cost']} against {wide['alert']['best_baseline_cost']} for the best "
+        f"simple rule ({wide['alert']['best_baseline']}).",
+        "An outside review suggested two simple rules that were not in our baseline list. They were scored "
+        "after the final run. "
+        f"4-week rule '{extra['alert_rule']}': cost {extra['alert_rule_cost_test']} on the test years, against "
+        f"{extra['system_cost_test']} for the system. "
+        f"12-month rule '{extra['year_rule']}': average error {extra['year_rule_mae']} weeks, against "
+        f"{extra['system_mae']} for the system.",
+        "The 6-month outlook uses an El Nino value that NOAA publishes a few days into the month, around the "
+        "same days the outlook is issued. A real-time forecast might have to use the value from a month earlier.",
+    ]
+
+
+# The last two limit sentences. They are fixed text about the district map and the sealant plan.
+DISTRICT_LIMITS = [
+    "The district map and sealant plan cover Texas districts only. We found no public boundary file for "
+    "districts in New Mexico or Colorado.",
+    "The sealant plan is a ranking, not a measurement. It assumes every canal is bare earth, has 20 feet of "
+    "wetted width and carries water for 90 days. We do not know which canals are already lined. The budget "
+    "is an example figure, and the sealant price is materials only.",
+]
+
+
+# What the same code and data gave on the GitHub runner (reports/metrics.json at commit 1931ed5,
+# written by the daily job on 2026-11-15). Kept only so the frozen file can state the difference.
+RUNNER = {"alert_cost": 1912, "season_cost": 2328, "year_mae": 14.0, "all_rivers_alert_cost": 1883}
+
+
+def machine_note(alert, season, year, checks):
+    """The "machine_note" of the frozen block: how far the numbers moved between two computers,
+    and how far they move between random seeds on one. Every number is taken from this run,
+    from RUNNER above, or from the robustness checks (checks, None if they were not run)."""
+    s = season["focus"]
+    here = {"alert_cost": alert["headline"]["system_cost"], "season_cost": s["system_cost"],
+            "year_mae": year["focus"]["mae_system"], "all_rivers_alert_cost": alert["per_river"][0]["all_rivers_cost"]}
+    moved = {key: round(abs(here[key] - RUNNER[key]), 2) for key in here}
+    note = ("Random forests in this project are not identical across computers. Same code and data on two "
+            f"computers: the system's three headline numbers moved by {moved['alert_cost']:g}, "
+            f"{moved['season_cost']:g} and {moved['year_mae']:g} (4-week cost {here['alert_cost']} here and "
+            f"{RUNNER['alert_cost']} on the GitHub runner; 6-month cost {here['season_cost']} and "
+            f"{RUNNER['season_cost']}; 12-month error {here['year_mae']} and {RUNNER['year_mae']} weeks), and a "
+            f"comparison model (the 4-week forest trained on all five rivers) moved by "
+            f"{moved['all_rivers_alert_cost']:g} ({here['all_rivers_alert_cost']} here, "
+            f"{RUNNER['all_rivers_alert_cost']} there).")
+    if checks is not None:
+        seeds = checks["seed_check"]["summary"]["season_cost"]
+        best_rule = min(s[k] for k in ("persistence_cost", "d1_rule_cost", "usual_cost", "always_warn_cost",
+                                       "never_warn_cost"))
+        note += (f" On one computer the 6-month cost ranges from {seeds['lowest']} to {seeds['highest']} across "
+                 f"{len(checks['seed_check']['runs'])} random seeds, against a margin of "
+                 f"{best_rule - s['system_cost']} over the best simple rule. So the random seed, more than the "
+                 "computer, is why a margin of that size is not a result.")
+    return note
+
+
+def git_state():
+    """The commit the code was at, and whether any SOURCE file differed from it.
+
+    Only src/ and the Python files in app/ are looked at. Data and report files are expected to
+    differ while the results are being produced, so they are not counted.
+    """
+    def git(*args):
+        return subprocess.run(["git", *args], cwd=ROOT, capture_output=True, text=True, check=True).stdout
+    try:
+        changed = [line[3:] for line in git("status", "--porcelain", "--", "src", "app/*.py").splitlines()]
+        return {"git_commit": git("rev-parse", "HEAD").strip(), "git_dirty_source": bool(changed),
+                "git_dirty_source_paths": changed[:20],
+                "git_dirty_source_means": "a file under src/ or a Python file in app/ differed from git_commit"}
+    except (OSError, subprocess.CalledProcessError):
+        return {"git_commit": None, "git_dirty_source": None, "git_dirty_source_paths": [],
+                "git_dirty_source_means": "git was not available"}
+
+
+def frozen_block(note_on_machines):
+    """The "frozen" key: what the scored results were made from, so a reader can check them.
+
+    note_on_machines : the text from machine_note().
+    """
+    block = {
+        "score_through": SCORE_THROUGH,
+        "evaluated_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+        "manifest_sha256": sha256_of(MANIFEST),
+        **git_state(),
+        # make_forest, make_classifier and make_regressor all default to seed 0; the shuffled-answer
+        # check in alert.py uses seeds 0, 1 and 2.
+        "seeds": {"alert_forest": 0, "outlook_forests": 0, "shuffled_answer_check": [0, 1, 2]},
+        "python": platform.python_version(),
+        "platform": platform.platform(),
+        "library_versions": {name: version(name) for name in ("pandas", "numpy", "scikit-learn", "pyarrow")},
+    }
+    for key, path in (("robustness_json_sha256", ROBUSTNESS), ("v2_json_sha256", V2_JSON)):
+        block[key] = sha256_of(path) if path.exists() else None
+    block["note"] = ("The robustness checks and version 2's candidate search are not rerun by evaluate(). Their "
+                     "numbers are read from reports/robustness.json and reports/v2.json as those files stood, and "
+                     "the sha256 of each file as read is recorded above.")
+    block["machine_note"] = note_on_machines
+    return block
+
+
+def evaluate(force=False):
+    """Score version 1 on the weeks up to SCORE_THROUGH and write reports/frozen/v1/.
+
+    Refuses to run if the frozen results already exist, unless force is True: scoring again
+    replaces numbers that were meant to be scored once, so it has to be asked for by name.
+    Refuses to run if a raw input differs from data/manifest.json. Writes nothing outside
+    reports/frozen/v1/.
+    """
+    if (FROZEN / METRICS.name).exists() and not force:
+        raise RuntimeError(f"{(FROZEN / METRICS.name).relative_to(ROOT)} already exists, so nothing was scored. "
+                           "The frozen results are meant to be scored once. To replace them on purpose, run: "
+                           "PYTHONPATH=src python -m farmdrought.export evaluate --force")
+    problems = check_manifest()
+    if problems:
+        raise RuntimeError("the raw inputs do not match data/manifest.json, so nothing was scored:\n  "
+                           + "\n  ".join(problems))
+
+    # 1. Run the three experiments, on weeks up to the cut-off only
+    panel, alert = run_alert(score_through=SCORE_THROUGH)
+    scored, season, year = run_outlook(panel)
+
+    # 2. Build the two scored tables in contract shape
+    _, _, test = split_masks(panel)
+    predictions = panel[test].copy()
+    predictions["tier"] = tiers(predictions["p_model"], alert["threshold"])
+    metrics = build_metrics(alert, season, year, predictions, scored, panel)
+    for key in ("generated_at", "latest_week"):  # live keys: predict() adds them to reports/metrics.json
+        del metrics[key]
+    # Version 2 of the 4-week alert (Rio Grande only): its alarm goes in as a last column
+    _, v2_alarm = alert_v2(panel)
+    predictions = finish(add_v2_alarm(predictions, v2_alarm), PREDICTION_COLUMNS + V2_COLUMNS, ["date", "fips"])
+    outlook = finish(scored, OUTLOOK_COLUMNS + PIVOT_OUTLOOK_COLUMNS, ["date", "fips"])
+    # The map's length range uses each river's measured 12-month error.
+    error_by_river = {entry["river"]: entry["mae_system"] for entry in year["per_river"]}
+    metrics["map_fields"] = map_fields_block(scored, error_by_river)
+
+    # 3. The keys that come after the contract's list (contract rule 2 allows additions at the end)
     # Add the robustness checks (seeds and county buffer) if they have been run.
-    # They are extra keys at the end, which contract rule 2 allows.
+    checks = None
     if ROBUSTNESS.exists():
         with open(ROBUSTNESS) as f:
             checks = json.load(f)
         metrics.update(checks)
-        seeds, wide, extra = checks["seed_check"]["summary"], checks["buffer_check"], checks["extra_rules_check"]
-        metrics["limits"] += [
-            f"Seed check: retrained with {len(checks['seed_check']['runs'])} random seeds, the system beat the best simple rule in "
-            f"{seeds['alert_cost']['seeds_beating_best_baseline']} runs for the 4-week alert, "
-            f"{seeds['season_cost']['seeds_beating_best_baseline']} for the 6-month outlook and "
-            f"{seeds['year_mae']['seeds_beating_best_baseline']} for the 12-month outlook.",
-            f"Buffer check: with a {wide['buffer_km']} km county rule ({wide['n_focus_counties']} counties), the 4-week "
-            f"system cost {wide['alert']['system_cost']} against {wide['alert']['best_baseline_cost']} for the best "
-            f"simple rule ({wide['alert']['best_baseline']}).",
-            "An outside review suggested two simple rules that were not in our baseline list. They were scored "
-            "after the final run. "
-            f"4-week rule '{extra['alert_rule']}': cost {extra['alert_rule_cost_test']} on the test years, against "
-            f"{extra['system_cost_test']} for the system. "
-            f"12-month rule '{extra['year_rule']}': average error {extra['year_rule_mae']} weeks, against "
-            f"{extra['system_mae']} for the system.",
-            "The 6-month outlook uses an El Nino value that NOAA publishes a few days into the month, around the "
-            "same days the outlook is issued. A real-time forecast might have to use the value from a month earlier.",
-        ]
-    # ---- Pivot keys (canal action), at the very end ----
-    metrics.update(pivot_metrics(scored, season, panel, metrics["limits"], latest))
-    # ---- Version 2 key, after everything else (run farmdrought.v2 first: it writes v2.json) ----
+        metrics["limits"] += robustness_limits(checks)
+    metrics["frozen"] = frozen_block(machine_note(alert, season, year, checks))
+    # ---- Scored pivot keys (canal action) ----
+    metrics.update(pivot_metrics(scored, season, panel, metrics["limits"]))
+    # ---- Version 2 key (farmdrought.v2 writes v2.json; it is not rerun here) ----
     if V2_JSON.exists():
         metrics.update(v2_metrics(metrics["limits"]))
-    # ---- Districts and the sealant plan: the last link of the chain (must run after the canal levels) ----
-    metrics["districts"] = run_districts(latest)
-    metrics["limits"] += [
-        "The district map and sealant plan cover Texas districts only. We found no public boundary file for "
-        "districts in New Mexico or Colorado.",
-        "The sealant plan is a ranking, not a measurement. It assumes every canal is bare earth, has 20 feet of "
-        "wetted width and carries water for 90 days. We do not know which canals are already lined. The budget "
-        "is an example figure, and the sealant price is materials only.",
-    ]
-    with open(METRICS, "w") as f:
+    metrics["limits"] += DISTRICT_LIMITS
+
+    # 4. Write the three frozen files
+    FROZEN.mkdir(parents=True, exist_ok=True)
+    predictions.to_parquet(FROZEN / PREDICTIONS.name, index=False)
+    outlook.to_parquet(FROZEN / OUTLOOK.name, index=False)
+    with open(FROZEN / METRICS.name, "w") as f:
         # default=... turns numpy numbers into plain numbers that JSON accepts
         json.dump(metrics, f, indent=2, default=lambda value: value.item())
-    print(f"Wrote {len(predictions)} alert rows, {len(outlook)} outlook rows, {len(latest)} latest rows, and metrics.json")
+    print(f"Froze {len(predictions)} alert rows, {len(outlook)} outlook rows and metrics.json in {FROZEN.relative_to(ROOT)}")
+
+
+def live_metrics(panel, latest):
+    """The live keys: this week's date, the reservoir readings' dates, and the canal chain.
+
+    The chain: AI forecast (when) + canal map (where) + soil under the canal (how leaky), then
+    the districts and the sealant plan (which must run after the canal levels).
+    """
+    counties = river_counties(panel)
+    return {
+        "generated_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+        "latest_week": str(panel["date"].max().date()),
+        "reservoir_systems": reservoir_summary(),
+        "canals": run_canals(counties),
+        "canal_priority": run_leaks(latest, counties),
+        "districts": run_districts(latest),
+    }
+
+
+def merge_metrics(frozen, live):
+    """reports/metrics.json = the frozen results with the live keys put back in their old places."""
+    merged = {}
+    for key, value in frozen.items():
+        merged[key] = value
+        if key == "contract_version":
+            merged["generated_at"] = live["generated_at"]
+        elif key == "test_years":
+            merged["latest_week"] = live["latest_week"]
+        elif key == "reservoir":
+            merged[key] = {**value, "systems": live["reservoir_systems"]}
+        elif key == "losses":
+            merged["canals"], merged["canal_priority"] = live["canals"], live["canal_priority"]
+    merged["districts"] = live["districts"]
+    return merged
+
+
+def predict():
+    """This week's forecast and the live keys. Never scores, and never writes under reports/frozen/.
+
+    It reads the newest downloads (data/live) where there are any, and the snapshot otherwise.
+    """
+    with live_data():
+        _predict()
+
+
+def _predict():
+    frozen_metrics = FROZEN / METRICS.name
+    if not frozen_metrics.exists():
+        raise RuntimeError(f"{frozen_metrics.relative_to(ROOT)} does not exist. Run the scoring step once first: "
+                           "PYTHONPATH=src python -m farmdrought.export evaluate")
+    with open(frozen_metrics) as f:
+        frozen = json.load(f)
+    outputs = [LATEST, LIVE / "latest.json", METRICS, PREDICTIONS, OUTLOOK]
+    assert not any(FROZEN.parent in path.parents for path in outputs), "predict() must not write under reports/frozen/"
+
+    # 1. This week's rows from ALL the data (no cut-off), plus the extra columns for the risk map
+    #    (added at the end, which contract rule 2 allows). The alarm threshold and each river's
+    #    12-month error are the frozen, tested ones.
+    panel = build_panel()
+    error_by_river = {entry["river"]: entry["mae_system"] for entry in frozen["year"]["per_river"]}
+    _, v2_alarm = alert_v2(panel)
+    latest = add_map_fields(latest_table(panel, frozen["alert_threshold"]), panel, error_by_river)
+    latest = finish(add_v2_alarm(latest, v2_alarm), LATEST_COLUMNS + MAP_COLUMNS + PIVOT_LATEST_COLUMNS + V2_COLUMNS,
+                    ["fips"])
+
+    # 2. Write the latest table, then the live keys (the canal chain rewrites the two map files)
+    PROCESSED.mkdir(parents=True, exist_ok=True)
+    LIVE.mkdir(parents=True, exist_ok=True)
+    latest.to_parquet(LATEST, index=False)
+    live = live_metrics(panel, latest)
+    dump = lambda data, path: path.write_text(json.dumps(data, indent=2, default=lambda value: value.item()))
+    dump(live, LIVE / "latest.json")
+
+    # 3. The handoff files the App reads: the frozen results with the live keys, and the frozen tables
+    dump(merge_metrics(frozen, live), METRICS)
+    for path in (PREDICTIONS, OUTLOOK):
+        source = FROZEN / path.name
+        if not path.exists() or path.read_bytes() != source.read_bytes():
+            shutil.copyfile(source, path)
+    print(f"Wrote {len(latest)} latest rows for the week of {live['latest_week']}, {(LIVE / 'latest.json').relative_to(ROOT)} "
+          "and metrics.json (frozen results plus the live keys)")
 
 
 if __name__ == "__main__":
-    main()
+    if sys.argv[1:] in (["evaluate"], ["evaluate", "--force"]):
+        evaluate(force="--force" in sys.argv)
+    elif not sys.argv[1:]:
+        predict()
+    else:
+        sys.exit("usage: python -m farmdrought.export [evaluate [--force]]")
