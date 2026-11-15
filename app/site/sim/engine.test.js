@@ -141,8 +141,12 @@ test("sealing cannot save water that was never released", () => {
 
 /* ---- Physical uncertainty (off unless a run asks for it) ---- */
 const band = (b) => b.high - b.low;
-const fixedDraw = (over) => Object.assign({ s: 1, seepMult: 1, cut: 0.575, widthMult: 1, linedShare: 0, calibrated: false }, over);
+// A draw written by hand. Uncalibrated unless said otherwise; every multiplier neutral unless set.
+const fixedDraw = (over) => Object.assign({ regime: "uncalibrated", calibrated: false, s: null, seepMult: 1, cut: 0.575, widthMult: 1, linedShare: 0 }, over);
 const withPhysics = (s, over) => Object.assign({}, s, { physics: fixedDraw(over) });
+const calibratedDraw = (over) => Object.assign({ regime: "calibrated", calibrated: true, s: 1, seepMult: 1 }, over);
+const mean = (list) => list.reduce((a, b) => a + b, 0) / list.length;
+const median = (list) => { const sorted = list.slice().sort((a, b) => a - b); return (sorted[Math.floor((sorted.length - 1) / 2)] + sorted[Math.ceil((sorted.length - 1) / 2)]) / 2; };
 
 test("without a physics draw, simulate gives the totals it gave before physics was added", () => {
   // These numbers were printed by the engine before the physics code was written.
@@ -192,73 +196,172 @@ test("every policy in one future faces the same physics draw, and different futu
     }
   }
   assert.strictEqual(run.physics.draws.length, today.draws);
-  for (const part of ["seepMult", "cut", "widthMult", "linedShare"]) {
+  for (const part of ["cut", "widthMult", "linedShare"]) {
     assert.strictEqual(new Set(run.physics.draws.map((d) => d[part])).size, today.draws, part + " differs in every future");
   }
 });
 
-test("a seepage multiplier of zero keeps no water and leaves the sealing bill as it was", () => {
-  const base = E.simulate(withPhysics(dry), { trigger: "always" }).totals;
-  const none = E.simulate(withPhysics(dry, { seepMult: 0 }), { trigger: "always" }).totals;
-  assert.ok(base.savedAf > 0 && base.spend > 0);
-  assert.strictEqual(none.savedAf, 0);
-  assert.strictEqual(none.recoveredAf, 0);
-  assert.strictEqual(none.spend, base.spend);
-  assert.strictEqual(none.loss, E.simulate(dry, { trigger: "never" }).totals.loss);   // as if nothing had been done
+test("in every future, each policy's totals are the ones the future's one recorded draw implies", () => {
+  // The same futures with physics off give each policy's bill at the assumed width. With physics
+  // on, every policy's bill in future k must be that bill times future k's width multiplier.
+  // A fresh draw for each policy would break this for all but one of them.
+  const policies = [{ trigger: "never" }, { trigger: "forecast" }, { trigger: "always" }, { trigger: "d1" }];
+  const off = E.fromToday(history(), policies, {}, today), on = E.fromToday(history(), policies, {}, Object.assign({}, today, { physics: true }));
+  let sealedTwice = 0;
+  for (let k = 0; k < today.draws; k++) {
+    const draw = on.physics.draws[k];
+    for (const i of [1, 2, 3]) {
+      close(on.policies[i].draws[k].spend, off.policies[i].draws[k].spend * draw.widthMult);
+    }
+    // Two policies that both sealed: their bills are in the ratio they had at the assumed width.
+    const a = on.policies[1].draws[k], b = on.policies[2].draws[k];
+    if (a.spend > 0 && b.spend > 0) { sealedTwice++; close(a.spend / b.spend, off.policies[1].draws[k].spend / off.policies[2].draws[k].spend); }
+  }
+  assert.ok(sealedTwice > 10, `${sealedTwice} futures where both policies sealed`);
+  // Two entries with the same rule are the same in every future.
+  const twins = E.fromToday(history(), [{ trigger: "always" }, { trigger: "always" }], {}, Object.assign({}, today, { physics: true }));
+  assert.deepStrictEqual(twins.policies[0].draws, twins.policies[1].draws);
 });
 
-test("canals that are all lined keep no water when sealed and cost the same; with none lined the full saving is kept", () => {
+test("with physics on, the weekly and yearly spend add up to the total bill", () => {
+  const run = E.simulate(withPhysics(dry, { widthMult: 1.3 }), { trigger: "always" });
+  const plain = E.simulate(dry, { trigger: "always" });
+  const weekly = run.years.reduce((s, y) => s + y.weekly.reduce((t, w) => t + w.spend, 0), 0);
+  close(weekly, run.totals.spend);
+  close(run.years.reduce((s, y) => s + y.spend, 0), run.totals.spend);
+  close(run.totals.spend, 1.3 * plain.totals.spend);
+  // Each round on the weekly record is the round's bill, not the plan's nominal cost.
+  const rounds = run.years[0].weekly.filter((w) => w.spend > 0).map((w) => w.spend);
+  assert.ok(rounds.length >= 1);
+  rounds.forEach((r) => close(r, run.plan.spent));
+  close(run.plan.spent, 1.3 * plain.plan.spent);
+});
+
+test("uncalibrated: the seepage share is never applied, whatever the draw carries", () => {
+  const base = E.simulate(withPhysics(dry), { trigger: "always" }).totals;
+  for (const seepMult of [0, 0.5, 0.7, 3]) {
+    const t = E.simulate(withPhysics(dry, { seepMult, s: seepMult }), { trigger: "always" }).totals;
+    assert.strictEqual(t.savedAf, base.savedAf);
+    assert.strictEqual(t.spend, base.spend);
+  }
+  // And a sampled uncalibrated draw carries no share at all.
+  const rng = E.makeRng(1);
+  for (let i = 0; i < 50; i++) {
+    const d = E.samplePhysics(rng, i % 2 ? {} : undefined);
+    assert.deepStrictEqual([d.regime, d.calibrated, d.s, d.seepMult], ["uncalibrated", false, null, 1]);
+  }
+});
+
+test("uncalibrated: water kept scales with width and with the unlined share; the bill scales with width only", () => {
   const plain = E.simulate(dry, { trigger: "always" }).totals;
-  const unlined = E.simulate(withPhysics(dry, { linedShare: 0 }), { trigger: "always" }).totals;
+  const neutral = E.simulate(withPhysics(dry), { trigger: "always" }).totals;
+  close(neutral.savedAf, plain.savedAf);
+  assert.strictEqual(neutral.spend, plain.spend);
   const lined = E.simulate(withPhysics(dry, { linedShare: 1 }), { trigger: "always" }).totals;
+  assert.strictEqual(lined.savedAf, 0);                                       // all lined: nothing to keep
+  assert.strictEqual(lined.spend, plain.spend);                               // and the sealant is still bought
   const half = E.simulate(withPhysics(dry, { linedShare: 0.5 }), { trigger: "always" }).totals;
-  assert.strictEqual(lined.savedAf, 0);
-  assert.strictEqual(lined.spend, plain.spend);
-  close(unlined.savedAf, plain.savedAf);
-  assert.strictEqual(unlined.spend, plain.spend);
   close(half.savedAf, plain.savedAf / 2);
   assert.strictEqual(half.spend, plain.spend);
+  const wide = E.simulate(withPhysics(dry, { widthMult: 2 }), { trigger: "always" });
+  close(wide.totals.savedAf, 2 * plain.savedAf);
+  close(wide.totals.spend, 2 * plain.spend);
+  assert.strictEqual(wide.plan.canals, E.simulate(dry, { trigger: "always" }).plan.canals);   // the same canals: the plan is made at the assumed width
+  const both = E.simulate(withPhysics(dry, { widthMult: 1.5, linedShare: 0.4 }), { trigger: "always" }).totals;
+  close(both.savedAf, plain.savedAf * 1.5 * 0.6);
+  close(both.spend, plain.spend * 1.5);
 });
 
-test("canals twice as wide cost twice as much to seal and keep twice the water", () => {
-  const one = E.simulate(withPhysics(dry), { trigger: "always" }), two = E.simulate(withPhysics(dry, { widthMult: 2 }), { trigger: "always" });
-  close(two.totals.spend, 2 * one.totals.spend);
-  close(two.totals.savedAf, 2 * one.totals.savedAf);
-  close(two.plan.spent, 2 * one.plan.spent);
-  assert.strictEqual(two.plan.canals, one.plan.canals);                      // the same canals: the plan is made at the assumed width
+test("calibrated: water kept scales with the seepage multiplier only; width moves the bill and nothing else", () => {
+  const plain = E.simulate(dry, { trigger: "always" }).totals;
+  const cal = (over) => E.simulate(Object.assign({}, dry, { physics: fixedDraw(calibratedDraw(over)) }), { trigger: "always" }).totals;
+  close(cal({ seepMult: 0.6 }).savedAf, 0.6 * plain.savedAf);
+  assert.strictEqual(cal({ seepMult: 0.6 }).spend, plain.spend);
+  // Width and lining do not touch the water kept: they are already inside the district totals.
+  close(cal({ seepMult: 0.6, widthMult: 1.5, linedShare: 0.5 }).savedAf, 0.6 * plain.savedAf);
+  close(cal({ seepMult: 0.6, widthMult: 1.5, linedShare: 0.5 }).spend, 1.5 * plain.spend);
+  assert.strictEqual(cal({ seepMult: 1, linedShare: 1 }).savedAf, cal({ seepMult: 1, linedShare: 0 }).savedAf);
+  // No seepage at all: nothing kept, the same bill, and the same loss as doing nothing.
+  const none = cal({ seepMult: 0 });
+  assert.strictEqual(none.savedAf, 0);
+  assert.strictEqual(none.spend, plain.spend);
+  assert.strictEqual(none.loss, E.simulate(dry, { trigger: "never" }).totals.loss);
 });
 
-test("the drawn sealant effect is used in place of the fixed one", () => {
-  const low = E.simulate(withPhysics(dry, { cut: 0.28 }), { trigger: "always" }).totals, high = E.simulate(withPhysics(dry, { cut: 0.87 }), { trigger: "always" }).totals;
-  close(high.savedAf / low.savedAf, 0.87 / 0.28);
-  assert.strictEqual(high.spend, low.spend);
-  // A slider value for the sealant effect is ignored once a draw is supplied.
-  assert.strictEqual(E.simulate(withPhysics(dry, { cut: 0.28 }), { trigger: "always" }, { cut: 0.8 }).totals.savedAf, low.savedAf);
+test("the two regimes give different water for the same width and lining, and the same bill", () => {
+  const draw = { widthMult: 1.4, linedShare: 0.5, seepMult: 0.7, s: 0.7 };
+  const un = E.simulate(withPhysics(dry, draw), { trigger: "always" }).totals;
+  const cal = E.simulate(withPhysics(dry, calibratedDraw(draw)), { trigger: "always" }).totals;
+  close(un.savedAf / cal.savedAf, (1.4 * 0.5) / 0.7);
+  assert.strictEqual(un.spend, cal.spend);
 });
 
-test("with physics sampled the bands are at least as wide as with physics held fixed, and the fixed run is returned beside it", () => {
+test("the drawn sealant effect is used in place of the fixed one, in both regimes", () => {
+  for (const regime of [{}, calibratedDraw({})]) {
+    const low = E.simulate(withPhysics(dry, Object.assign({ cut: 0.28 }, regime)), { trigger: "always" }).totals;
+    const high = E.simulate(withPhysics(dry, Object.assign({ cut: 0.87 }, regime)), { trigger: "always" }).totals;
+    close(high.savedAf / low.savedAf, 0.87 / 0.28);
+    assert.strictEqual(high.spend, low.spend);
+    // A slider value for the sealant effect is ignored once a draw is supplied.
+    assert.strictEqual(E.simulate(withPhysics(dry, Object.assign({ cut: 0.28 }, regime)), { trigger: "always" }, { cut: 0.8 }).totals.savedAf, low.savedAf);
+  }
+});
+
+test("with physics sampled the bands are wider than with physics held fixed, and sit around the same middle", () => {
   const policies = [{ trigger: "never" }, { trigger: "always" }];
-  const run = E.fromToday(history(), policies, {}, Object.assign({}, today, { physics: true, draws: 200 }));
-  const sampled = run.policies[1].summary, fixed = run.fixedPhysics.policies[1].summary;
-  assert.ok(fixed.recoveredAf.mid > 0, "sealing keeps water in this fixture");
-  assert.ok(band(sampled.recoveredAf) > band(fixed.recoveredAf), `${band(sampled.recoveredAf)} vs ${band(fixed.recoveredAf)}`);
-  assert.ok(band(sampled.spend) > band(fixed.spend));
-  assert.ok(sampled.recoveredAf.low < fixed.recoveredAf.low && sampled.recoveredAf.high > fixed.recoveredAf.high);
-  // Doing nothing involves no canal, so physics cannot move it.
-  assert.deepStrictEqual(run.fixedPhysics.policies[0].draws, run.policies[0].draws);
-  assert.strictEqual(run.fixedPhysics.policies[1].draws.length, 200);
+  for (const physicsOptions of [null, { seepSd: 0.4 }]) {
+    const run = E.fromToday(history(), policies, {}, Object.assign({}, today, { physics: true, draws: 400, physicsOptions }));
+    const sampled = run.policies[1].summary, fixed = run.fixedPhysics.policies[1].summary;
+    assert.ok(fixed.recoveredAf.mid > 0, "sealing keeps water in this fixture");
+    assert.ok(band(sampled.recoveredAf) > band(fixed.recoveredAf), `${band(sampled.recoveredAf)} vs ${band(fixed.recoveredAf)}`);
+    assert.ok(band(sampled.spend) > band(fixed.spend));
+    assert.ok(sampled.recoveredAf.low < fixed.recoveredAf.low && sampled.recoveredAf.high > fixed.recoveredAf.high);
+    // Centred: the middle bill of the sampled futures is the bill with physics fixed.
+    assert.ok(Math.abs(sampled.spend.mid / fixed.spend.mid - 1) < 0.03, `spend middle ratio ${sampled.spend.mid / fixed.spend.mid}`);
+    assert.ok(fixed.spend.mid > sampled.spend.low && fixed.spend.mid < sampled.spend.high);
+    // Doing nothing involves no canal, so physics cannot move it.
+    assert.deepStrictEqual(run.fixedPhysics.policies[0].draws, run.policies[0].draws);
+    assert.strictEqual(run.fixedPhysics.policies[1].draws.length, 400);
+  }
 });
 
-test("physics held fixed sits at the centre of every range", () => {
+test("physics held fixed is the median of every unknown, not the most likely value", () => {
   const run = E.fromToday(history(), [{ trigger: "never" }], {}, Object.assign({}, today, { physics: true }));
-  close(run.physics.central.s, 0.7);
-  close(run.physics.central.seepMult, 0.7);
-  close(run.physics.central.cut, 0.575);
-  assert.strictEqual(run.physics.central.widthMult, 1);
-  assert.strictEqual(run.physics.central.linedShare, 0.3);
-  assert.strictEqual(run.physics.calibrated, false);
+  const c = run.physics.central;
+  close(c.cut, 0.575);
+  close(c.widthMult, 1);
+  close(c.linedShare, 0.7 - Math.sqrt(0.14));                                 // 0.3258: half the triangle's area lies below it
+  assert.ok(c.linedShare > 0.3);
+  assert.deepStrictEqual([c.regime, c.calibrated, c.s, c.seepMult], ["uncalibrated", false, null, 1]);
+  assert.deepStrictEqual([run.physics.regime, run.physics.calibrated], ["uncalibrated", false]);
   const calibrated = E.fromToday(history(), [{ trigger: "never" }], {}, Object.assign({}, today, { physics: true, physicsOptions: { seepSd: 0.5 } }));
-  assert.strictEqual(calibrated.physics.calibrated, true);
+  assert.deepStrictEqual([calibrated.physics.regime, calibrated.physics.calibrated], ["calibrated", true]);
+  close(calibrated.physics.central.s, 0.7);
+  close(calibrated.physics.central.seepMult, 0.7);
+  // The medians are the medians of what is actually drawn.
+  const rng = E.makeRng(77), draws = [];
+  for (let i = 0; i < 20000; i++) draws.push(E.samplePhysics(rng, { seepSd: 0.5 }));
+  const central = E.centralPhysics({ seepSd: 0.5 });
+  for (const key of ["s", "seepMult", "cut", "widthMult", "linedShare"]) {
+    const m = median(draws.map((d) => d[key]));
+    assert.ok(Math.abs(m - central[key]) < 0.012 * (key === "seepMult" || key === "widthMult" ? 2 : 1), `${key}: sampled median ${m}, central ${central[key]}`);
+  }
+  // Taken together: the fixed bill multiplier is the middle of the sampled ones, and the fixed
+  // water multiplier (what is kept of the plain run's water) is their average, in both regimes.
+  // Its median is a little lower (about a tenth, uncalibrated), because a product of medians
+  // is not the median of the product.
+  for (const opts of [undefined, { seepSd: 0.4 }]) {
+    const r = E.makeRng(5), list = [], c = E.centralPhysics(opts);
+    for (let i = 0; i < 40000; i++) list.push(E.samplePhysics(r, opts));
+    const kept = (d) => (d.calibrated ? d.seepMult : d.widthMult * (1 - d.linedShare)) * d.cut;
+    assert.ok(Math.abs(median(list.map((d) => d.widthMult)) - c.widthMult) < 0.01);
+    assert.ok(Math.abs(mean(list.map((d) => d.widthMult)) - c.widthMult) < 0.01);
+    const centre = kept(c), avg = mean(list.map(kept)), mid = median(list.map(kept));
+    assert.ok(Math.abs(avg / centre - 1) < (opts ? 0.11 : 0.03), `average kept ${avg} vs fixed ${centre}`);
+    assert.ok(mid / centre > 0.85 && mid / centre < 1.02, `median kept ${mid} vs fixed ${centre}`);
+  }
+  // A width range that is not centred on 1 moves the central width with it.
+  close(E.centralPhysics({ widthLow: 1, widthHigh: 2 }).widthMult, 1.5);
 });
 
 test("the count of futures where a policy loses to doing nothing matches the futures themselves", () => {
@@ -282,6 +385,30 @@ test("the count of futures where a policy loses to doing nothing matches the fut
   assert.strictEqual(E.fromToday(wet, [{ trigger: "always" }], {}, Object.assign({}, today, { pctNow: 90 })).policies[0].losesToNothing, null);
 });
 
+test("the count of futures where a round cost more than the budget is the futures with wider canals where the policy sealed", () => {
+  // The budget is exactly what the three canals cost at the assumed width, so any width
+  // multiplier above 1 makes a round cost more than the budget.
+  const p = E.makeParams(), budget = E.fundCanals(dry.canals, Infinity, p).spent;
+  const policies = [{ trigger: "never" }, { trigger: "always" }, { trigger: "forecast" }];
+  const run = E.fromToday(history(), policies, { budget }, Object.assign({}, today, { physics: true, draws: 200 }));
+  const wider = run.physics.draws.map((d) => d.widthMult > 1);
+  assert.strictEqual(run.policies[0].overBudget, 0);                           // doing nothing never pays a bill
+  assert.strictEqual(run.policies[1].overBudget, wider.filter(Boolean).length);                    // "always" seals in every future
+  assert.strictEqual(run.policies[2].overBudget, wider.filter((w, k) => w && run.policies[2].draws[k].yearsActed > 0).length);
+  assert.ok(run.policies[1].overBudget > 60 && run.policies[1].overBudget < 140, `${run.policies[1].overBudget} of 200`);   // about half
+  assert.ok(run.policies[2].overBudget <= run.policies[1].overBudget);
+  // At the median width a round costs exactly the budget, never more.
+  assert.strictEqual(run.fixedPhysics.policies[1].overBudget, 0);
+  // With room in the budget for the widest canals, it never happens.
+  const roomy = E.fromToday(history(), policies, { budget: budget * 1.5 + 1 }, Object.assign({}, today, { physics: true, draws: 200 }));
+  assert.strictEqual(roomy.policies[1].overBudget, 0);
+  // One run says so itself; with physics off the field is not there at all.
+  assert.strictEqual(E.simulate(withPhysics(dry, { widthMult: 1.2 }), { trigger: "always" }, { budget }).plan.overBudget, true);
+  assert.strictEqual(E.simulate(withPhysics(dry, { widthMult: 0.9 }), { trigger: "always" }, { budget }).plan.overBudget, false);
+  assert.strictEqual("overBudget" in E.simulate(dry, { trigger: "always" }, { budget }).plan, false);
+  assert.strictEqual("overBudget" in E.fromToday(history(), policies, { budget }, today).policies[1], false);
+});
+
 test("samplePhysics stays inside its ranges over many draws and covers most of each", () => {
   const rng = E.makeRng(42), draws = [];
   for (let i = 0; i < 5000; i++) draws.push(E.samplePhysics(rng, { seepSd: 0.4 }));
@@ -289,14 +416,26 @@ test("samplePhysics stays inside its ranges over many draws and covers most of e
   const inside = (key, low, high) => { const [a, b] = range(key); assert.ok(a >= low && b <= high, `${key}: ${a} to ${b}`); assert.ok(a < low + 0.05 * (high - low) && b > high - 0.05 * (high - low), `${key} covers its range`); };
   inside("s", 0.5, 0.9);
   inside("cut", 0.28, 0.87);
-  inside("widthMult", 0.4, 2.0);
+  inside("widthMult", 0.5, 1.5);
   inside("linedShare", 0, 0.7);
-  assert.ok(draws.every((d) => d.seepMult > 0));
-  // The lined share leans towards 0.3: its average is (0 + 0.3 + 0.7) / 3, and more draws fall near 0.3 than near either end.
-  const lined = draws.map((d) => d.linedShare), mean = lined.reduce((a, b) => a + b, 0) / lined.length;
-  assert.ok(Math.abs(mean - 1 / 3) < 0.01, `mean lined share ${mean}`);
-  const near = (x) => lined.filter((v) => Math.abs(v - x) < 0.05).length;
-  assert.ok(near(0.3) > 2 * near(0.05) && near(0.3) > 2 * near(0.65));
+  assert.ok(draws.every((d) => d.seepMult > 0 && d.regime === "calibrated"));
+  // Flat ranges have their average in the middle. The width range is centred on the assumed width.
+  assert.ok(Math.abs(mean(draws.map((d) => d.widthMult)) - 1) < 0.015);
+  assert.ok(Math.abs(mean(draws.map((d) => d.cut)) - 0.575) < 0.01);
+  assert.ok(Math.abs(mean(draws.map((d) => d.s)) - 0.7) < 0.007);
+});
+
+test("the lined share follows a triangle that peaks at 0.3, not somewhere near it", () => {
+  // Checked against the triangle's own formulas. A peak at 0.35 in place of 0.3 would give a
+  // median of 0.350, a mean of 0.350 and 36.7% of draws under 0.3; each check below rejects that.
+  const rng = E.makeRng(2024), lined = [];
+  for (let i = 0; i < 40000; i++) lined.push(E.samplePhysics(rng).linedShare);
+  const below = (x) => lined.filter((v) => v < x).length / lined.length;
+  assert.ok(Math.abs(median(lined) - (0.7 - Math.sqrt(0.14))) < 0.005, `median ${median(lined)}`);          // 0.3258
+  assert.ok(Math.abs(mean(lined) - 1 / 3) < 0.004, `mean ${mean(lined)}`);                                  // (0 + 0.3 + 0.7) / 3
+  assert.ok(Math.abs(below(0.3) - 0.3 / 0.7) < 0.01, `share under 0.3: ${below(0.3)}`);                     // 42.9%: the area left of the peak
+  assert.ok(Math.abs(below(0.15) - 0.15 * 0.15 / 0.21) < 0.008, `share under 0.15: ${below(0.15)}`);        // 10.7%
+  assert.ok(Math.abs(below(0.5) - (1 - 0.2 * 0.2 / 0.28)) < 0.008, `share under 0.5: ${below(0.5)}`);       // 85.7%
 });
 
 test("samplePhysics gives the same draws for the same seed and different draws for another seed", () => {
@@ -306,25 +445,22 @@ test("samplePhysics gives the same draws for the same seed and different draws f
   assert.notDeepStrictEqual(take(9)[0], take(9)[1]);
 });
 
-test("samplePhysics without a calibration spread says so, and the seepage multiplier is then just the seepage share", () => {
-  const rng = E.makeRng(1);
-  for (let i = 0; i < 50; i++) {
-    const d = E.samplePhysics(rng, i % 2 ? {} : undefined);
-    assert.strictEqual(d.calibrated, false);
-    assert.strictEqual(d.seepMult, d.s);
-  }
-  const d = E.samplePhysics(E.makeRng(1), { seepSd: 0.5 });
-  assert.strictEqual(d.calibrated, true);
-  assert.notStrictEqual(d.seepMult, d.s);
-  assert.strictEqual(E.samplePhysics(E.makeRng(1), { seepSd: 0 }).calibrated, true);   // a spread of zero is still a calibration
+test("samplePhysics: a calibration switches the regime, and leaves the other draws as they were", () => {
+  const un = E.samplePhysics(E.makeRng(1)), cal = E.samplePhysics(E.makeRng(1), { seepSd: 0.5 });
+  assert.deepStrictEqual([un.regime, un.calibrated, un.seepMult, un.s], ["uncalibrated", false, 1, null]);
+  assert.deepStrictEqual([cal.regime, cal.calibrated], ["calibrated", true]);
+  assert.ok(cal.s >= 0.5 && cal.s <= 0.9 && cal.seepMult !== cal.s);
+  for (const key of ["cut", "widthMult", "linedShare"]) assert.strictEqual(cal[key], un[key], key);
+  const zero = E.samplePhysics(E.makeRng(1), { seepSd: 0 });                  // a spread of zero is still a calibration
+  assert.strictEqual(zero.calibrated, true);
+  assert.strictEqual(zero.seepMult, zero.s);
 });
 
 test("samplePhysics: a calibration spread widens the seepage multiplier around the seepage share", () => {
   const ratios = [], rng = E.makeRng(7);
   for (let i = 0; i < 4000; i++) { const d = E.samplePhysics(rng, { seepSd: 0.5 }); ratios.push(Math.log(d.seepMult / d.s)); }
-  const mean = ratios.reduce((a, b) => a + b, 0) / ratios.length;
-  const sd = Math.sqrt(ratios.reduce((a, b) => a + (b - mean) * (b - mean), 0) / ratios.length);
-  assert.ok(Math.abs(mean) < 0.03, `mean ${mean}`);
+  const m = mean(ratios), sd = Math.sqrt(mean(ratios.map((r) => (r - m) * (r - m))));
+  assert.ok(Math.abs(m) < 0.03, `mean ${m}`);
   assert.ok(Math.abs(sd - 0.5) < 0.03, `sd ${sd}`);
 });
 
@@ -341,15 +477,20 @@ test("samplePhysics: the width range can be set, and per-class widths come back 
   }
 });
 
-test("the Normal draw has a mean near 0 and a standard deviation near 1, and is about as often above as below", () => {
-  const rng = E.makeRng(123), n = 20000, z = [];
+test("the Normal draw has the bell curve's mean, spread, tails and fourth moment", () => {
+  const rng = E.makeRng(123), n = 100000, z = [];
   for (let i = 0; i < n; i++) z.push(E.normal(rng));
-  const mean = z.reduce((a, b) => a + b, 0) / n, sd = Math.sqrt(z.reduce((a, b) => a + (b - mean) * (b - mean), 0) / n);
+  const m = mean(z), sd = Math.sqrt(mean(z.map((v) => (v - m) * (v - m))));
   assert.ok(z.every(Number.isFinite));
-  assert.ok(Math.abs(mean) < 0.03, `mean ${mean}`);
-  assert.ok(Math.abs(sd - 1) < 0.03, `sd ${sd}`);
-  const within1 = z.filter((v) => Math.abs(v) < 1).length / n, within2 = z.filter((v) => Math.abs(v) < 2).length / n;
-  assert.ok(Math.abs(within1 - 0.683) < 0.02 && Math.abs(within2 - 0.954) < 0.01, `${within1}, ${within2}`);
+  assert.ok(Math.abs(m) < 0.015, `mean ${m}`);
+  assert.ok(Math.abs(sd - 1) < 0.015, `sd ${sd}`);
+  const outside = (x) => z.filter((v) => Math.abs(v) > x).length / n, above = (x) => z.filter((v) => v > x).length / n;
+  assert.ok(Math.abs(outside(1) - 0.3173) < 0.006, `outside 1: ${outside(1)}`);
+  assert.ok(Math.abs(outside(1.96) - 0.05) < 0.003, `outside 1.96: ${outside(1.96)}`);
+  assert.ok(Math.abs(outside(3) - 0.0027) < 0.0008, `outside 3: ${outside(3)}`);
+  assert.ok(Math.abs(above(0) - 0.5) < 0.006 && Math.abs(above(1.645) - 0.05) < 0.003, "the two sides match");
+  assert.ok(Math.abs(mean(z.map((v) => v * v * v)) ) < 0.05, "no lean to either side");
+  assert.ok(Math.abs(mean(z.map((v) => v * v * v * v)) - 3) < 0.12, `fourth moment ${mean(z.map((v) => v * v * v * v))}`);   // 3 for a bell curve
 });
 
 test("every physics range is listed in DEFAULTS with a tag, and only the sealant range is tagged published", () => {
@@ -358,6 +499,8 @@ test("every physics range is listed in DEFAULTS with a tag, and only the sealant
     assert.ok(E.DEFAULTS[key] && typeof E.DEFAULTS[key].value === "number" && E.DEFAULTS[key].label.length > 0, key);
     assert.strictEqual(E.DEFAULTS[key].tag, key.indexOf("cut") === 0 ? "published" : "assumption", key);
   }
+  assert.deepStrictEqual([E.DEFAULTS.widthMultLow.value, E.DEFAULTS.widthMultHigh.value], [0.5, 1.5]);   // centred on the assumed width
+  assert.ok(/no width is measured/.test(E.DEFAULTS.widthMultLow.label) && /no width is measured/.test(E.DEFAULTS.widthMultHigh.label));
   assert.strictEqual(E.DEFAULTS.cut.value, 0.575);                            // the page's slider still starts here
   assert.strictEqual(E.DEFAULTS.cut.tag, "assumption");                       // only the range is published, not its middle
 });
