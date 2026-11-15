@@ -188,3 +188,10 @@ def test_canal_map_says_not_available_without_the_pipeline_keys(monkeypatch):
     assert not at.exception
     assert any("Canal map: not available yet" in str(e.value) for e in at.markdown)
     st.cache_data.clear()
+
+
+def test_canal_tab_on_a_transfer_river_says_rio_grande_only():
+    at = _run_with_link(river="Ohio", view="Canal action")
+    assert not at.exception
+    assert any("cover the Rio Grande counties only" in str(e.value) for e in at.info)
+    assert not any("Texas districts only" in str(e.value) for e in at.info)

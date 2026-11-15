@@ -650,8 +650,12 @@ def show_canal_map(fips):
     km = {lvl: sum(x["length_km"] or 0 for x in segs if x["level"] == lvl) for lvl in theme.CANAL_COLOR}
     # One plain sentence first, so the manager knows what to look for on the map.
     inspect = km["Inspect first"]
-    st.markdown(f"**{inspect:,.0f} km of the {sum(km.values()):,.0f} km of canal in this county are marked "
-                "'Inspect first'** (red). Those sit on leaky soil in a county the forecast warns about.")
+    if inspect >= 0.5:
+        st.markdown(f"**{inspect:,.0f} km of the {sum(km.values()):,.0f} km of canal in this county are marked "
+                    "'Inspect first'** (red). Those sit on leaky soil in a county the forecast warns about.")
+    else:
+        st.markdown(f"**No canal in this county is marked 'Inspect first' this week** "
+                    f"({sum(km.values()):,.0f} km mapped). That level needs leaky soil AND a forecast warning.")
     st.plotly_chart(theme.canal_map(segs), width="stretch", key="canal_map")
     st.caption(md_escape("Kilometres by level: " + ", ".join(f"{lvl} {v:,.0f}" for lvl, v in km.items() if v)
                          + ". Click a level in the legend to hide or show it; scroll to zoom."))
@@ -748,6 +752,13 @@ def tab_canal():
         cards.append(dict(label="History since 2000", value=f"{round(row['d2_share_history'] * 100)}%",
                           accent=TIER_COLOR["Watch"], caption="of weeks in severe drought here"))
     theme.card_grid(cards)
+
+    # The canal map and the district plan exist for the Rio Grande only. On a transfer-test river
+    # we stop here and say so, instead of showing Rio Grande figures under another river's name.
+    if is_transfer:
+        st.info(f"The canal map and the sealant plan cover the {focus} counties only. "
+                f"Pick {focus} in the sidebar to see them.")
+        return
 
     # 2) Which canals? The map is what a district manager acts on.
     st.markdown("#### 1. Which canals to look at")
