@@ -252,3 +252,41 @@ The figures in this section are the checker's, computed after the result was kno
 - Its ranking skill was only a little lower: an AUC of 0.837 against 0.868.
 
 This is one untuned model at one fixed warning line. It does not show that boosting cannot work here.
+
+## Round 4: one general forecast, tested on six rivers it has never seen (declared Nov 15, 2026, before any holdout county was loaded, trained on or scored)
+
+Round 3 left the six-river holdout declared and unopened. This section says exactly what will be scored on it, before it is opened. The commit that adds this section comes before the commit that adds the code.
+
+**Why a new model.** On the Rio Grande the 6-month forecast ties the rule "D1 or worse now". The forecast and the rule read the same drought map, so the new idea is to give the forecast information the rule cannot see, and to let it learn from more places.
+
+**What development showed (on the 436 river counties already used; none of this is blind).** Seven candidates were tried, all with the version 1 forest settings unless named, forward-chained exactly as version 1. Cost is 3 x missed + false alarms at the fixed 0.25 warning line, minus the cost of "D1 or worse now", with a year-block interval (18 years):
+
+| Candidate | Rio Grande | Colorado | Missouri | Mississippi | Ohio |
+|---|---|---|---|---|---|
+| Version 1 (Rio Grande rows, 34 inputs) | -58 (-276 to 171) | +11 (-78 to 112) | +1680 | +2833 | +1513 |
+| Rio Grande rows + drought index + weather | +135 (-70 to 358) | +14 | +867 | +2338 | +1391 |
+| All five rivers + drought index + weather | +242 (-104 to 598) | +73 (-87 to 250) | -920 (-1910 to 1) | -2273 (-3559 to -1067) | -1078 (-1635 to -601) |
+| All five rivers + drought index + weather + climate normals | +216 (-105 to 545) | +49 (-94 to 215) | -1010 (-1903 to -181) | -2156 (-3493 to -920) | -1346 (-1970 to -790) |
+| The same with a larger forest | +158 | +40 | -1052 | -1965 | -1221 |
+| Regularised gradient boosting, same inputs | +301 | +90 | -341 | -483 | -1286 |
+
+What this says, on used data: on the two dry western rivers nothing beats the simple rule, with or without the new inputs. On the three wetter rivers a model trained on every river with the new inputs is clearly ahead of it. On rows where the county is not yet at D1 (where the rule cannot warn) the forecasts barely rank Rio Grande counties (AUC 0.58 to 0.63): the start of a severe drought six months ahead is close to unforecastable there from these inputs.
+
+**The model that will be scored (called G, the general model).** Chosen because it has the lowest total cost over the five development rivers (20,364 against 20,571 and 20,655 for the next two).
+- Forest: version 1's settings unchanged (80 trees, depth 10, at least 20 rows per leaf, square-root inputs per split, seed 0).
+- Training rows: all 436 river counties on the five development rivers. Forward chaining as version 1: for each test year 2008 to 2025, only rows whose 26-week answer was fully known before 1 January of that year.
+- Inputs (47): version 1's 34 (history, long memory, El Nino); 6 from NOAA's county drought index files (Palmer index now, its change over 3 months, its lowest value in 12 months; the Palmer Z index for 1, 3 and 6 months); 5 from NOAA's county rain and temperature files (rain over 3, 6 and 12 months as a share of normal, temperature over 3 and 12 months minus normal); 2 climate normals (the county's 1901 to 1999 yearly rain and mean temperature).
+- Publication lag: a forecast made in month M uses NOAA values up to month M-2, as weather.py already does.
+- Warning line: 0.25, the fixed break-even value. Not chosen on any data.
+
+**The holdout.** Every county whose centre is within 50 km of the Pecos, Canadian, Gila, San Juan, Brazos or Arkansas river (lower 48 states, the same map file and distance rule as before), minus the 436 counties already used. A county belongs to the nearest of the six. No holdout county is in any training row. The scored rows are monthly issue rows from 2008 to 2025 whose full 52-week future was known by 2026-11-10, the same rule as version 1.
+
+**Primary outcome, and what counts as a win.** Cost of G minus cost of "D1 or worse now" over all holdout counties together, with a year-block bootstrap (10,000 draws, seed 0). Single-year blocks are the primary interval; two-year blocks are printed beside it. It is a win only if the primary interval lies wholly below zero. If the two block sizes disagree it is reported as unsettled. A tie or a loss is printed as plainly as a win.
+
+**Also reported, none of them the win criterion.** The same comparison per river. Version 1 (trained on Rio Grande rows) on the holdout, which is the test round 3 declared. G against "D2 now" and against always warning. AUC, precision, recall and plain accuracy for G, version 1 and the rule. Rows where the county is not at D1 on the issue date, against never warning. Each river's base rate beside its result.
+
+**A prediction, written before the result.** G's lead over the rule will be larger on rivers where a drought season is rarer, and on a river where it happens in more than about four years in ten we expect a tie, as on the Rio Grande and the Colorado.
+
+**Limits, stated now.** The holdout shares its calendar years with everything else and several of its rivers border the Rio Grande basin, so it is new places, not new time. NOAA's county values are a revised record, not what was published on the day. G was picked from six candidates on used counties. Version 1 stays the reported Rio Grande system whatever this shows: on the Rio Grande G was already seen in development and does not beat the rule.
+
+**Once.** The holdout is scored one time. After any holdout number is seen only a crash may be fixed.
