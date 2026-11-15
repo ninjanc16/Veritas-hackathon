@@ -310,7 +310,12 @@ test("the scan caption and the home page do not present the canal order or the l
   assert.ok(scan.indexOf("Which canals first") < 0);
   // The home page's leak figure is followed, in the same block, by the line that says what it is.
   const block = home.slice(home.indexOf('id="nGal"'), home.indexOf("</section>", home.indexOf('id="nGal"')));
-  assert.ok(block.indexOf("<p class=\"src\">An upper estimate from published leak rates. Our own test could not confirm the model's volumes.</p>") >= 0);
+  assert.ok(block.indexOf("<p class=\"caveat\">An upper estimate from published leak rates. Our own test could not confirm the model's volumes.</p>") >= 0);
+  // The caveat is body-size text in the ink colour, and its panel has a backing so the canal drawing does not cross the words.
+  const landing = fs.readFileSync(path.join(__dirname, "..", "css", "landing.css"), "utf8");
+  assert.ok(/\.caveat \{ font: 400 1rem\/1\.5 var\(--sans\); color: var\(--ink\);/.test(landing));
+  assert.ok(/\.beat \.copy\.backed \{ background: color-mix\(in srgb, var\(--ground\) 92%, transparent\);/.test(landing));
+  assert.ok(home.indexOf('<section class="beat right" data-beat="1">\n      <div class="copy backed">') >= 0);
 });
 
 test("tierFor and actionFor follow the warning line in the data, not a fixed number", () => {
