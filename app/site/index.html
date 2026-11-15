@@ -1,11 +1,14 @@
 <!doctype html>
 <!--
-  index.html: the intro page. It tells the story in order: the problem, the solution, then a
-  button into the platform (app.html) where the detailed data lives.
+  index.html: the intro page.
 
-  All numbers on this page are filled in by js/landing.js from data/core.js and data/sim.js,
-  so the page always matches the pipeline's latest run. Nothing here is typed in by hand
-  except the figures from named reports, which carry their source link.
+  One full-screen map (a <canvas>, drawn by js/landing.js from the real map data) stays fixed
+  behind the page. As you scroll, the map moves: the whole river, then the reservoirs, the
+  drought, the canals of the Lower Valley, and finally the canals being sealed. Each stop has
+  one big number and one sentence.
+
+  Every number is filled in by js/landing.js from data/core.js and data/sim.js, so the page
+  always matches the pipeline's latest run. Figures from named reports carry their source.
 -->
 <html lang="en">
 <head>
@@ -15,199 +18,124 @@
   <meta name="description" content="A six-month drought forecast for the Texas reach of the Rio Grande, joined to a map of every irrigation canal, so districts know which canals to seal first.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/site.css">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400;1,8..60,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/landing.css">
 </head>
 <body>
-  <div class="progress" id="progress"></div>
+  <!-- The map, the film grain over it, and the light that follows the pointer. -->
+  <canvas id="map" aria-hidden="true"></canvas>
+  <div id="glow" aria-hidden="true"></div>
+  <div id="grain" aria-hidden="true"></div>
 
-  <header class="nav" id="nav">
-    <div class="wrap">
-      <a class="brand" href="#top">
-        <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 5v22M26 5v22M6 9h20M11 9v9M16 9v13M21 9v6"/><path d="M3 27c3-2 5 2 8 0s5 2 8 0 5 2 10 0" stroke="#8fd0ff"/></svg>
-        <span>Headgate<small>RIO GRANDE DROUGHT AND CANAL PORTAL</small></span>
-      </a>
-      <nav>
-        <a href="#problem">The problem</a>
-        <a href="#cost">The cost</a>
-        <a href="#solution">The solution</a>
-        <a href="#limits">Limits</a>
-        <a class="btn small" href="app.html">Open the platform</a>
-      </nav>
-    </div>
+  <header class="top">
+    <a class="brand" href="#top">
+      <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 5v22M26 5v22M6 9h20M11 9v9M16 9v13M21 9v6"/><path d="M3 27c3-2 5 2 8 0s5 2 8 0 5 2 10 0" stroke="#38c8f5"/></svg>
+      Headgate
+    </a>
+    <span class="coords" id="coords"></span>
+    <a class="enter" href="app.html">Open the platform <i>&rarr;</i></a>
   </header>
 
-  <!-- ============ 1. Opening ============ -->
-  <section class="hero" id="top">
-    <div class="mosaic" id="mosaic" aria-hidden="true"></div>
-    <div class="wrap">
-      <div class="eyebrow reveal">Texas reach of the Rio Grande</div>
-      <h1 class="reveal" style="--d:.1s">The river is running short. <em>The canals leak what is left.</em></h1>
-      <p class="lead reveal" style="--d:.2s">Headgate joins a six-month drought forecast to a map of every irrigation canal in the Texas districts on the Rio Grande, so a district manager or a state agency can see which canals to seal first, what it costs, and what happens if nobody acts.</p>
-      <div class="cta reveal" style="--d:.3s">
-        <a class="btn" href="app.html">Get started <span aria-hidden="true">&rarr;</span></a>
-        <a class="btn ghost" href="#problem">See the problem</a>
-      </div>
-      <div class="heroStats reveal" style="--d:.4s">
-        <div><b><span data-count id="sDrought">0</span> of 254</b><span>Texas counties in drought this week</span></div>
-        <div><b><span data-count id="sRes" data-digits="1">0</span>%</b><span>Amistad and Falcon reservoirs, percent full</span></div>
-        <div><b><span data-count id="sWarn">0</span> of 14</b><span>river counties over our warning line</span></div>
-      </div>
-    </div>
-    <div class="scrollHint" aria-hidden="true">Scroll</div>
-  </section>
+  <!-- How far down the river you have scrolled. -->
+  <div class="gauge" aria-hidden="true"><i id="gaugeFill"></i></div>
 
-  <!-- ============ 2. The problem, told on a map that changes as you scroll ============ -->
-  <section class="story" id="problem">
-    <div class="stage">
-      <svg id="storyMap" role="img" aria-label="Map of Texas and the Rio Grande that changes as you scroll"></svg>
-      <div class="stageLabel" id="stageLabel"></div>
-      <div class="stageLegend"><div class="legend" id="stageLegend"></div></div>
-    </div>
-    <div class="cards">
-      <div class="step" data-step="0"><div>
-        <span class="n">The problem &middot; 1 of 6</span>
-        <h3>Texas is dry right now</h3>
-        <span class="big"><span id="tDrought"></span> counties</span>
-        <p>That is how many of the 254 Texas counties the U.S. Drought Monitor rates in drought this week (<span id="tWeek"></span>). Every county on this map is coloured by its official class.</p>
-        <p class="fine">Source: U.S. Drought Monitor, weekly county record.</p>
-      </div></div>
-      <div class="step" data-step="1"><div>
-        <span class="n">The problem &middot; 2 of 6</span>
-        <h3>One river carries the south</h3>
-        <p>Fourteen Texas counties sit on the Rio Grande, from El Paso to the Gulf. Their farms and cities take water from two reservoir systems on the river.</p>
-        <span class="big"><span id="tRes"></span>% full</span>
-        <p>Amistad and Falcon, which serve everything from Del Rio down to Brownsville, as of <span id="tResDate"></span>.</p>
-        <p class="fine">Source: Water Data for Texas (Texas Water Development Board), daily readings.</p>
-      </div></div>
-      <div class="step" data-step="2"><div>
-        <span class="n">The forecast &middot; 3 of 6</span>
-        <h3>We look six months ahead</h3>
-        <span class="big"><span id="tWarn"></span> of 14</span>
-        <p>river counties are over our warning line: a 25% or higher chance of a drought season (8 straight weeks of severe drought) in the next six months.</p>
-        <p>The model is a random forest trained on the drought record since 2000. Each week it reads fresh public data and makes a new forecast.</p>
-        <p class="fine" id="tSkill"></p>
-      </div></div>
-      <div class="step" data-step="3"><div>
-        <span class="n">The canals &middot; 4 of 6</span>
-        <h3>The water travels by canal</h3>
-        <span class="big"><span id="tKm"></span> km</span>
-        <p>of canals run through <span id="tDistricts"></span> Texas irrigation and water districts on the river. Most are in the Lower Rio Grande Valley, shown here.</p>
-        <p class="fine">Sources: USGS National Hydrography Dataset (canals); Texas Commission on Environmental Quality (district boundaries).</p>
-      </div></div>
-      <div class="step" data-step="4"><div>
-        <span class="n">The canals &middot; 5 of 6</span>
-        <h3>Some sit on soil that leaks</h3>
-        <p>Water seeps out through the bed of an unlined canal. How fast depends on the soil: sandy loam loses about seven times more than clay.</p>
-        <p>We matched every canal to the soil under it and to the drought forecast for its county. Red canals are leaky <b>and</b> forecast dry. Amber is one of the two.</p>
-        <p class="fine">Sources: USDA soil survey; seepage rates from Fipps, Texas A&amp;M (1998). We assume canals are unlined, because no public data says which are lined.</p>
-      </div></div>
-      <div class="step" data-step="5"><div>
-        <span class="n">The plan &middot; 6 of 6</span>
-        <h3>So spend where it leaks most</h3>
-        <span class="big"><span id="tPlanKm"></span> km sealed</span>
-        <p>A budget of $100,000 covers the highlighted canals: the leakiest stretches in the driest-forecast districts, in order, until the money runs out.</p>
-        <p>Estimated water kept: <b><span id="tSaved"></span> acre-feet</b> in one 90-day application.</p>
-        <p class="fine">An estimate from published figures, not a tested result. The price is sealant materials only, and the sealant has not been field-tested on the Rio Grande.</p>
-      </div></div>
-    </div>
-  </section>
-
-  <!-- ============ 3. What waiting costs ============ -->
-  <section class="band dark" id="cost">
-    <div class="wrap">
-      <div class="kicker reveal">The cost of waiting</div>
-      <h2 class="reveal">Today the money arrives after the crop is gone</h2>
-      <p class="intro reveal">Relief is paid after the loss. It replaces income, but it does not bring back any water. Money spent before the season can.</p>
-      <div class="costGrid">
-        <div class="reveal">
-          <div class="bars" id="lossBars"></div>
-          <div class="barsAxis"><span>2000</span><span>Insured crop losses paid for drought, Texas river counties, by year</span><span id="lossLastYear"></span></div>
-          <p class="small" style="color:#c9d8e8;margin-top:10px">Total: <b id="lossTotal"></b>. Source: USDA Risk Management Agency, Cause of Loss files. Insured losses only, so real losses are larger.</p>
-        </div>
-        <div class="facts" id="facts"></div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ============ 4. The solution ============ -->
-  <section class="band white" id="solution">
-    <div class="wrap">
-      <div class="kicker reveal">The solution</div>
-      <h2 class="reveal">Forecast the season. Rank the canals. Fund the worst first.</h2>
-      <p class="intro reveal">Three steps, each one built on public data and each one open to inspection inside the platform.</p>
-      <div class="grid3">
-        <div class="feature reveal">
-          <span class="stepNo">1</span>
-          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-6 4 3 5-8 4 5"/><path d="M3 21h18"/></svg></div>
-          <h3>Forecast</h3>
-          <p>A random forest model gives each river county a chance of a drought season in the next six months. It learns from the past drought record and makes new predictions from new data: the Drought Monitor each week, reservoirs each day.</p>
-        </div>
-        <div class="feature reveal" style="--d:.12s">
-          <span class="stepNo">2</span>
-          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h11M4 18h6"/><circle cx="19" cy="15" r="2.5"/></svg></div>
-          <h3>Rank</h3>
-          <p>Nearly ten thousand canal segments are mapped. Each one with a known soil is scored by how fast that soil leaks times how likely a drought is. Open your district and you see each canal on the map, its soil, its rank and its cost.</p>
-        </div>
-        <div class="feature reveal" style="--d:.24s">
-          <span class="stepNo">3</span>
-          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M7 12h.01M17 12h.01"/></svg></div>
-          <h3>Fund and test</h3>
-          <p>Enter a budget and a drought severity. The planner lists exactly which canals to seal, what each costs, how long it takes and how much water it saves. The simulation then starts from today's live readings and runs five years forward: doing nothing against acting early.</p>
+  <main id="top">
+    <!-- 0. Opening -->
+    <section class="beat hero" data-beat="0">
+      <div class="copy">
+        <p class="eyebrow" id="eyebrow"></p>
+        <h1>
+          <span class="line"><span>The river is</span></span>
+          <span class="line"><span>running short.</span></span>
+          <span class="line it"><span>The canals leak</span></span>
+          <span class="line it"><span>what is left.</span></span>
+        </h1>
+        <p class="lede">Headgate forecasts drought on the Rio Grande six months out, then shows each irrigation district which canals to seal first.</p>
+        <div class="go">
+          <a class="btn" href="app.html">Open the platform</a>
+          <a class="btn line" href="app.html?step=sim">Run the simulation</a>
         </div>
       </div>
-    </div>
-  </section>
+      <div class="ticker" aria-hidden="true"><div id="ticker"></div></div>
+      <div class="scrollCue" aria-hidden="true">scroll <i></i></div>
+    </section>
 
-  <!-- ============ 5. The places ============ -->
-  <section class="band" style="padding-bottom:70px">
-    <div class="wrap">
-      <div class="kicker reveal">On the ground</div>
-      <h2 class="reveal">Every Texas county, pictured</h2>
-      <p class="intro reveal">Inside the platform each county opens with its aerial image, a close-up of its driest area, a ground photo and a short profile.</p>
-    </div>
-    <div class="marquee reveal"><div class="track" id="marquee"></div></div>
-    <div class="wrap"><p class="small muted" style="margin-top:12px">Aerial imagery: USGS The National Map (public domain), from past flights, not this week.</p></div>
-  </section>
-
-  <!-- ============ 6. What this cannot tell you ============ -->
-  <section class="band white" id="limits">
-    <div class="wrap">
-      <div class="kicker reveal">Honest limits</div>
-      <h2 class="reveal">What this does not claim</h2>
-      <p class="intro reveal">A planning tool is only useful if you know where it stops. These are stated on every screen where they matter.</p>
-      <div class="honest">
-        <div class="reveal"><b>The forecast is a close call, not a crystal ball.</b><span id="limitTie"></span></div>
-        <div class="reveal" style="--d:.08s"><b>Canals are assumed unlined.</b>No public data says which canals are already lined. Walk a canal before you spend on it.</div>
-        <div class="reveal" style="--d:.16s"><b>The price is materials only.</b>Labour, equipment and water quality checks are not in the sealant cost. The sealant has not been field-tested on the Rio Grande.</div>
-        <div class="reveal" style="--d:.24s"><b>Nothing here was measured in the field.</b>Water saved is a range worked out from published seepage rates. Texas districts only.</div>
+    <!-- 1. Reservoirs -->
+    <section class="beat" data-beat="1">
+      <div class="copy">
+        <p class="tag">01 &nbsp; The supply</p>
+        <p class="num"><span data-count id="nRes" data-digits="1">0</span><small>% full</small></p>
+        <p class="say">Amistad and Falcon, the two reservoirs behind every farm from Del Rio to Brownsville. Upstream, Elephant Butte holds <b id="nButte"></b>.</p>
+        <p class="src">Texas Water Development Board, <span id="resDate"></span></p>
       </div>
-    </div>
-  </section>
+    </section>
 
-  <!-- ============ 7. Into the platform ============ -->
-  <section class="final">
-    <div class="wrap">
-      <h2 class="reveal">Open your district, or all of Texas</h2>
-      <p class="reveal">No sign-in. Choose your irrigation district to see its canals, its risk and a budget plan, or choose the state view to compare all thirty.</p>
-      <div class="cta reveal">
-        <a class="btn light" href="app.html">Get started <span aria-hidden="true">&rarr;</span></a>
-        <a class="btn ghost" href="app.html#state">See the state map</a>
+    <!-- 2. Drought -->
+    <section class="beat right" data-beat="2">
+      <div class="copy">
+        <p class="tag">02 &nbsp; The drought</p>
+        <p class="num"><span data-count id="nDrought">0</span><small>of 254</small></p>
+        <p class="say">Texas counties in drought this week. On the river, <b id="nWarn"></b> of 14 counties are over our six-month warning line.</p>
+        <p class="src">U.S. Drought Monitor, week of <span id="week"></span></p>
       </div>
-    </div>
-  </section>
+    </section>
 
-  <footer class="site">
-    <div class="wrap">
-      <p>A student hackathon project (Veritas AI, AI + Climate track). Not a government website. No sign-in and no personal data collected.</p>
-      <p>Data: U.S. Drought Monitor &middot; Water Data for Texas &middot; USGS National Hydrography Dataset &middot; USDA soil survey and Risk Management Agency &middot; Texas Commission on Environmental Quality &middot; Texas A&amp;M AgriLife &middot; county profiles from Wikipedia, ground photos from Wikimedia Commons (credited beside each photo in the platform).</p>
+    <!-- 3. Canals -->
+    <section class="beat" data-beat="3">
+      <div class="copy">
+        <p class="tag">03 &nbsp; The leak</p>
+        <p class="num"><span data-count id="nKm">0</span><small>km</small></p>
+        <p class="say">of canals and ditches carry what water there is to the fields. Most are bare earth, and bare earth leaks: <b id="nRate"></b> gallons through every square foot, every day.</p>
+        <p class="src">USGS and OpenStreetMap canal lines; leak rates from Fipps, Texas A&amp;M, 1998</p>
+      </div>
+    </section>
+
+    <!-- 4. Cost -->
+    <section class="beat right" data-beat="4">
+      <div class="copy">
+        <p class="tag">04 &nbsp; The bill</p>
+        <p class="num">$<span data-count id="nCost" data-digits="1">0</span><small>million</small></p>
+        <p class="say">in crops is what one year without irrigation water costs the Valley. The help comes afterwards: $280 million in federal relief in 2025, for water lost in 2023 and 2024.</p>
+        <p class="src">Texas A&amp;M AgriLife, 2023 (a worst case, not an observed loss); USDA, 2025</p>
+      </div>
+    </section>
+
+    <!-- 5. The fix -->
+    <section class="beat" data-beat="5">
+      <div class="copy">
+        <p class="tag">05 &nbsp; The fix</p>
+        <p class="num">$<span data-count id="nSeal" data-digits="2">0</span><small>million</small></p>
+        <p class="say">of sealant covers all <b id="nSealKm"></b> km of rankable canal once. Headgate ranks every segment, leakiest soil first, and tells you when the forecast says to start.</p>
+        <p class="src">Sealant price: U.S. Bureau of Reclamation. Materials only; not yet field-tested on the Rio Grande.</p>
+        <div class="go">
+          <a class="btn" href="app.html?step=sim">See what acting saves</a>
+          <a class="btn line" href="app.html">Open the platform</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- After the map: how it works, and what it does not claim. -->
+  <section class="after">
+    <div class="cols">
+      <div><span>01</span><h3>Forecast</h3><p id="howForecast"></p></div>
+      <div><span>02</span><h3>Rank</h3><p id="howRank"></p></div>
+      <div><span>03</span><h3>Simulate</h3><p>Run a district, several, or all of them through 300 possible futures, doing nothing beside sealing early. Same weather, same reservoir, same prices.</p></div>
     </div>
-  </footer>
+    <div class="limits">
+      <h2>What this does not claim</h2>
+      <ul>
+        <li id="limitModel"></li>
+        <li>No public source records which canals are already lined, so every canal is treated as bare earth. Savings are upper estimates.</li>
+        <li>Texas districts only. Prices are sealant materials only. Nothing here was measured in the field.</li>
+      </ul>
+      <a class="btn" href="app.html">Open the platform</a>
+    </div>
+    <footer>A student hackathon project (Veritas AI, AI + Climate track). Not a government website. Data and sources are listed inside the platform.</footer>
+  </section>
 
   <script src="data/core.js"></script>
   <script src="data/sim.js"></script>
-  <script src="sim/engine.js"></script>
-  <script src="js/common.js"></script>
   <script src="js/landing.js"></script>
 </body>
 </html>

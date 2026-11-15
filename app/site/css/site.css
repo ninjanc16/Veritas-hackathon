@@ -294,6 +294,8 @@ body.app { height: 100vh; display: flex; flex-direction: column; overflow: hidde
 @media (max-height: 900px) { .scase p.tiny { display: none; } }
 .scase .gain { font-size: 14px; font-weight: 700; color: var(--low); margin-top: 3px; } .scase .gain.bad { color: var(--warning); }
 .scase .go { font-size: 13.5px; font-weight: 700; color: var(--blue); }
+#simCases { position: absolute; right: 14px; top: 14px; display: flex; gap: 4px; z-index: 4; } #simCases .sbtn { padding: 5px 9px; font-size: 14px; }
+table.t input[type=checkbox] { accent-color: var(--blue); pointer-events: none; }
 #simBar { position: absolute; left: 14px; right: 14px; bottom: 10px; display: flex; gap: 10px; align-items: center; z-index: 3; }
 #simBar input[type=range] { flex: 1; min-width: 0; }
 #simDate { font-size: 15px; min-width: 118px; text-align: right; color: var(--ink); }
@@ -491,6 +493,7 @@ ul.plain { margin: 0; padding-left: 18px; font-size: .84rem; } ul.plain li { mar
   .scopeBtn { max-width: 34vw; }
   .kpis { grid-template-columns: 1fr; }
   #simCards { width: 52%; top: 108px; gap: 6px; } .stage.cards #simPrompt { left: 50%; width: 92%; } .scase p, .scase svg, .scase .go { display: none; } .scase .big { font-size: 20px; } .scase h3 { font-size: 15px; }
+  #simCases { left: 14px; right: auto; top: 50px; } #simCases .sbtn { padding: 3px 7px; font-size: 12.5px; }
   #simSteps button { padding: 5px 8px; font-size: 13.5px; } #simSkip { display: none; } #simPrompt { top: 54px; } #simPrompt span { display: none; }
   #legend { display: none; }
   .futures, .triple { grid-template-columns: 1fr; } .stats dd { font-size: 1.3rem; } .stats.three dd { font-size: 1.05rem; }
