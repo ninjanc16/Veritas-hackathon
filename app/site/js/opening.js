@@ -129,7 +129,7 @@
     h("span", { "aria-hidden": "true" }, [first.slice(0, TITLE.eye), eye, first.slice(TITLE.eye + 1)]),
     h("em", { "aria-hidden": "true" }, TITLE.name[1]),
   ]);
-  const backdrop = h("img", { class: "backdrop", src: TITLE.photo.src, alt: TITLE.photo.what, width: 1800, height: 1201 });
+  const backdrop = h("img", { class: "backdrop", src: TITLE.photo.src, alt: TITLE.photo.what, width: 1800, height: 1201, decoding: "async" });
   const wordWrap = h("div", { class: "wordWrap" }, [h("p", { class: "lbl titleLabel" }, TITLE.label), word]);
   const rest = h("div", { class: "rest" }, [
     h("p", { class: "line" }, TITLE.line),
@@ -217,7 +217,7 @@
   // A round window onto the ground at the stops we hold an aerial photo for, tied to the
   // river's head by a thin line.
   const lensImgs = CHAPTERS.map((c) => c.photo
-    ? h("img", { src: "photos/" + c.photo[0], alt: c.photo[1], loading: "lazy" }) : null);
+    ? h("img", { src: "photos/" + c.photo[0], alt: c.photo[1], loading: "lazy", decoding: "async" }) : null);
   const lensCap = h("figcaption", { class: "lbl" });
   const lens = h("figure", { class: "lens" }, [h("div", { class: "glass" }, lensImgs.filter(Boolean)), lensCap]);
   const leader = h("div", { class: "leader", "aria-hidden": "true" });

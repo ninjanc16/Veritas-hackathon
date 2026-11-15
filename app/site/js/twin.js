@@ -163,7 +163,11 @@
         rows.forEach((r, n) => {
           const y = y0 + n * 38;
           ctx.globalAlpha = 1; ctx.fillStyle = C.rule; ctx.fillRect(14, y - 19, p.w - 28, 1);
-          text(r[0], 14, y, 14, C.muted); text(r[1], p.w - 14, y, n === 1 ? 22 : 16, r[2], { weight: 600, align: "right", serif: n === 1 });
+          text(r[1], p.w - 14, y, n === 1 ? 22 : 16, r[2], { weight: 600, align: "right", serif: n === 1 });
+          // The first label is long. Where it would run into its value (a narrow panel), the short form is used.
+          const room = p.w - 28 - 12 - ctx.measureText(r[1]).width;
+          ctx.font = "400 14px " + C.sans;
+          text(!n && ctx.measureText(r[0]).width > room ? "Water reaching farms" : r[0], 14, y, 14, C.muted);
         });
       }
       ctx.restore();
@@ -193,14 +197,19 @@
         const label = small ? "In this illustrative run, sealing early kept no measurable amount of crops."
           : "In this illustrative run, sealing early kept " + money(kept) + " of crops" + (spend > kept ? " and cost " + money(spend) + " in sealant." : ".");
         const color = small ? C.muted : spend > kept ? C.warning : C.low;
-        let size = narrow ? 15 : 20;
+        // On a phone the sentence is cut in two near its middle, so it can stay at a readable size.
+        let lines = [label];
+        if (narrow) { const cut = label.lastIndexOf(" ", Math.ceil(label.length / 2) + 4); lines = [label.slice(0, cut), label.slice(cut + 1)]; }
+        const widest = () => Math.max.apply(null, lines.map((l) => ctx.measureText(l).width));
+        let size = narrow ? 13 : 20;
         ctx.font = "600 " + size + "px " + C.serif;
-        while (ctx.measureText(label).width + 30 > W - 16 && size > 10) { size -= 1; ctx.font = "600 " + size + "px " + C.serif; }   // keep the line inside the picture
-        // On a phone the line takes the place of the second panel's title, so it covers no figure.
-        const tw = ctx.measureText(label).width + 30, ty = narrow ? panels[1].y + 20 : panels[0].y + 62, half = narrow ? 15 : 20;
+        while (widest() + 30 > W - 2 * 14 && size > 10) { size -= 1; ctx.font = "600 " + size + "px " + C.serif; }   // keep the lines inside the picture
+        // On a phone the two lines take the place of the second panel's title (40px tall), so they cover no figure.
+        // There the box is as wide as the panel, so the title does not show at its sides.
+        const tw = narrow ? panels[1].w - 2 : widest() + 30, ty = narrow ? panels[1].y + 20 : panels[0].y + 62, half = narrow ? 19 : 20;
         ctx.globalAlpha = 1; ctx.fillStyle = C.map; ctx.strokeStyle = color; ctx.lineWidth = 2;
         ctx.fillRect(W / 2 - tw / 2, ty - half, tw, 2 * half); ctx.strokeRect(W / 2 - tw / 2, ty - half, tw, 2 * half);
-        text(label, W / 2, ty, size, color, { weight: 600, align: "center", serif: true });
+        lines.forEach((l, n) => text(l, W / 2, ty + (n - (lines.length - 1) / 2) * (size + 3), size, color, { weight: 600, align: "center", serif: true }));
       }
     }
 
@@ -224,7 +233,12 @@
          left / right are the engine's weekly rows; sumL / sumR are running totals with
          loss ($), spend ($), saved, recovered and leak (acre-feet). */
       load(next) { data = next; shape = build(next); at = 0; shown[0] = shown[1] = 1; playing = false; layout(); opt.onTick(0, false); },
-      play() { if (!data) return; if (at >= data.weeks.length - 1) at = 0; playing = true; opt.onTick(index(), true); },   // tell the page at once, so the button reads Pause
+      play() {
+        if (!data) return;
+        // People who ask for less motion get the result at once: the last week, with no animation.
+        if (reduced) { at = data.weeks.length - 1; playing = false; opt.onTick(index(), false); return; }
+        if (at >= data.weeks.length - 1) at = 0; playing = true; opt.onTick(index(), true);   // tell the page at once, so the button reads Pause
+      },
       pause() { playing = false; if (data) opt.onTick(index(), false); },
       seek(i) { at = i; if (data) opt.onTick(index(), playing); },
       playing: () => playing,

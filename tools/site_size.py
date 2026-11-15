@@ -11,8 +11,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 MB = 1_000_000
 CORE_LIMIT = 3.2 * MB     # app/site/data/core.js was 2.88 MB
-FILE_LIMIT = 1.0 * MB     # any other tracked file under app/site; the largest was 0.67 MB (a photo)
-TOTAL_LIMIT = 50 * MB     # all tracked files under app/site together were 44.9 MB
+FILE_LIMIT = 1.0 * MB     # any other tracked file under app/site; the largest is 0.34 MB (a photo; 0.67 MB before it was re-encoded)
+TOTAL_LIMIT = 50 * MB     # all tracked files under app/site together are 44.1 MB (44.9 MB before the photos were re-encoded)
 
 
 def tracked_sizes():
