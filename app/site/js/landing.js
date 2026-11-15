@@ -1,237 +1,270 @@
 /*
-  landing.js: everything that moves on the intro page.
+  landing.js: the intro page (index.html).
 
-    1. fills in the numbers from the data files
-    2. fades sections in as they scroll into view, and counts numbers up
-    3. draws the story map (an SVG) and changes it as each story card reaches the middle
-       of the screen: colours, layers, and a smooth zoom from all of Texas to the Valley
+  WHAT IT DOES
+    1. Fills in every number on the page from the generated data (data/core.js, data/sim.js).
+    2. Draws one map on a full-screen <canvas> and moves it as the page scrolls.
+
+  HOW THE MAP WORKS
+    - Every shape (state lines, Texas counties, rivers, canals) is turned once from
+      longitude/latitude into flat kilometres (the same Albers map projection the platform
+      uses) and stored as a ready-to-draw path.
+    - The page is a list of "beats". Each beat has a camera position (CAMERA below). The
+      scroll position says which two beats we are between, and the camera glides from one
+      to the other.
+    - Layers fade in and out with the scroll too: drought colours, canals in red, and at
+      the end the canals turning white as they are "sealed".
+    - Blue dots flow down the Rio Grande all the time. Red dots drift off unsealed canals.
+      The dots are decoration; the numbers beside them are the data.
 */
 (function () {
   "use strict";
-  const HG = window.HG, SIM = window.HG_SIM, U = window.HGU;
+  const HG = window.HG, SIM = window.HG_SIM || {};
   const $ = (id) => document.getElementById(id);
-  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const num = (v, digits) => Number(v).toLocaleString("en-US", { maximumFractionDigits: digits || 0, minimumFractionDigits: digits || 0 });
+  const niceDate = (iso) => new Date(iso + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 
-  /* ---------- 1. Numbers ---------- */
-  const inDrought = HG.texas.filter((c) => c.dm != null && c.dm >= 2).length;      // D1 or worse
+  /* ---------- 1. The numbers ---------- */
+  const PUBLISHED_CROP_LOSS_MILLION = 495.8;   // Texas A&M AgriLife, 2023: a year with no irrigation water, four Valley counties
+  const inDrought = HG.texas.filter((c) => c.dm != null && c.dm >= 2).length;            // D1 or worse
   const warned = HG.river.filter((c) => c.pSeason >= HG.threshold).length;
-  const valleyCounty = HG.river.find((c) => c.reservoir === "Amistad-Falcon");
-  const resPct = valleyCounty ? valleyCounty.reservoirPct : null;
-  const resDate = HG.refresh && HG.refresh.sources && HG.refresh.sources.reservoirs ? HG.refresh.sources.reservoirs.newest : HG.week;
-  const plan = U.planFor(U.canals, HG.plan.budget_usd, null);
-  const forecastRule = HG.trigger.rules.find((r) => r.name === "Our forecast");
-  const d1Rule = HG.trigger.rules.find((r) => r.name === "D1 or worse now");
+  const amistadFalcon = (HG.river.find((c) => c.reservoir === "Amistad-Falcon") || {}).reservoirPct;
+  const butte = HG.lakes.find((l) => l.name === "Elephant Butte");
+  const canalKm = HG.canals.reduce((sum, c) => sum + c[4], 0);
+  const rates = Object.keys(HG.seepage).map((k) => HG.seepage[k]);
+  const test = SIM.pre2020 && SIM.pre2020.test.preSeason;
 
-  $("sDrought").dataset.to = inDrought;
-  $("sRes").dataset.to = resPct;
-  $("sWarn").dataset.to = warned;
-  $("tDrought").textContent = inDrought;
-  $("tWeek").textContent = "week of " + U.niceDate(HG.week);
-  $("tRes").textContent = resPct;
-  $("tResDate").textContent = U.niceDate(resDate);
-  $("tWarn").textContent = warned;
-  $("tSkill").textContent = "Tested on 2008 to 2025, years the model had not seen: it caught " +
-    Math.round(forecastRule.recall * 100) + "% of drought seasons, and about " +
-    Math.round((1 - forecastRule.precision) * 100) + " in 100 warnings were false alarms.";
-  $("tKm").textContent = U.num(HG.plan.canal_km_in_districts);
-  $("tDistricts").textContent = HG.plan.n_districts;
-  $("tPlanKm").textContent = U.num(plan.km);
-  $("tSaved").textContent = U.num(plan.savedLow) + " to " + U.num(plan.savedHigh);
-  $("limitTie").textContent = "Before the season it caught " + Math.round(forecastRule.recall * 100) +
-    "% of drought seasons. The simple rule \"already in moderate drought\" caught " + Math.round(d1Rule.recall * 100) +
-    "%. The forecast's edge is small; its value is the months of warning.";
+  $("eyebrow").textContent = "Rio Grande · Texas reach · week of " + niceDate(HG.week);
+  $("nRes").dataset.to = amistadFalcon; $("nButte").textContent = butte.pct + "%"; $("resDate").textContent = niceDate(butte.date);
+  $("nDrought").dataset.to = inDrought; $("nWarn").textContent = warned; $("week").textContent = niceDate(HG.week);
+  $("nKm").dataset.to = Math.round(canalKm); $("nRate").textContent = Math.min.apply(null, rates) + " to " + Math.max.apply(null, rates);
+  $("nCost").dataset.to = PUBLISHED_CROP_LOSS_MILLION;
+  $("nSeal").dataset.to = HG.plan.cost_to_treat_everything_usd / 1e6; $("nSealKm").textContent = num(HG.plan.treatable_km);
+  $("howForecast").textContent = "A random forest reads the weekly Drought Monitor and the El Niño index." +
+    (test ? " Frozen at the end of 2019 and tested on the years since, its January to March warnings caught " + test.forecast.caught + " of " + test.forecast.droughtSeasons + " drought seasons." : "");
+  $("howRank").textContent = num(HG.canals.length) + " canal segments, each matched to the soil under it. Leak rate times drought chance gives the sealing order, with a cost, a crew time and the water kept for every one.";
+  $("limitModel").textContent = test
+    ? "The forecast is accurate but not special: the simple rule \"already in moderate drought\" caught " + test.d1Rule.caught + " of the same " + test.d1Rule.droughtSeasons + " seasons. We show both."
+    : "The forecast only narrowly matches the simple rule \"already in moderate drought\".";
+  // The strip of readings under the headline (written twice so it can loop without a gap).
+  const readings = HG.lakes.map((l) => l.name + " <b>" + l.pct + "%</b>")
+    .concat(["Counties in drought <b>" + inDrought + " / 254</b>", "River counties warned <b>" + warned + " / 14</b>", "Canals mapped <b>" + num(canalKm) + " km</b>",
+             "Irrigation districts <b>" + HG.districts.length + "</b>", "Forecast week <b>" + niceDate(HG.week) + "</b>"]);
+  $("ticker").innerHTML = readings.concat(readings).map((r) => "<span>" + r + "</span>").join("");
 
-  // Insured drought losses by year, added up over the Texas river counties.
-  const lossByYear = {};
-  Object.values(SIM.insuredDroughtLoss).forEach((years) => {
-    for (const y in years) lossByYear[y] = (lossByYear[y] || 0) + years[y];
-  });
-  const lossYears = Object.keys(lossByYear).map(Number);
-  const firstYear = 2000, lastYear = Math.max.apply(null, lossYears);
-  const biggest = Math.max.apply(null, Object.values(lossByYear));
-  for (let y = firstYear; y <= lastYear; y++) {
-    const bar = U.el("div", { "data-tip": y + ": " + U.usd(lossByYear[y] || 0), "data-h": 100 * (lossByYear[y] || 0) / biggest });
-    bar.style.setProperty("--d", ((y - firstYear) * 0.03) + "s");
-    $("lossBars").appendChild(bar);
-  }
-  $("lossLastYear").textContent = lastYear;
-  $("lossTotal").textContent = U.usd(Object.values(lossByYear).reduce((a, b) => a + b, 0));
-
-  // Figures from named reports (checked against the reports; see common.js).
-  const P = U.PUBLISHED;
-  $("facts").innerHTML = P.facts.map((f, i) =>
-    '<div class="reveal" style="--d:' + (i * 0.1) + 's"><b>' + f.big + "</b><span>" + f.text +
-    ' <a href="' + f.url + '" target="_blank" rel="noopener">' + f.source + "</a></span></div>").join("");
-
-  /* ---------- Photos: the hero wall and the moving strip ---------- */
-  const riverFips = HG.river.map((c) => c.fips);
-  const wall = riverFips.map((f) => U.photo(f, "drought")).concat(riverFips.map((f) => U.photo(f, "county")));
-  $("mosaic").innerHTML = wall.slice(0, 28).map((src) => '<img src="' + src + '" alt="" loading="eager">').join("");
-  // The strip: river counties first, then a spread of other counties. Listed twice so the loop is seamless.
-  const others = HG.texas.filter((c) => riverFips.indexOf(c.fips) < 0 && c.photos.indexOf("county") >= 0)
-    .filter((c, i) => i % 12 === 0);
-  const strip = HG.river.map((c) => U.countyByFips[c.fips]).concat(others).filter(Boolean);
-  const figure = (c) => '<figure><img src="' + U.photo(c.fips, "county") + '" alt="Aerial image of ' + U.esc(c.name) +
-    ' County" loading="lazy"><figcaption>' + U.esc(c.name) + " County</figcaption></figure>";
-  $("marquee").innerHTML = strip.map(figure).join("") + strip.map(figure).join("");
-
-  /* ---------- 2. Fade-in on scroll, counting numbers, top bar ---------- */
-  function countUp(node) {
-    const to = Number(node.dataset.to), digits = Number(node.dataset.digits || 0);
-    if (reduced || isNaN(to)) { node.textContent = isNaN(to) ? "n/a" : to.toFixed(digits); return; }
-    const start = performance.now(), ms = 1400;
+  /* Numbers count up the first time their beat comes into view. */
+  function countUp(el) {
+    const to = Number(el.dataset.to), digits = Number(el.dataset.digits || 0), t0 = performance.now(), ms = reduced ? 1 : 1500;
     (function tick(now) {
-      const t = Math.min(1, (now - start) / ms), eased = 1 - Math.pow(1 - t, 3);
-      node.textContent = (to * eased).toFixed(digits);
-      if (t < 1) requestAnimationFrame(tick);
-    })(start);
+      const u = Math.min(1, (now - t0) / ms), e = 1 - Math.pow(1 - u, 4);
+      el.textContent = num(to * e, digits);
+      if (u < 1) requestAnimationFrame(tick);
+    })(t0);
   }
   const seen = new IntersectionObserver((entries) => {
-    entries.forEach((entry) => {
-      if (!entry.isIntersecting) return;
-      entry.target.classList.add("in");
-      entry.target.querySelectorAll("[data-count]").forEach(countUp);
-      entry.target.querySelectorAll("[data-h]").forEach((bar) => { bar.style.height = bar.dataset.h + "%"; });
-      seen.unobserve(entry.target);
+    entries.forEach((en) => {
+      if (!en.isIntersecting) return;
+      en.target.classList.add("in");
+      en.target.querySelectorAll("[data-count]").forEach(countUp);
+      seen.unobserve(en.target);
     });
-  }, { threshold: 0.15 });
-  document.querySelectorAll(".reveal").forEach((node) => seen.observe(node));
+  }, { threshold: 0.35 });
+  document.querySelectorAll(".beat").forEach((b) => seen.observe(b));
 
-  window.addEventListener("scroll", () => {
-    const max = document.documentElement.scrollHeight - window.innerHeight;
-    $("progress").style.transform = "scaleX(" + (max > 0 ? window.scrollY / max : 0) + ")";
-    $("nav").classList.toggle("solid", window.scrollY > 40);
-  }, { passive: true });
+  /* ---------- 2. The map ---------- */
+  const canvas = $("map"), ctx = canvas.getContext("2d");
+  const COLOR = { ground: "#05090b", line: "#3d565e", texas: "#e9efec", river: "#38c8f5", red: "#ff4d5e", white: "#ffffff", green: "#2fd9b6",
+                  dm: ["#101b1f", "#5d5a35", "#8b7426", "#a55a1c", "#a8323f", "#7a1029"] };   // drought classes None, D0 .. D4, dimmed for a dark map
 
-  /* ---------- 3. The story map ---------- */
-  const svg = $("storyMap");
-  const NS = "http://www.w3.org/2000/svg";
-  // A simple flat projection that is accurate enough at Texas latitudes:
-  // squeeze longitude by cos(29 degrees) so shapes are not stretched sideways.
-  const K = Math.cos(29 * Math.PI / 180), S = 100;
-  const px = (lon) => +(lon * K * S).toFixed(1), py = (lat) => +(-lat * S).toFixed(1);
-  const ringPath = (ring) => "M" + ring.map((p) => px(p[0]) + " " + py(p[1])).join("L") + "Z";
-  const linePath = (line) => "M" + line.map((p) => px(p[0]) + " " + py(p[1])).join("L");
-  const add = (parent, tag, attrs) => {
-    const node = document.createElementNS(NS, tag);
-    for (const k in attrs) node.setAttribute(k, attrs[k]);
-    parent.appendChild(node);
-    return node;
-  };
-  const layer = (name) => add(svg, "g", { class: "layer l-" + name });
+  // Albers equal-area projection: longitude/latitude to kilometres on a flat sheet.
+  const RAD = Math.PI / 180, P1 = 29.5 * RAD, P2 = 45.5 * RAD, L0 = -96 * RAD, P0 = 37.5 * RAD, EARTH = 6371;
+  const AN = (Math.sin(P1) + Math.sin(P2)) / 2, AC = Math.cos(P1) ** 2 + 2 * AN * Math.sin(P1), R0 = Math.sqrt(AC - 2 * AN * Math.sin(P0)) / AN;
+  function project(lon, lat) {
+    const rho = Math.sqrt(AC - 2 * AN * Math.sin(lat * RAD)) / AN, th = AN * (lon * RAD - L0);
+    return [EARTH * rho * Math.sin(th), -EARTH * (R0 - rho * Math.cos(th))];
+  }
+  const flat = (line) => line.map((p) => project(p[0], p[1]));
+  function pathOf(lines, close) {
+    const path = new Path2D();
+    lines.forEach((l) => { l.forEach((p, i) => (i ? path.lineTo(p[0], p[1]) : path.moveTo(p[0], p[1]))); if (close) path.closePath(); });
+    return path;
+  }
+  const boxOf = (lon0, lat0, lon1, lat1) => { const a = project(lon0, lat0), b = project(lon1, lat1), c = project(lon0, lat1), d = project(lon1, lat0);
+    return [Math.min(a[0], c[0]), Math.min(b[1], c[1], d[1]), Math.max(b[0], d[0]), Math.max(a[1], d[1])]; };
 
-  // Layers, bottom to top.
-  const gCounties = layer("counties"), gDistricts = layer("districts"), gCanals = layer("canals"),
-        gFunded = layer("funded"), gRiver = layer("river"), gLabels = layer("labels");
-
-  const countyNodes = HG.texas.map((c) => {
-    const node = add(gCounties, "path", { class: "county", d: c.rings.map(ringPath).join("") });
-    return { c, node };
+  // Shapes, built once.
+  const states = pathOf(HG.base.states.map(flat));
+  const texas = pathOf(HG.base.texasEdge.map(flat), true);
+  const counties = COLOR.dm.map((_, cls) => pathOf([].concat.apply([], HG.texas.filter((c) => (c.dm || 0) === cls).map((c) => c.rings.map(flat))), true));
+  const otherRivers = pathOf(HG.rivers.filter((r) => r.name !== "Rio Grande").map((r) => flat(r.line)));
+  // The Rio Grande, piece by piece, with each piece's length so dots can travel along it.
+  const river = HG.rivers.filter((r) => r.name === "Rio Grande").map((r) => {
+    const pts = flat(r.line), at = [0];
+    for (let i = 1; i < pts.length; i++) at.push(at[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+    return { pts, at, km: at[at.length - 1], path: pathOf([pts]) };
   });
-  HG.districts.forEach((d) => add(gDistricts, "path", { class: "district", d: d.rings.map(ringPath).join("") }));
-  // One path per canal level (5 paths instead of 7,000) keeps scrolling smooth.
-  const canalNodes = {};
-  HG.levels.forEach((level) => {
-    const d = U.canals.filter((c) => c.level === level).map((c) => linePath(c.line)).join("");
-    canalNodes[level] = add(gCanals, "path", { class: "canal", d });
-  });
-  add(gFunded, "path", { class: "funded", d: plan.funded.map((c) => linePath(c.line)).join("") });
-  const riverNodes = HG.riverLine.map((line) => add(gRiver, "path", { class: "riverLine", d: linePath(line), pathLength: 1 }));
-  HG.river.forEach((c) => { add(gLabels, "text", { class: "label", x: px(c.lon), y: py(c.lat) }).textContent = c.name; });
-
-  // Bounding boxes to zoom to: all of Texas, the river counties, and the Valley.
-  function boxOf(fipsList) {
-    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-    HG.texas.forEach((c) => {
-      if (fipsList && fipsList.indexOf(c.fips) < 0) return;
-      c.rings.forEach((ring) => ring.forEach((p) => {
-        const x = px(p[0]), y = py(p[1]);
-        if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
-      }));
-    });
-    return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+  const riverKm = river.reduce((s, r) => s + r.km, 0);
+  // Canals in 30 groups from west to east, so they can be drawn (and later sealed) in a sweep.
+  const GROUPS = 30;
+  const sorted = HG.canals.map((c) => flat(c[10])).sort((a, b) => a[0][0] - b[0][0]);
+  const canalGroups = [];
+  for (let g = 0; g < GROUPS; g++) {
+    const lines = sorted.slice(Math.floor(sorted.length * g / GROUPS), Math.floor(sorted.length * (g + 1) / GROUPS));
+    canalGroups.push({ lines, path: pathOf(lines) });
   }
-  const BOXES = { texas: boxOf(null), reach: boxOf(riverFips), valley: boxOf(["48061", "48215", "48489"]) };
+  const lakes = HG.lakes.map((l) => ({ name: l.name, pct: l.pct, xy: project(l.lon, l.lat) }));
 
-  // Turn a box into an SVG viewBox that leaves room for the story card on the right.
-  function viewFor(box) {
-    const W = svg.clientWidth || window.innerWidth, H = svg.clientHeight || window.innerHeight;
-    const wide = W > 900;
-    const availW = W * (wide ? 0.56 : 0.9), availH = H * (wide ? 0.74 : 0.5);
-    const scale = Math.min(availW / box.w, availH / box.h);                 // screen pixels per map unit
-    const vw = W / scale, vh = H / scale;
-    const cx = box.x + box.w / 2, cy = box.y + box.h / 2;
-    const centreX = wide ? 0.31 : 0.5, centreY = wide ? 0.54 : 0.36;        // where on screen the box is centred
-    return [cx - vw * centreX, cy - vh * centreY, vw, vh];
-  }
-
-  let view = null, tween = 0;
-  function applyView(v) {
-    view = v;
-    svg.setAttribute("viewBox", v.map((n) => n.toFixed(1)).join(" "));
-    // The river and labels are sized in map units, so resize them to stay the same on screen.
-    const unit = v[2] / (svg.clientWidth || window.innerWidth);              // map units per screen pixel
-    riverNodes.forEach((n) => { n.style.strokeWidth = (3.2 * unit).toFixed(2); });
-    gLabels.style.fontSize = (11 * unit).toFixed(2) + "px";
-    gLabels.style.strokeWidth = (3 * unit).toFixed(2) + "px";
-  }
-  function zoomTo(name) {
-    const target = viewFor(BOXES[name]);
-    cancelAnimationFrame(tween);
-    if (!view || reduced) { applyView(target); return; }
-    const from = view.slice(), start = performance.now(), ms = 1300;
-    (function tick(now) {
-      const t = Math.min(1, (now - start) / ms);
-      const e = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;   // ease in and out
-      applyView(from.map((a, i) => a + (target[i] - a) * e));
-      if (t < 1) tween = requestAnimationFrame(tick);
-    })(start);
-  }
-
-  const key = (color, text, line) => '<span><i class="' + (line ? "lineKey" : "") + '" style="background:' + color + '"></i>' + text + "</span>";
-  const DM_LEGEND = U.DM_TEXT.map((text, i) => key(U.DM_COLOR[i], text)).join("");
-  const TIER_LEGEND = ["Low", "Watch", "Warning"].map((t) => key(U.TIER_COLOR[t], t + (t === "Warning" ? " (25% or more)" : ""))).join("");
-  const LEVEL_LEGEND = HG.levels.map((l) => key(U.LEVEL_COLOR[l], l, true)).join("");
-
-  // What the map shows at each story card.
-  const STEPS = [
-    { zoom: "texas", show: ["counties"], fill: "dm", label: "Drought this week", legend: DM_LEGEND },
-    { zoom: "reach", show: ["counties", "river"], fill: "dm", label: "The Rio Grande in Texas", legend: DM_LEGEND + key("#38c8f5", "Rio Grande", true) },
-    { zoom: "reach", show: ["counties", "river", "labels"], fill: "forecast", label: "Six-month drought forecast", legend: TIER_LEGEND },
-    { zoom: "valley", show: ["counties", "river", "districts", "canals"], fill: "dark", canals: "plain", label: "Lower Rio Grande Valley: districts and canals", legend: key("#9fc4e6", "Canal", true) + key("#bfe4ff", "District boundary", true) },
-    { zoom: "valley", show: ["counties", "river", "canals"], fill: "dark", canals: "levels", label: "Canals by priority", legend: LEVEL_LEGEND },
-    { zoom: "valley", show: ["counties", "river", "canals", "funded"], fill: "dark", canals: "levels", label: "The $100,000 plan", legend: key("#5ef2ff", "Sealed under this budget", true) },
+  // Where the camera looks at each beat: a box in longitude and latitude.
+  const CAMERA = [
+    boxOf(-110.5, 25.2, -92.5, 38.6),     // 0 the whole river, Colorado to the Gulf
+    boxOf(-108.4, 25.4, -96.2, 34.4),     // 1 the reservoirs
+    boxOf(-107.2, 25.4, -93.2, 36.8),     // 2 Texas and its drought
+    boxOf(-98.62, 25.82, -97.12, 26.72),  // 3 the canals of the Lower Valley
+    boxOf(-98.95, 25.7, -96.95, 26.9),    // 4 the same, a step back
+    boxOf(-98.5, 25.86, -97.2, 26.66),    // 5 the canals being sealed
   ];
-  function setStep(i) {
-    const step = STEPS[i];
-    ["counties", "river", "districts", "canals", "funded", "labels"].forEach((name) =>
-      svg.classList.toggle("show-" + name, step.show.indexOf(name) >= 0));
-    countyNodes.forEach(({ c, node }) => {
-      let fill = "#15272d";
-      if (step.fill === "dm") fill = c.dm == null ? "#15272d" : U.DM_COLOR[c.dm];
-      if (step.fill === "forecast" && U.riverByFips[c.fips]) fill = U.TIER_COLOR[U.riverByFips[c.fips].tier];
-      node.style.fill = fill;
-    });
-    HG.levels.forEach((level) => { canalNodes[level].style.stroke = step.canals === "levels" ? U.LEVEL_COLOR[level] : "#9fc4e6"; });
-    // The river "draws itself" the first time it appears.
-    riverNodes.forEach((n) => { n.style.strokeDasharray = 1; n.style.transition = reduced ? "none" : "stroke-dashoffset 2.6s ease"; n.style.strokeDashoffset = step.show.indexOf("river") >= 0 ? 0 : 1; });
-    $("stageLabel").textContent = step.label;
-    $("stageLegend").innerHTML = step.legend;
-    zoomTo(step.zoom);
+
+  let W = 0, H = 0, dpr = 1, beat = 0, clock = 0, last = 0;
+  const cam = { x: 0, y: 0, k: 1 };
+  function resize() { W = innerWidth; H = innerHeight; dpr = Math.min(devicePixelRatio || 1, 1.5); canvas.width = W * dpr; canvas.height = H * dpr; }
+  addEventListener("resize", resize); resize();
+
+  const smooth = (v, a, b) => { const u = Math.max(0, Math.min(1, (v - a) / (b - a))); return u * u * (3 - 2 * u); };
+  /* Fit a box into the part of the screen the text leaves free (text sits left on even beats, right on odd). */
+  function fit(box, side) {
+    const wide = W > 760, free = wide ? 0.56 : 1, w = W * free, h = H * (wide ? 0.8 : 0.5);
+    const k = Math.min(w / (box[2] - box[0]), h / (box[3] - box[1])) * 0.92;
+    const cx = wide ? (side > 0 ? W * (1 - free / 2) - W * 0.02 : W * free / 2 + W * 0.02) : W / 2, cy = wide ? H / 2 : H * 0.32;
+    return { k, x: (box[0] + box[2]) / 2 - (cx - W / 2) / k, y: (box[1] + box[3]) / 2 - (cy - H / 2) / k };
+  }
+  const SIDE = [1, 1, -1, 1, -1, 1];      // +1 = map on the right (text on the left)
+
+  /* Scroll position as a beat number: 0 at the top of the hero, 5 at the last beat. */
+  const beats = Array.from(document.querySelectorAll(".beat"));
+  function readScroll() {
+    const mid = scrollY + innerHeight / 2;
+    let b = 0;
+    beats.forEach((el, i) => { const top = el.offsetTop, c = top + el.offsetHeight / 2; if (mid >= c) b = i; });
+    const here = beats[b], next = beats[b + 1];
+    if (next) { const c0 = here.offsetTop + here.offsetHeight / 2, c1 = next.offsetTop + next.offsetHeight / 2; b += Math.max(0, Math.min(1, (mid - c0) / (c1 - c0))); }
+    beat = b;
+    const doc = document.documentElement; $("gaugeFill").style.height = Math.min(100, 100 * scrollY / (doc.scrollHeight - innerHeight)) + "%";
+  }
+  addEventListener("scroll", readScroll, { passive: true }); readScroll();
+  addEventListener("pointermove", (e) => { document.body.style.setProperty("--mx", e.clientX + "px"); document.body.style.setProperty("--my", e.clientY + "px"); }, { passive: true });
+
+  /* ---------- Moving dots ---------- */
+  const flow = [];                         // blue dots on the river: { piece, s (km along it) }
+  for (let i = 0; i < 150; i++) { const r = river[Math.floor(Math.random() * river.length)]; flow.push({ r, s: Math.random() * r.km }); }
+  function along(r, s) {
+    let i = 1; while (i < r.at.length - 1 && r.at[i] < s) i++;
+    const u = (s - r.at[i - 1]) / ((r.at[i] - r.at[i - 1]) || 1), a = r.pts[i - 1], b = r.pts[i];
+    return [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u];
+  }
+  let leaks = [];                          // red dots off unsealed canals: { x, y, dx, dy, life }
+  function spawnLeak(firstUnsealed, lastDrawn) {
+    if (lastDrawn <= firstUnsealed) return;
+    const g = canalGroups[firstUnsealed + Math.floor(Math.random() * (lastDrawn - firstUnsealed))];
+    const line = g.lines[Math.floor(Math.random() * g.lines.length)], p = line[Math.floor(Math.random() * line.length)], a = Math.random() * 6.283;
+    leaks.push({ x: p[0], y: p[1], dx: Math.cos(a), dy: Math.sin(a), life: 1 });
   }
 
-  let current = -1;
-  const steps = Array.prototype.slice.call(document.querySelectorAll(".story .step"));
-  const stepWatcher = new IntersectionObserver((entries) => {
-    entries.forEach((entry) => {
-      if (!entry.isIntersecting) return;
-      const i = Number(entry.target.dataset.step);
-      steps.forEach((s) => s.classList.toggle("active", s === entry.target));
-      if (i !== current) { current = i; setStep(i); }
-    });
-  }, { rootMargin: "-45% 0px -45% 0px" });   // a card counts as "current" when it crosses the middle of the screen
-  steps.forEach((s) => stepWatcher.observe(s));
+  /* ---------- One frame ---------- */
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000 || 0); last = now; clock += dt;
+    // Camera: glide between the two beats we are between, holding still near each one.
+    const i = Math.min(CAMERA.length - 2, Math.floor(beat)), u = smooth(beat - i, 0.2, 0.8);
+    const a = fit(CAMERA[i], SIDE[i]), b = fit(CAMERA[i + 1], SIDE[i + 1]);
+    const target = { k: a.k * Math.pow(b.k / a.k, u), x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) * u };
+    const ease = reduced ? 1 : Math.min(1, dt * 5);                  // a little lag, so the camera feels weighted
+    cam.k += (target.k - cam.k) * ease; cam.x += (target.x - cam.x) * ease; cam.y += (target.y - cam.y) * ease;
+    if (!last || cam.k === 1) Object.assign(cam, target);
 
-  setStep(0); current = 0; steps[0].classList.add("active");
-  window.addEventListener("resize", () => { view = null; zoomTo(STEPS[Math.max(0, current)].zoom); });
+    // How strongly each layer shows, from the scroll position.
+    const intro = reduced ? 1 : smooth(clock, 0.3, 3.2);              // the river draws itself when the page opens
+    const drought = smooth(beat, 1.35, 1.95) * (1 - 0.8 * smooth(beat, 2.45, 2.95));
+    const sweep = smooth(beat, 1.3, 2.0);
+    const lakeShow = smooth(beat, 0.45, 0.9) * (1 - smooth(beat, 2.4, 2.8));
+    const canalsDrawn = Math.round(GROUPS * smooth(beat, 2.5, 3.25));
+    const canalsSealed = Math.round(GROUPS * smooth(beat, 4.35, 4.95));
+    const zoomed = smooth(beat, 2.4, 3);
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.globalAlpha = 1; ctx.fillStyle = COLOR.ground; ctx.fillRect(0, 0, W, H);
+    ctx.setTransform(dpr * cam.k, 0, 0, dpr * cam.k, dpr * (W / 2 - cam.x * cam.k), dpr * (H / 2 - cam.y * cam.k));
+    const px = 1 / cam.k;                                             // one screen pixel, in map kilometres
+    ctx.lineJoin = ctx.lineCap = "round";
+
+    // Drought colours, revealed in a sweep from west to east.
+    if (drought > 0.01) {
+      const tb = CAMERA[2];
+      ctx.save(); ctx.beginPath(); ctx.rect(tb[0] - 200, tb[1] - 200, (tb[2] - tb[0] + 400) * sweep, tb[3] - tb[1] + 400); ctx.clip();
+      counties.forEach((path, cls) => { ctx.globalAlpha = drought * 0.9; ctx.fillStyle = COLOR.dm[cls]; ctx.fill(path, "evenodd"); });
+      ctx.restore();
+    }
+    ctx.globalAlpha = 0.5 * (1 - 0.6 * zoomed); ctx.strokeStyle = COLOR.line; ctx.lineWidth = 0.8 * px; ctx.stroke(states);
+    ctx.globalAlpha = 0.7; ctx.strokeStyle = COLOR.texas; ctx.lineWidth = 1.1 * px; ctx.stroke(texas);
+    ctx.globalAlpha = 0.28; ctx.strokeStyle = COLOR.river; ctx.lineWidth = 0.9 * px; ctx.stroke(otherRivers);
+
+    // The Rio Grande: a soft glow under a bright line. It draws itself once, from the source down.
+    let before = 0;
+    river.forEach((r) => {
+      const from = before / riverKm, to = (before + r.km) / riverKm; before += r.km;
+      const part = Math.max(0, Math.min(1, (intro - from) / (to - from)));
+      if (part <= 0) return;
+      ctx.setLineDash([r.km * part, r.km * 2]);
+      ctx.globalAlpha = 0.22; ctx.strokeStyle = COLOR.river; ctx.lineWidth = 9 * px; ctx.stroke(r.path);
+      ctx.globalAlpha = 1; ctx.lineWidth = 2.2 * px; ctx.stroke(r.path);
+      ctx.setLineDash([]);
+    });
+
+    // Canals: red where unsealed, white where sealed.
+    for (let g = 0; g < canalsDrawn; g++) {
+      const sealed = g < canalsSealed;
+      // The green glow is only drawn on the few groups just sealed: it is costly, and the eye is there anyway.
+      if (sealed && g >= canalsSealed - 3) { ctx.globalAlpha = 0.3; ctx.strokeStyle = COLOR.green; ctx.lineWidth = 6 * px; ctx.stroke(canalGroups[g].path); }
+      ctx.globalAlpha = sealed ? 1 : 0.85; ctx.strokeStyle = sealed ? COLOR.white : COLOR.red; ctx.lineWidth = (sealed ? 1.3 : 1.1) * px; ctx.stroke(canalGroups[g].path);
+    }
+
+    if (!reduced) {
+      // Water moving down the river. The dots keep a steady speed on screen at every zoom.
+      ctx.fillStyle = COLOR.white;
+      flow.forEach((d) => {
+        d.s += dt * 70 * px; if (d.s > d.r.km) d.s = 0;
+        const p = along(d.r, d.s);
+        ctx.globalAlpha = 0.9 * intro; ctx.beginPath(); ctx.arc(p[0], p[1], 1.5 * px, 0, 7); ctx.fill();
+      });
+      // Water leaking out of canals that are drawn but not yet sealed.
+      if (canalsDrawn > canalsSealed) for (let n = 0; n < 4; n++) if (leaks.length < 320 && Math.random() < dt * 60) spawnLeak(canalsSealed, canalsDrawn);
+      ctx.fillStyle = COLOR.red;
+      leaks.forEach((d) => {
+        d.life -= dt * 0.8; const far = (1 - d.life) * 12 * px;
+        ctx.globalAlpha = Math.max(0, d.life); ctx.beginPath(); ctx.arc(d.x + d.dx * far, d.y + d.dy * far, 1.6 * px, 0, 7); ctx.fill();
+      });
+      leaks = leaks.filter((d) => d.life > 0);
+    }
+
+    // Reservoirs: a ring that fills to how full each one is, with its reading beside it.
+    if (lakeShow > 0.01) {
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const fill = smooth(beat, 0.6, 1.0);
+      lakes.forEach((l) => {
+        const x = (l.xy[0] - cam.x) * cam.k + W / 2, y = (l.xy[1] - cam.y) * cam.k + H / 2;
+        ctx.globalAlpha = lakeShow; ctx.lineWidth = 5; ctx.strokeStyle = "rgba(255,255,255,.18)"; ctx.beginPath(); ctx.arc(x, y, 17, 0, 7); ctx.stroke();
+        ctx.strokeStyle = l.pct < 25 ? COLOR.red : COLOR.river; ctx.beginPath(); ctx.arc(x, y, 17, -Math.PI / 2, -Math.PI / 2 + 2 * Math.PI * (l.pct / 100) * fill); ctx.stroke();
+        ctx.font = "500 12px 'IBM Plex Mono', monospace"; ctx.textBaseline = "middle"; ctx.fillStyle = "#f2f5f1";
+        ctx.fillText(l.name.toUpperCase() + "  " + (l.pct * fill).toFixed(1) + "%", x + 28, y);
+      });
+    }
+
+    // The readout in the top bar: where the camera is looking.
+    if (Math.round(clock * 10) % 2 === 0) {
+      // Undo the map projection to get the longitude and latitude at the centre of the view.
+      const yy = cam.y + EARTH * R0, th = Math.atan2(cam.x, yy), rho = Math.hypot(cam.x, yy) / EARTH;
+      const lat = Math.asin((AC - (rho * AN) ** 2) / (2 * AN)) / RAD, lon = (L0 + th / AN) / RAD;
+      $("coords").textContent = Math.abs(lat).toFixed(2) + "°N  " + Math.abs(lon).toFixed(2) + "°W";
+    }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
 })();

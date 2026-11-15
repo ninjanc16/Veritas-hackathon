@@ -59,15 +59,30 @@
        Longitude and latitude are turned into kilometres east and south of the district's
        centre. A district is small, so this simple flattening is accurate enough to draw. */
     function build(d) {
-      let lon0 = 0, lat0 = 0, n = 0;
-      d.rings.forEach((r) => r.forEach((p) => { lon0 += p[0]; lat0 += p[1]; n++; }));
-      lon0 /= n; lat0 /= n;
-      const kx = 111.32 * Math.cos(lat0 * Math.PI / 180), ky = 110.57;
-      const flat = (line) => line.map((p) => [(p[0] - lon0) * kx, -(p[1] - lat0) * ky]);
-      const rings = d.rings.map(flat);
+      // Flatten each district about its own centre.
+      const flatPart = (part) => {
+        let lon0 = 0, lat0 = 0, n = 0;
+        part.rings.forEach((r) => r.forEach((p) => { lon0 += p[0]; lat0 += p[1]; n++; }));
+        lon0 /= n; lat0 /= n;
+        const kx = 111.32 * Math.cos(lat0 * Math.PI / 180), ky = 110.57;
+        const flat = (line) => line.map((p) => [(p[0] - lon0) * kx, -(p[1] - lat0) * ky]);
+        const rings = part.rings.map(flat); let half = 0;
+        rings.forEach((r) => r.forEach((p) => { half = Math.max(half, Math.abs(p[0]), Math.abs(p[1])); }));
+        return { rings, half, canals: part.canals.map((c) => ({ pts: flat(c.line), funded: c.funded, ranked: c.ranked, level: c.level, weight: c.km * (c.rate || 0) })) };
+      };
+      const parts = d.parts.slice().sort((a, b) => (b.km || 0) - (a.km || 0)).map(flatPart);
+      // One district keeps its real shape and size. Several districts are laid out in a grid,
+      // each one scaled to fill its own cell, so small districts stay readable (not to scale).
+      const many = parts.length > 1, cols = Math.ceil(Math.sqrt(parts.length * 0.8));
+      const rings = [], canals = [];
+      parts.forEach((part, k) => {
+        const f = many ? 0.44 / part.half : 1, ox = many ? k % cols : 0, oy = many ? Math.floor(k / cols) : 0;
+        const move = (line) => line.map((q) => [q[0] * f + ox, q[1] * f + oy]);
+        part.rings.forEach((r) => rings.push(move(r)));
+        part.canals.forEach((c) => canals.push(Object.assign(c, { pts: move(c.pts) })));
+      });
       const box = [1e9, 1e9, -1e9, -1e9];
       rings.forEach((r) => r.forEach((p) => { box[0] = Math.min(box[0], p[0]); box[1] = Math.min(box[1], p[1]); box[2] = Math.max(box[2], p[0]); box[3] = Math.max(box[3], p[1]); }));
-      const canals = d.canals.map((c) => ({ pts: flat(c.line), funded: c.funded, ranked: c.ranked, level: c.level, weight: c.km * (c.rate || 0) }));
       // Tile the district with squares ("fields"). Each gets a fixed random number from 0 to 1;
       // a field is dry in a week when the share of water that arrived is below its number.
       const inside = (x, y) => {
@@ -77,11 +92,11 @@
         }
         return hit;
       };
-      let step = Math.sqrt((box[2] - box[0]) * (box[3] - box[1]) / 700), fields = [];
+      let step = Math.sqrt((box[2] - box[0]) * (box[3] - box[1]) / (many ? 1500 : 700)), fields = [];
       for (let tries = 0; tries < 4; tries++) {
         fields = [];
         for (let y = box[1] + step / 2; y < box[3]; y += step) for (let x = box[0] + step / 2; x < box[2]; x += step) if (inside(x, y)) fields.push({ x, y });
-        if (fields.length >= 180 && fields.length <= 520) break;
+        if (fields.length >= 180 && fields.length <= (many ? 900 : 520)) break;
         step *= Math.sqrt(fields.length / 330) || 0.7;
       }
       let seed = 12345;                                             // a fixed seed: the same squares every time
@@ -225,7 +240,8 @@
       if (!data || !panels.length) return;
       const i = index(), w = data.weeks[i], narrow = panels[0].narrow, tone = C[data.tone] || C.watch;
       // Header: which future this is (left) and the week and reservoir (right).
-      text(data.caseName, 14, narrow ? 64 : 70, narrow ? 19 : 24, tone, { weight: 700 });
+      if (!narrow) text(data.caseName, 14, 70, 24, tone, { weight: 700 });
+      if (!narrow && data.parts.length > 1) text(data.parts.length + " districts, each drawn to fill its own cell", 14, 96, 13.5, C.muted);
       text(w.date.slice(0, 4), W - 14, narrow ? 64 : 70, narrow ? 24 : 34, C.head, { weight: 700, align: "right" });
       text("reservoirs " + w.pct.toFixed(0) + "% full", narrow ? 14 : W - 14, narrow ? 86 : 96, 13.5, w.pct < data.fullAt ? C.warning : C.muted, { align: narrow ? "left" : "right" });
       panels.forEach((p, k) => drawPanel(p, k, w, i));
@@ -260,7 +276,7 @@
     requestAnimationFrame(frame);
 
     return {
-      /* next: { rings, canals: [{ line, km, rate, level, ranked, funded }], weeks: [{ date, pct, demand, left, right, sumL, sumR }],
+      /* next: { parts: [{ rings, km, canals: [{ line, km, rate, level, ranked, funded }] }], weeks: [{ date, pct, demand, left, right, sumL, sumR }],
                  caseName, caseNote, tone, system, fullAt, cut, leftName, rightName, leftNote, rightNote } */
       load(next) { data = next; shape = build(next); at = 0; split = 0; zoom = 1; dots[0] = []; dots[1] = []; playing = false; layout(); opt.onTick(0, false); },
       play() { if (!data) return; if (at >= data.weeks.length - 1) at = 0; playing = true; opt.onTick(index(), true); },   // tell the page at once, so the button reads Pause

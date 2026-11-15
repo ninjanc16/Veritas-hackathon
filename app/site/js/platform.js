@@ -34,7 +34,7 @@
     { key: "wet", label: "A wet autumn", note: "storage gains 10 points next October", shock: { year: 1, month: 10, points: 10 } },
   ];
 
-  const state = { scope: null, step: "risk", mapMode: "now", budget: null, severity: null, simStep: 2, simCase: "likely",
+  const state = { scope: null, step: "risk", mapMode: "now", budget: null, severity: null, simStep: 2, simCase: "likely", simSel: null,
                   overrides: {}, county: null, canal: null, live: null, shocks: {} };
 
   /* ---------- Scope helpers ---------- */
@@ -151,7 +151,11 @@
     stage: $("stage"), canvas: $("map"), tip: $("tip"), coords: $("coords"), bar: $("bar"),
     hud: { phase: $("phase"), line1: $("hud1"), line2: $("hud2") },
     onCanal: (c) => { state.canal = c.id; if (state.step === "sim") state.step = "risk"; refresh(false); },
-    onDistrict: (i) => setScope(i),
+    onDistrict: (i) => {
+      // In the state view's simulation list, a click on the map ticks or unticks a district.
+      if (state.step === "sim" && !district() && state.simStep === 1 && GROUPABLE.indexOf(i) >= 0) { simMembers(); state.simSel.has(i) ? state.simSel.delete(i) : state.simSel.add(i); renderSimResult(); simChrome(); }
+      else setScope(i);
+    },
     onCounty: (fips) => { state.county = fips; state.canal = null; state.step = "risk"; refresh(false); },
     tipHtml(hit) {
       if (hit.canal) {
@@ -347,10 +351,19 @@
   ];
 
   /* What the engine needs for the current scope: its weekly record, its canals and the money at stake. */
-  function simScope(d) {
-    if (d === undefined) d = district();
-    const system = d && usesElephantButte(d) ? "Elephant Butte" : "Amistad-Falcon";
-    const members = d ? [d] : HG.districts.filter((x) => !usesElephantButte(x));
+  /* Where sealing can be simulated: districts with at least one canal that has a seepage rate. */
+  const APPLICABLE = HG.districts.map((d, i) => U.canals.some((c) => c.district === i && c.rank != null));
+  /* Districts the state view can run TOGETHER: they must share one reservoir system (Amistad-Falcon). */
+  const GROUPABLE = HG.districts.map((d, i) => i).filter((i) => APPLICABLE[i] && !usesElephantButte(HG.districts[i]));
+  /* The districts being simulated: the open district, or the ones ticked in the state view (all by default). */
+  function simMembers() {
+    if (district()) return [district()];
+    if (!state.simSel) state.simSel = new Set(GROUPABLE);
+    return GROUPABLE.filter((i) => state.simSel.has(i)).map((i) => HG.districts[i]);
+  }
+  function simScope(list) {
+    const members = list || simMembers();
+    const system = members.length && usesElephantButte(members[0]) ? "Elephant Butte" : "Amistad-Falcon";
     const fips = Array.from(new Set([].concat.apply([], members.map((x) => x.fips))));
     const ids = new Set(members.map((x) => HG.districts.indexOf(x)));
     const canals = U.canals.filter((c) => ids.has(c.district) && c.rank != null);
@@ -375,7 +388,7 @@
     const pNow = members.reduce((s, x) => s + pOf(x) * x.canalKm, 0) / (kmHere || 1);
     return { weeks, canals: canals.slice().sort((a, b) => a.rank - b.rank), canalsUnranked: canals,
              demandAf: U.PUBLISHED.valleyIrrigationAf * share, revenueAtStake: U.PUBLISHED.worstCaseRevenue * share,
-             share, system, pNow, outsideValley: members.some((x) => !x.fips.some((f) => SIM.valley.indexOf(f) >= 0)), members: members.length };
+             share, system, pNow, ids: Array.from(ids), outsideValley: members.some((x) => !x.fips.some((f) => SIM.valley.indexOf(f) >= 0)), members: members.length };
   }
   /* The frozen model's hit rates on 2020 to 2025, used to decide how often a simulated warning is right. */
   function hitRates() {
@@ -388,17 +401,22 @@
        2 Scenario   pick a future: best, average or worst of the 300, or the real 2020 to 2025 record
        3 Simulation watch that district twice, side by side */
   const CASES = [
-    { key: "best", name: "Best case", tone: "low", note: "9 in 10 of the 300 futures are harsher than this one" },
-    { key: "likely", name: "Average case", tone: "watch", note: "the middle one of the 300 futures" },
-    { key: "worst", name: "Worst case", tone: "warning", note: "9 in 10 of the 300 futures are milder than this one" },
-    { key: "check", name: "The real record", tone: "accent", note: "2020 to 2025 as it happened: years the forecast model never saw" },
+    { key: "best", short: "Best", name: "Best case", tone: "low", note: "9 in 10 of the 300 futures are harsher than this one" },
+    { key: "likely", short: "Average", name: "Average case", tone: "watch", note: "the middle one of the 300 futures" },
+    { key: "worst", short: "Worst", name: "Worst case", tone: "warning", note: "9 in 10 of the 300 futures are milder than this one" },
+    { key: "check", short: "2020 to 2025", name: "The real record", tone: "accent", note: "2020 to 2025 as it happened: years the forecast model never saw" },
   ];
   const caseOf = (key) => CASES.find((c) => c.key === key);
   function renderSim() {
     const d = district(), p = params();
+    if (d && !APPLICABLE[state.scope]) {                       // nothing to seal here, so nothing to simulate
+      $("view").innerHTML = "<h2>Simulation</h2><div class=\"sub\">" + U.esc(d.name) + '</div><p class="rec inspect"><b>Not applicable here.</b> None of this district\'s mapped canals has a published seepage rate (they are drains, or sit on soil with no rate), so sealing cannot be costed or simulated.</p>' +
+        '<div class="rowBtns"><button class="btn" data-act="state">Choose other districts &rarr;</button></div>';
+      return;
+    }
     $("view").innerHTML =
-      "<h2>" + (d ? "Simulation" : "Simulation: choose a district") + "</h2>" +
-      '<div class="sub">' + U.esc(scopeName()) + " · do nothing against sealing when the forecast warns</div>" +
+      "<h2>Simulation</h2>" +
+      '<div class="sub">' + (d ? U.esc(d.name) : simMembers().length + " of " + GROUPABLE.length + " districts together") + " · do nothing against sealing when the forecast warns</div>" +
       '<div id="simLead"></div>' +
       '<div class="controls"><div class="field"><label for="simBudget">Sealing budget, each application <output id="simBudgetOut"></output></label><input id="simBudget" type="range" min="0" max="' + maxBudget() + '" step="' + budgetStep() + '" value="' + state.budget + '"></div><div id="shockRow"></div></div>' +
       '<div id="simResult"></div>' +
@@ -410,16 +428,19 @@
   }
   /* The chips and the prompt drawn over the stage on the Simulation step. */
   function simChrome() {
-    const d = district(), n = state.simStep;
-    $("simSteps").innerHTML = [[1, "District"], [2, "Scenario"], [3, "Simulation"]].map(([k, name]) =>
-      '<button data-sim="' + k + '" class="' + (k === n ? "on" : "") + '"' + (k > 1 && !d ? " disabled" : "") + "><b>" + k + "</b>" + name + "</button>").join("");
-    $("simPrompt").innerHTML = n === 1 ? "<b>Choose a district</b><span>On the map or in the table. " + HG.districts.length + " districts.</span>"
-      : n === 2 ? "<b>" + U.esc(d.name) + "</b><span>Choose a scenario</span>" : "";
+    const n = state.simStep, ok = simMembers().length > 0 && (!district() || APPLICABLE[state.scope]);
+    $("simSteps").innerHTML = [[1, district() ? "District" : "Districts"], [2, "Scenario"], [3, "Simulation"]].map(([k, name]) =>
+      '<button data-sim="' + k + '" class="' + (k === n ? "on" : "") + '"' + (k > 1 && !ok ? " disabled" : "") + "><b>" + k + "</b>" + name + "</button>").join("");
+    $("simPrompt").innerHTML = n === 1 ? "<b>Choose districts</b><span>Tick them in the table, or click them on the map.</span>"
+      : n === 2 ? "<b>" + U.esc(district() ? district().name : simMembers().length + " districts together") + "</b><span>Choose a scenario</span>" : "";
+    // On the last step, one row of buttons switches scenario without going back.
+    $("simCases").innerHTML = CASES.map((c) => '<button class="sbtn ' + (c.key === state.simCase ? "on" : "") + '" data-case="' + c.key + '">' + c.short + "</button>").join("");
   }
+  $("simCases").addEventListener("click", (e) => { const b = e.target.closest("[data-case]"); if (b) { state.simCase = b.dataset.case; refresh(false); } });
   $("simSteps").addEventListener("click", (e) => {
     const b = e.target.closest("button"); if (!b || b.disabled) return;
     const k = Number(b.dataset.sim);
-    if (k === 1) { if (district()) setScope(STATE, true); return; }
+    if (k === 1 && district()) { setScope(STATE, true); return; }
     state.simStep = k; refresh(k === 2);
   });
   $("simCards").addEventListener("click", (e) => {
@@ -460,8 +481,9 @@
     $("simSeek").max = twinWeeks.length - 1;
     const funded = new Set(plan.funded.map((c) => c.id));
     twin.load({
-      rings: district().rings,
-      canals: U.canals.filter((c) => c.district === state.scope).map((c) => ({ line: c.line, km: c.km, rate: c.rate, level: c.level, ranked: c.rank != null, funded: funded.has(c.id) })),
+      // One part per district. With several districts, each is drawn in its own cell (not to scale).
+      parts: scope.ids.map((id) => ({ rings: HG.districts[id].rings, km: HG.districts[id].canalKm,
+        canals: U.canals.filter((c) => c.district === id).map((c) => ({ line: c.line, km: c.km, rate: c.rate, level: c.level, ranked: c.rank != null, funded: funded.has(c.id) })) })),
       weeks: twinWeeks, caseName: which.name, caseNote: note, tone: which.tone, system: scope.system, fullAt: P.fullAt, cut: P.cut,
       sealedWord: U.theme() === "dark" ? "white" : "black", leftName: "Do nothing", rightName: "Act on the forecast", leftNote: "no canal work", rightNote: "seals when the forecast warns",
     });
@@ -498,22 +520,31 @@
     const key = JSON.stringify([over, state.live && state.live.systems, on.map((s) => s.key)]);
     if (key !== tableKey) {
       const median = (list) => list.slice().sort((a, b) => a - b)[Math.floor(list.length / 2)];
-      tableCache = HG.districts.map((d, i) => {
-        const scope = simScope(d), res = reservoirFor(d);
+      tableCache = HG.districts.map((d, i) => ({ d, i })).filter((r) => APPLICABLE[r.i]).map(({ d, i }) => {
+        const scope = simScope([d]), res = reservoirFor(d);
         const budget = scope.canals.reduce((s, c) => s + c.usd, 0) + 1;
         const r = E.fromToday(scope, [{ trigger: "never" }, { trigger: "forecast" }], Object.assign({}, over, { budget }), {
           startDate: TODAY, pctNow: res.pct == null ? 50 : res.pct, pNow: scope.pNow, years: 5, draws: 100, seed: 11, cutoffYear: 2020,
           recall: hit.recall, falseAlarm: hit.falseAlarm, shocks: on.filter((x) => x.shock).map((x) => x.shock), secondDryYear: on.some((x) => x.secondDryYear) });
-        return { d, i, loss: r.policies[0].summary.loss.mid, saved: median(r.policies[1].draws.map((t, k) => r.policies[0].draws[k].cost - t.cost)) };
+        return { d, i, alone: usesElephantButte(d), loss: r.policies[0].summary.loss.mid, saved: median(r.policies[1].draws.map((t, k) => r.policies[0].draws[k].cost - t.cost)) };
       }).sort((a, b) => b.saved - a.saved);
       tableKey = key;
     }
-    return "<h3>Five-year result by district, middle future</h3><div class=\"scroll\"><table class=\"t\"><tr><th>District</th><th class=\"r\">Canals</th><th class=\"r\">Do nothing loses</th><th class=\"r\">Acting saves</th></tr>" +
-      tableCache.map((r) => '<tr class="go" data-act="district" data-i="' + r.i + '"><td>' + U.esc(r.d.name) + ' <span class="muted">' + r.d.counties.join(", ") + '</span></td><td class="r">' + U.num(r.d.canalKm) + ' km</td><td class="r">' + money(r.loss) + '</td><td class="r save">' + money(r.saved) + "</td></tr>").join("") +
-      '</table></div><p class="fn">Middle of 100 futures per district, every rankable canal funded. Select a row to watch that district.</p>';
+    const n = simMembers().length, skipped = HG.districts.length - tableCache.length;
+    return '<div class="rowBtns"><button class="btn" data-act="simRun"' + (n ? "" : " disabled") + ">Run the simulation for " + (n === GROUPABLE.length ? "all " + n : n) + (n === 1 ? " district" : " districts") + ' &rarr;</button>' +
+      '<button class="btn ghost small" data-act="simAll">All</button><button class="btn ghost small" data-act="simNone">None</button></div>' +
+      "<div class=\"scroll\" style=\"max-height:330px\"><table class=\"t\"><tr><th></th><th>District</th><th class=\"r\">Canals</th><th class=\"r\">Do nothing loses</th><th class=\"r\">Acting saves</th></tr>" +
+      tableCache.map((r) => r.alone
+        ? '<tr class="go" data-act="district" data-i="' + r.i + '"><td>&rarr;</td><td>' + U.esc(r.d.name) + ' <span class="muted">runs alone (Elephant Butte)</span></td><td class="r">' + U.num(r.d.canalKm) + ' km</td><td class="r">' + money(r.loss) + '</td><td class="r save">' + money(r.saved) + "</td></tr>"
+        : '<tr class="go" data-act="simPick" data-i="' + r.i + '"><td><input type="checkbox" tabindex="-1"' + (state.simSel.has(r.i) ? " checked" : "") + "></td><td>" + U.esc(r.d.name) + ' <span class="muted">' + r.d.counties.join(", ") + '</span></td><td class="r">' + U.num(r.d.canalKm) + ' km</td><td class="r">' + money(r.loss) + '</td><td class="r save">' + money(r.saved) + "</td></tr>").join("") +
+      '</table></div><p class="fn">Each row: that district alone, middle of 100 futures. Ticked districts are simulated together below.' + (skipped ? " " + skipped + " districts are left out: none of their canals has a seepage rate." : "") + "</p>";
   }
 
   function renderSimResult() {
+    if (!simMembers().length) {                                // nothing ticked: show the list only
+      $("simLead").innerHTML = districtTable(state.overrides, hitRates(), []); $("simResult").innerHTML = ""; $("simNotes").innerHTML = ""; $("shockRow").innerHTML = "";
+      return;
+    }
     const scope = simScope(), over = Object.assign({}, state.overrides, { budget: state.budget }), P = E.makeParams(over);
     $("simBudgetOut").textContent = U.usd(state.budget);
     const plan = E.fundCanals(scope.canals, state.budget, P), planN = U.canalNumbers(plan.funded, P);
@@ -521,7 +552,7 @@
     const who = scope.members > 1 ? scope.members + " districts on the " + scope.system + " system" : "this district";
     let html = "<h3>What acting means each year you act</h3>" + triple(planN);
     const d = district(), which = caseOf(state.simCase), hit = hitRates(), on = SHOCKS.filter((s) => state.shocks[s.key]);
-    const showCheck = d && state.simStep === 3 && state.simCase === "check";
+    const showCheck = state.simStep === 3 && state.simCase === "check";
     // The real 2020 to 2025 record, with the forecasts the frozen model made for those years.
     const test = Object.assign({}, scope, { weeks: scope.weeks.filter((w) => w.year >= 2020 && w.year <= 2025) });
     const runs = POLICIES.map((pol) => E.simulate(test, { trigger: pol.trigger }, over));
@@ -568,7 +599,7 @@
       simFacts = {
         start: U.niceDate(TODAY), system: scope.system, pct: res.pct, live: res.live, pNow: scope.pNow, library: run.libraryYears, dry: run.dryYears,
         recall: hit.recall, falseAlarm: hit.falseAlarm, shocks: on.map((x) => x.label + " (" + x.note + ")"), keptYear, wrongWarning: plan.spent * P.applications,
-        cases: d ? CASES.filter((c) => c.key !== "check").map((c) => c.name + ": " + run.cases[c.key].sourceYears.join(", ")) : [], share: scope.share,
+        cases: state.simStep > 1 ? CASES.filter((c) => c.key !== "check").map((c) => c.name + ": " + run.cases[c.key].sourceYears.join(", ")) : [], share: scope.share,
         outsideValley: scope.outsideValley, who, P,
       };
       html = "<h3>All 300 futures, to " + endYear + "</h3>" + heroHtml +
@@ -608,7 +639,7 @@
     }
 
     // What the stage shows, and the few lines that lead the panel, for the current sub-step.
-    if (!d) lead = districtTable(over, hit, on);
+    if (state.simStep === 1) lead = districtTable(over, hit, on);
     else if (state.simStep === 2) {
       buildCards(run, runs, endYear);
       lead = "";
@@ -702,7 +733,7 @@
   function refresh(refit) {
     document.querySelectorAll("#stepper button").forEach((b) => b.classList.toggle("on", b.dataset.step === state.step));
     const sim = state.step === "sim";
-    if (sim) state.simStep = district() ? Math.max(2, state.simStep) : 1;      // the state view can only pick a district
+    if (sim && !district() && !simMembers().length) state.simStep = 1;         // nothing ticked yet: stay on the list
     $("stage").classList.toggle("flow", sim);                                   // chips and prompt over the stage
     $("stage").classList.toggle("cards", sim && state.simStep === 2);           // the scenario cards
     $("stage").classList.toggle("sim", sim && state.simStep === 3);             // the twin picture instead of the map
@@ -716,7 +747,8 @@
     if (refit && !map.isScanning()) map.fitScope();
   }
   function setScope(scope, noScan) {
-    state.scope = scope; state.county = null; state.canal = null; state.severity = null; state.simStep = 2;
+    state.scope = scope; state.county = null; state.canal = null; state.severity = null;
+    state.simStep = scope === STATE ? 1 : 3; state.simCase = "likely";       // a district goes straight to the average case
     state.budget = defaultBudget();
     $("onboard").classList.remove("open");
     let seen = false;
@@ -740,6 +772,10 @@
     if (act === "closeCanal") { state.canal = null; refresh(false); }
     if (act === "csv") downloadCsv();
     if (act === "resetAssume") { state.overrides = {}; renderSim(); }
+    if (act === "simPick") { const i = Number(t.dataset.i); simMembers(); state.simSel.has(i) ? state.simSel.delete(i) : state.simSel.add(i); renderSimResult(); simChrome(); }
+    if (act === "simAll") { state.simSel = new Set(GROUPABLE); renderSimResult(); simChrome(); }
+    if (act === "simNone") { state.simSel = new Set(); renderSimResult(); simChrome(); }
+    if (act === "simRun") { state.simCase = "likely"; state.simStep = 3; refresh(false); }
     if (act === "fullBudget") { state.budget = maxBudget(); renderSim(); }
     if (act === "canal") { state.canal = Number(t.dataset.id); map.flyToCanal(state.canal); refresh(false); }
   });
