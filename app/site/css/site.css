@@ -508,11 +508,21 @@ ul.plain { margin: 0; padding-left: 18px; font-size: .84rem; } ul.plain li { mar
   .scopeBtn { max-width: 34vw; }
   .kpis { grid-template-columns: 1fr; }
   #simCards { width: 52%; top: 108px; gap: 6px; } .stage.cards #simPrompt { left: 50%; width: 92%; } .scase p, .scase svg, .scase .go { display: none; } .scase .big { font-size: 20px; } .scase h3 { font-size: 15px; }
-  #simCases { left: 14px; right: auto; top: 50px; } #simCases .sbtn { padding: 3px 7px; font-size: 12.5px; }
-  #simSteps button { padding: 5px 8px; font-size: 13.5px; } #simSkip { display: none; } #simPrompt { top: 54px; } #simPrompt span { display: none; }
+  #simSteps button { padding: 5px 8px; font-size: 13.5px; } #simPrompt { top: 54px; } #simPrompt span { display: none; }
   #legend { display: none; }
   .futures, .triple { grid-template-columns: 1fr; } .stats dd { font-size: 1.3rem; } .stats.three dd { font-size: 1.05rem; }
   .nav nav a:not(.btn) { display: none; }
   .live span { display: none; }
+}
+/* The simulation picture on a phone (js/twin.js stacks its two panels when the stage is under
+     620px wide). The scenario buttons go on a row of their own under the back button, with the
+     long label shortened so all four fit; the picture's date and reservoir bar start below that
+     row (twin.js). The date beside the play bar is left out, because the picture shows the month,
+     and that makes room for "Skip to the end". */
+@media (max-width: 620px) {
+  #simCases { left: 14px; right: 14px; top: 50px; } #simCases .sbtn { padding: 3px 7px; font-size: 12.5px; white-space: nowrap; }
+  #simCases .wide { display: none; }
+  #simBar .sbtn { white-space: nowrap; } #simSkip { padding: 6px 10px; font-size: 14px; }
+  #simDate { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { .cine, #vig { transition: none; } }

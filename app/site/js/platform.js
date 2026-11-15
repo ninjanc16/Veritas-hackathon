@@ -394,6 +394,7 @@
     { key: "check", short: "What really happened, 2020-25", name: "The real record", tone: "accent", note: "2020 to 2025 as it happened: years the forecast model never saw" },
   ];
   const caseOf = (key) => CASES.find((c) => c.key === key);
+  const LONG_PART = "What really happened, ";             // left out of that button on a phone, where it reads "2020-25" (css/site.css)
   function renderSim() {
     const d = district(), p = params();
     if (d && !APPLICABLE[state.scope]) {                       // nothing to seal here, so nothing to simulate
@@ -419,7 +420,7 @@
     $("simSteps").innerHTML = n === 3 ? '<button data-sim="1">&larr; ' + (district() ? "Other districts" : "Back to the district list") + "</button>" : "";
     $("simPrompt").innerHTML = n === 1 ? "<b>Tap a district on the map</b><span>or tick several in the list, then run the simulation</span>" : "";
     // One row of buttons switches scenario.
-    $("simCases").innerHTML = CASES.map((c) => '<button class="sbtn ' + (c.key === state.simCase ? "on" : "") + '" data-case="' + c.key + '" title="' + c.note + '">' + c.short + "</button>").join("");
+    $("simCases").innerHTML = CASES.map((c) => '<button class="sbtn ' + (c.key === state.simCase ? "on" : "") + '" data-case="' + c.key + '" title="' + c.note + '">' + c.short.replace(LONG_PART, '<span class="wide">' + LONG_PART + "</span>") + "</button>").join("");
   }
   $("simCases").addEventListener("click", (e) => { const b = e.target.closest("[data-case]"); if (b) { state.simCase = b.dataset.case; refresh(false); } });
   /* Back to the list. From a district's own view, the state list opens with only that district ticked. */

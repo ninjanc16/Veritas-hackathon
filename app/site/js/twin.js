@@ -80,8 +80,9 @@
       W = r.width; H = r.height; dpr = Math.min(window.devicePixelRatio || 1, 2);
       canvas.width = W * dpr; canvas.height = H * dpr;
       if (!shape) return;
+      // top: on a phone the scenario buttons have a row of their own (css/site.css), so the date, the reservoir bar and the panels start lower.
       // bottom: room for the play bar and, above it, the caption the page puts on the picture (two lines on a phone).
-      const narrow = W < 620, top = narrow ? 104 : 118, bottom = narrow ? 100 : 82, gap = 12, side = 14;
+      const narrow = W < 620, top = narrow ? 126 : 118, bottom = narrow ? 96 : 82, gap = 12, side = 14;
       const boxes = narrow
         ? [0, 1].map((k) => ({ x: side, y: top + k * ((H - top - bottom + gap) / 2), w: W - 2 * side, h: (H - top - bottom - gap) / 2 }))
         : [0, 1].map((k) => ({ x: side + k * ((W - 2 * side + gap) / 2), y: top, w: (W - 2 * side - gap) / 2, h: H - top - bottom }));
@@ -155,7 +156,7 @@
         right ? ["Water saved from leaking", gallons(sum.saved), C.low] : ["Water leaked out of canals", gallons(sum.leak), C.warning],
       ];
       if (p.narrow) {
-        const x = 10 + p.mw + 14, step = (p.h - p.head) / 3;
+        const x = 10 + p.mw + 14, step = (p.h - p.head - 6) / 3;     // 6px kept clear above the panel's bottom edge
         rows.forEach((r, n) => { const y = p.head + step * n + step / 2; text(n ? r[0] : "Water reaching farms", x, y - 9, 11.5, C.muted); text(r[1], x, y + 9, n === 1 ? 17 : 14, r[2], { weight: 600 }); });
       } else {
         const y0 = p.h - p.foot + 22;
@@ -171,7 +172,7 @@
     function draw(dt) {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.globalAlpha = 1; ctx.clearRect(0, 0, W, H);
       if (!data || !panels.length) return;
-      const i = index(), w = data.weeks[i], narrow = panels[0].narrow, y = narrow ? 76 : 80;
+      const i = index(), w = data.weeks[i], narrow = panels[0].narrow, y = narrow ? 100 : 80;
       // The driver, at the top: the date, and how full the reservoir is, as a bar with the
       // level marked below which farms start getting less than they asked for.
       const month = new Date(w.date + "T12:00:00").toLocaleDateString("en-US", { month: "short", year: "numeric" });
@@ -185,13 +186,20 @@
       panels.forEach((p, k) => drawPanel(p, k, w, dt));
       // The result, once the run has finished.
       if (i >= data.weeks.length - 1) {
-        const diff = (w.sumL.loss + w.sumL.spend) - (w.sumR.loss + w.sumR.spend), small = Math.abs(diff) < 1000;
-        const label = small ? "No measurable difference" : "Sealing early " + (diff > 0 ? "saves " : "costs ") + money(Math.abs(diff)) + (diff > 0 ? "" : " more");
-        const size = narrow ? 15 : 20, color = small ? C.muted : diff > 0 ? C.low : C.warning;
+        // Said as what happened in this one run, not as a saving: the crops kept, and the sealant
+        // bill too when it was the larger of the two. The page's caption on the picture says the
+        // run is illustrative; it is shown whenever the picture is.
+        const kept = w.sumL.loss - w.sumR.loss, spend = w.sumR.spend - w.sumL.spend, small = kept < 1000;
+        const label = small ? "In this illustrative run, sealing early kept no measurable amount of crops."
+          : "In this illustrative run, sealing early kept " + money(kept) + " of crops" + (spend > kept ? " and cost " + money(spend) + " in sealant." : ".");
+        const color = small ? C.muted : spend > kept ? C.warning : C.low;
+        let size = narrow ? 15 : 20;
         ctx.font = "600 " + size + "px " + C.serif;
-        const tw = ctx.measureText(label).width + 30, ty = narrow ? panels[1].y - 6 : panels[0].y + 62;
+        while (ctx.measureText(label).width + 30 > W - 16 && size > 10) { size -= 1; ctx.font = "600 " + size + "px " + C.serif; }   // keep the line inside the picture
+        // On a phone the line takes the place of the second panel's title, so it covers no figure.
+        const tw = ctx.measureText(label).width + 30, ty = narrow ? panels[1].y + 20 : panels[0].y + 62, half = narrow ? 15 : 20;
         ctx.globalAlpha = 1; ctx.fillStyle = C.map; ctx.strokeStyle = color; ctx.lineWidth = 2;
-        ctx.fillRect(W / 2 - tw / 2, ty - 20, tw, 40); ctx.strokeRect(W / 2 - tw / 2, ty - 20, tw, 40);
+        ctx.fillRect(W / 2 - tw / 2, ty - half, tw, 2 * half); ctx.strokeRect(W / 2 - tw / 2, ty - half, tw, 2 * half);
         text(label, W / 2, ty, size, color, { weight: 600, align: "center", serif: true });
       }
     }

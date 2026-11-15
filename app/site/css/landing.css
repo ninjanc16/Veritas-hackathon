@@ -47,6 +47,11 @@ main { position: relative; z-index: 5; }
 .say { font-size: clamp(1.05rem, 1.5vw, 1.3rem); line-height: 1.45; margin: 22px 0 14px; max-width: 30em; text-shadow: 0 1px 14px var(--ground), 0 0 30px var(--ground); }
 .say b { color: var(--blue); font-weight: 600; }
 .src { font-size: .66rem; color: var(--muted); margin: 0; letter-spacing: .07em; }
+/* A text block that sits over the canal drawing gets a near-solid backing, so the lines do not
+   run through its words. The one exception to "no boxes": a caveat nobody can read is not one. */
+.beat .copy.backed { background: color-mix(in srgb, var(--ground) 92%, transparent); padding: 4px 24px 22px; border-radius: 4px; }
+/* A caveat about a headline figure: body-size text in the ink colour, marked at the side. */
+.caveat { font: 400 1rem/1.5 var(--sans); color: var(--ink); margin: 0 0 12px; padding-left: 12px; border-left: 3px solid var(--watch); }
 /* Each beat's copy slides up and sharpens when it comes into view. */
 .beat .copy > * { opacity: 0; transform: translateY(34px); filter: blur(6px); transition: opacity .9s cubic-bezier(.2, .7, .2, 1), transform .9s cubic-bezier(.2, .7, .2, 1), filter .9s; }
 .beat.in .copy > * { opacity: 1; transform: none; filter: none; }
