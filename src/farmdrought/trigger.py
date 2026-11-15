@@ -108,6 +108,40 @@ def run_trigger(scored):
     }
 
 
+def annual_rows(scored, month=3, history=None):
+    """The rows the annual trigger test scores, and the class frequency for each of them.
+
+    Returns (rows, frequency, in_history): the Rio Grande rows issued in `month` (exactly one
+    per county per year, or an AssertionError), the class-conditional frequency of each row
+    (NaN where there is none), and whether each row's county and date are in the history.
+    See run_trigger_annual for `history`.
+    """
+    focus = scored[scored["river"] == FOCUS_RIVER]
+    rows = focus[focus["date"].dt.month == month]
+    county_years = int(pd.MultiIndex.from_arrays([rows["fips"], rows["date"].dt.year]).nunique())
+    assert len(rows) == county_years, f"{len(rows)} rows but {county_years} county-years"
+
+    past = focus if history is None else history[history["river"] == FOCUS_RIVER]
+    keys = pd.MultiIndex.from_arrays([past["fips"], past["date"]])
+    assert keys.is_unique, "the history holds a county and date twice"
+    frequency_all = pd.Series(class_frequency_by_past(past, "y_season", SEASON_WEEKS).to_numpy(), index=keys)
+    row_keys = pd.MultiIndex.from_arrays([rows["fips"], rows["date"]])
+    return rows, frequency_all.reindex(row_keys).to_numpy(), row_keys.isin(keys)
+
+
+def annual_fires(rows, frequency, ratio):
+    """Which rows each rule fires on at one cost ratio, for the rules round 3 compares.
+
+    The forecast and the class frequency fire when their probability is at least the cost ratio
+    (never below 0.02, as in value_sweep). The two class rules fire the same whatever the ratio.
+    A missing frequency (no past rows) compares as False, so that rule does not fire there.
+    """
+    return {"forecast": (rows["p_season"] >= max(ratio, 0.02)).to_numpy(),
+            "d1_rule": (rows["cls"] >= D2_CLASS - 1).to_numpy(),
+            "d0_rule": (rows["cls"] >= D2_CLASS - 2).to_numpy(),
+            "class_frequency": frequency >= max(ratio, 0.02)}
+
+
 def run_trigger_annual(scored, month=3, history=None):
     """ADDED in round 3 (ARCHITECTURE.md section 3.2): the trigger test with ONE decision per
     county per year. run_trigger above is not changed and stays the reported table.
@@ -136,19 +170,8 @@ def run_trigger_annual(scored, month=3, history=None):
       class_frequency_rows_absent_from_history the row's county and date are not in `history`
                                                at all (a sign the wrong table was passed)
     """
-    focus = scored[scored["river"] == FOCUS_RIVER]
-    rows = focus[focus["date"].dt.month == month]
-    county_years = int(pd.MultiIndex.from_arrays([rows["fips"], rows["date"].dt.year]).nunique())
-    assert len(rows) == county_years, f"{len(rows)} rows but {county_years} county-years"
-
-    past = focus if history is None else history[history["river"] == FOCUS_RIVER]
-    keys = pd.MultiIndex.from_arrays([past["fips"], past["date"]])
-    assert keys.is_unique, "the history holds a county and date twice"
-    frequency_all = pd.Series(class_frequency_by_past(past, "y_season", SEASON_WEEKS).to_numpy(), index=keys)
-    row_keys = pd.MultiIndex.from_arrays([rows["fips"], rows["date"]])
-    frequency = frequency_all.reindex(row_keys).to_numpy()
-    in_history = row_keys.isin(keys)
-    # A missing frequency (no past rows) compares as False, so the rule does not fire there.
+    rows, frequency, in_history = annual_rows(scored, month, history)
+    county_years = len(rows)
 
     y = rows["y_season"]
     d0 = (rows["cls"] >= D2_CLASS - 2).to_numpy()
@@ -158,7 +181,8 @@ def run_trigger_annual(scored, month=3, history=None):
     ]
     sweep = [{**line,
               "d0_rule": value(y, d0, line["cost_ratio"]),
-              "class_frequency": value(y, frequency >= max(line["cost_ratio"], 0.02), line["cost_ratio"])}
+              "class_frequency": value(y, annual_fires(rows, frequency, line["cost_ratio"])["class_frequency"],
+                                       line["cost_ratio"])}
              for line in value_sweep(rows)]
     at_threshold = next(line for line in sweep if line["cost_ratio"] == SEASON_THRESHOLD)
     return {

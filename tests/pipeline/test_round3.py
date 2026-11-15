@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from farmdrought import export
+from farmdrought import export, round3
 from farmdrought.allocation import model_minus_rule, run_allocation
 from farmdrought.config import (ALERT_WEEKS, COUNTY_RESERVOIR, FROZEN, METRICS, OUTLOOK, PREDICTIONS, SCORE_THROUGH,
                                 SEASON_WEEKS, YEAR_WEEKS)
@@ -853,6 +853,173 @@ def test_allocation_counts_the_years_where_the_choice_could_matter():
     assert k1["label"].startswith("Descriptive only")
     # with k = 5 every county is funded, so no year can matter and there is no mean to give
     assert (k5["n"], k5["years"], k5["model_minus_rule_a_mean"], k5["model_minus_rule_b_mean"]) == (0, [], None, None)
+
+
+# ---------------------------------------------------------------------------------------------
+# round3.py: the scoring script (package F, step 2). Made-up tables only; it is never run here
+# on the real data.
+# ---------------------------------------------------------------------------------------------
+def outlook_rows():
+    """The made-up scored table with the extra columns the 6- and 12-month comparisons read."""
+    table = scored_table()
+    table = table[table["river"] == "Rio Grande"].reset_index(drop=True)
+    dryness = table["mean12"] * 5
+    return table.assign(alarm_season_persistence=table["cls"] >= 3, alarm_season_d1=table["cls"] >= 2,
+                        p_season_usual=0.3, y_weeks=(dryness * 2).clip(upper=52),
+                        weeks_model=dryness * 2 + 3, weeks_same_as_now=np.where(table["cls"] >= 3, 52.0, 0.0),
+                        weeks_last_year=dryness, weeks_usual=20.0)
+
+
+def test_round3_writes_one_file_per_item_and_refuses_to_replace_any(tmp_path):
+    # Arrange
+    folder = tmp_path / "round3"
+    first = {"intervals_v1.json": {"added": True, "n": 1}, "allocation.json": {"added": True, "n": 2}}
+
+    # Act
+    written = round3.write_items(first, folder=folder)
+
+    # Assert: both files exist with their content
+    assert sorted(path.name for path in written) == ["allocation.json", "intervals_v1.json"]
+    assert json.loads((folder / "allocation.json").read_text()) == {"added": True, "n": 2}
+    # a second run that would replace one of them writes NOTHING, not even the new file
+    with pytest.raises(RuntimeError, match="already scored.*allocation.json.*--force"):
+        round3.write_items({"allocation.json": {"n": 99}, "calibration.json": {"n": 3}}, folder=folder)
+    assert json.loads((folder / "allocation.json").read_text())["n"] == 2
+    assert not (folder / "calibration.json").exists()
+    # with force it is replaced
+    round3.write_items({"allocation.json": {"n": 99}}, folder=folder, force=True)
+    assert json.loads((folder / "allocation.json").read_text())["n"] == 99
+
+
+def test_round3_main_refuses_before_scoring_when_a_result_exists(tmp_path, monkeypatch):
+    # Arrange: one result file is already there; scoring must never start
+    (tmp_path / "trigger_annual.json").write_text("{}")
+    monkeypatch.setattr(round3, "ROUND3", tmp_path)
+    monkeypatch.setattr(round3, "run_alert", lambda **kwargs: pytest.fail("round3 went on to score"))
+
+    # Act / Assert
+    with pytest.raises(RuntimeError, match="already scored.*trigger_annual.json"):
+        round3.main()
+    assert (tmp_path / "trigger_annual.json").read_text() == "{}"
+
+
+def test_round3_comparison_holds_every_year_and_agrees_with_the_totals():
+    # Arrange: yearly costs for a system and a rule over six years; the system is lower in four
+    years = range(2010, 2016)
+    system = pd.Series([10, 12, 8, 20, 5, 9], index=years, dtype=float)
+    rule = pd.Series([14, 11, 12, 25, 4, 15], index=years, dtype=float)
+
+    # Act
+    entry = round3.compare("system cost minus rule", system, rule, None, True, "made-up rows", b_name="D1 now")
+
+    # Assert
+    assert entry["per_year"] == {"years": list(years), "system": list(system), "D1 now": list(rule)}
+    assert (entry["system_total"], entry["D1 now_total"], entry["difference"]) == (64.0, 81.0, -17.0)
+    assert entry["block1"]["n_years"] == 6 and entry["block1"]["block"] == 1 and entry["block2"]["block"] == 2
+    assert entry["block1"]["years_a_better"] == 4 and entry["block1"]["draws"] == 10000
+    assert entry["block1"]["direction"] in ("system better", "D1 now better", "not separated")
+    assert "caveat" in entry["block1"] and entry["year_unit"].startswith("the calendar year of the issue date")
+    # an odd number of years has no block-2 interval, and says why
+    odd = round3.compare("x", system[:5], rule[:5], None, True, "made-up rows")
+    assert odd["block2"] == "not computed: block 2 needs an even number of years"
+
+
+def test_round3_direction_words_follow_the_interval():
+    # Arrange: the system is 5 lower every year, then 5 higher every year
+    years = range(2010, 2016)
+    rule = pd.Series([14, 11, 12, 25, 4, 15], index=years, dtype=float)
+
+    # Act
+    win = round3.compare("x", rule - 5, rule, None, True, "made-up rows")
+    loss = round3.compare("x", rule + 5, rule, None, True, "made-up rows")
+    share_win = round3.compare("x", rule + 5, rule, None, False, "made-up rows", a_name="forecast", b_name="D1")
+
+    # Assert
+    assert win["block1"]["direction"] == "system better" and loss["block1"]["direction"] == "rule better"
+    assert share_win["block1"]["direction"] == "forecast better"
+
+
+def test_round3_outlook_comparisons_add_up_to_the_whole_table_scores():
+    # Arrange
+    rows = outlook_rows()
+
+    # Act
+    season = {entry["b"]: entry for entry in round3.season_comparisons(rows)}
+    year = {entry["b"]: entry for entry in round3.year_comparisons(rows)}
+
+    # Assert: the yearly costs sum to the cost of the whole table, for the system and for each rule
+    y = rows["y_season"]
+    assert sorted(season) == ["Always warn", "D1 now", "Never warn", "Persistence", "Usual"]
+    assert season["D1 now"]["system_total"] == tally_cost(y, rows["p_season"] >= 0.25)
+    assert season["D1 now"]["D1 now_total"] == tally_cost(y, rows["cls"] >= 2)
+    assert season["Never warn"]["Never warn_total"] == 3 * int(y.sum())
+    assert season["Always warn"]["Always warn_total"] == int((y == 0).sum())
+    assert len(season["D1 now"]["per_year"]["years"]) == 6
+    # the 12-month error is a mean over rows: yearly means weighted by rows give the table's mean
+    assert sorted(year) == ["Last year", "Same as now", "Usual"]
+    assert year["Usual"]["system_mean"] == pytest.approx((rows["weeks_model"] - rows["y_weeks"]).abs().mean())
+    assert year["Usual"]["Usual_mean"] == pytest.approx((rows["weeks_usual"] - rows["y_weeks"]).abs().mean())
+    assert year["Usual"]["per_year"]["rows"] == [31 * 3] * 6
+
+
+def tally_cost(y, alarm):
+    """3 x missed + false alarms, written out here so the test does not lean on the code it checks."""
+    y, alarm = np.asarray(y) == 1, np.asarray(alarm, dtype=bool)
+    return float(3 * (y & ~alarm).sum() + (~y & alarm).sum())
+
+
+def test_round3_trigger_values_by_year_average_to_the_annual_table():
+    # Arrange
+    scored = scored_table()
+    history = scored_table(years=range(2005, 2014))
+
+    # Act
+    item = round3.trigger_item(scored, history)
+    sweep = {line["cost_ratio"]: line for line in item["table"]["value_sweep"]}
+
+    # Assert: three comparisons at each of the six cost ratios, two of them against ADDED rules
+    assert len(item["value_differences"]) == 18
+    assert sum(entry["rule_is_added"] for entry in item["value_differences"]) == 12
+    keys = {"D1 or worse now": "d1_rule", "D0 or worse now": "d0_rule", "Class-conditional frequency": "class_frequency"}
+    for entry in item["value_differences"]:
+        line = sweep[entry["cost_ratio"]]
+        # the mean over decisions of the yearly values is the value in the annual table
+        assert entry["forecast_mean"] == pytest.approx(line["forecast"], abs=5e-5)
+        assert entry[entry["rule"] + "_mean"] == pytest.approx(line[keys[entry["rule"]]], abs=5e-5)
+        assert entry["lower_is_better"] is False and entry["per_year"]["rows"] == [31] * 6
+        assert entry["block1"]["direction"] in ("forecast better", entry["rule"] + " better", "not separated")
+
+
+def test_round3_calibration_item_scores_all_four_probabilities_on_the_same_rows():
+    # Arrange: a made-up history with a chained forecast from 2001, and the "scored" rows from 2005
+    history = forecast_table().rename(columns={"p": "p_chain", "y": "y_season"})
+    scored = history[history["date"].dt.year >= 2005].rename(columns={"p_chain": "p_season"}).assign(p_season_usual=0.4)
+
+    # Act
+    item = round3.calibration_item(history, scored)
+
+    # Assert
+    assert item["rows_scored"] == item["rows_with_all_four_probabilities"] == 6 * 12 * 4
+    assert item["largest_gap_between_chained_and_system_forecast"] == 0.0
+    assert item["coverage"]["years_left_raw"] == [2001, 2002, 2003]
+    assert set(item["brier"]) == {"raw", "calibrated", "usual", "class_frequency"}
+    assert item["brier"]["usual"] == pytest.approx(((0.4 - scored["y_season"]) ** 2).mean())
+    assert item["skill"]["raw_against_usual"] == pytest.approx(1 - item["brier"]["raw"] / item["brier"]["usual"])
+    for entry in item["brier_differences"]:                      # yearly Briers weighted by rows give the pooled Brier
+        assert entry[entry["a"] + "_mean"] == pytest.approx(item["brier"][entry["a"].replace(" ", "_")])
+    assert sum(row["n"] for row in item["reliability"]["raw"]) == item["rows_scored"]
+    assert item["cost_at_threshold"]["raw_total"] == tally_cost(scored["y_season"], scored["p_season"] >= 0.25)
+    assert json.loads(json.dumps(item)) == item
+
+
+def test_round3_header_says_what_the_results_were_computed_against():
+    # Arrange / Act
+    top = round3.header({"frozen": {"manifest_sha256": "abc"}})
+
+    # Assert
+    assert top["added"] is True and top["computed_against_manifest_sha256"] == "abc"
+    assert top["score_through"] == SCORE_THROUGH and "Evaluation round 3" in top["declared_in"]
+    assert (top["draws"], top["seed"]) == (10000, 0) and "git_commit" in top
 
 
 # ---------------------------------------------------------------------------------------------
