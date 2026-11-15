@@ -126,23 +126,39 @@ def test_deployment_files_route_the_live_reading_and_keep_the_site_deployable():
     assert not any(line.startswith("/app") or line.startswith("/api") for line in ignored)
 
 
-def test_site_size_gate_passes_today_and_names_a_file_that_grew():
-    # Arrange: load tools/site_size.py (it is a script, not a package)
-    import importlib.util
-    spec = importlib.util.spec_from_file_location("site_size", REPO_ROOT / "tools" / "site_size.py")
-    gate = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(gate)
+def tracked_site_sizes(gate):
+    """The size gate's own listing of tracked files, or a skip when this is not a git checkout
+    (for example a clean export of the files): the gate lists files with `git ls-files`."""
+    import subprocess
+    try:
+        return gate.tracked_sizes()
+    except (subprocess.CalledProcessError, FileNotFoundError) as error:
+        pytest.skip(f"not a git checkout, so the tracked files cannot be listed ({type(error).__name__})")
+
+
+def test_site_size_gate_passes_on_the_tracked_files_today():
+    # Arrange / Act
+    gate = load_tool("site_size")
+    today = tracked_site_sizes(gate)
+
+    # Assert
+    assert "app/site/data/core.js" in today and gate.problems(today) == []
+
+
+def test_site_size_gate_names_a_file_that_grew():
+    # Arrange: made-up sizes, so this runs with or without git
+    gate = load_tool("site_size")
+    sizes = {"app/site/data/core.js": int(3.3 * gate.MB), "app/site/photos/new.jpg": int(1.2 * gate.MB),
+             "app/site/data/sim.js": int(0.25 * gate.MB)}
 
     # Act
-    today = gate.tracked_sizes()
-    grown = {**today, "app/site/data/core.js": int(3.3 * gate.MB), "app/site/photos/new.jpg": int(1.2 * gate.MB)}
+    found = gate.problems(sizes)
 
-    # Assert: today's files are within their limits; a core.js of 3.3 MB and a 1.2 MB photo are not
-    assert "app/site/data/core.js" in today and gate.problems(today) == []
-    found = gate.problems(grown)
+    # Assert: a core.js of 3.3 MB and a 1.2 MB photo are over their limits; sim.js is not
     assert len(found) == 2 and "core.js is 3.30 MB, over its limit of 3.2 MB" in found[0]
     assert "new.jpg is 1.20 MB, over its limit of 1.0 MB" in found[1]
-    assert any("in all" in line for line in gate.problems({"app/site/a.bin": 0.9 * gate.MB} | {f"app/site/{i}": 0.9 * gate.MB for i in range(60)}))
+    assert gate.problems({"app/site/data/core.js": int(2.9 * gate.MB)}) == []
+    assert any("in all" in line for line in gate.problems({f"app/site/{i}": 0.9 * gate.MB for i in range(60)}))
 
 
 def load_tool(name):
