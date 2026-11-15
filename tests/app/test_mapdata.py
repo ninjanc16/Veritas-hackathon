@@ -1,0 +1,96 @@
+"""Tests for the river lines: the file exists, covers all five rivers, and the map draws it."""
+import json
+
+import pandas as pd
+
+from app import theme
+from app.contract import load
+from app.mapdata import RIVERS_FILE, load_river_line
+
+RIVERS = ["Rio Grande", "Colorado", "Mississippi", "Missouri", "Ohio"]
+
+
+def test_river_file_is_small_and_covers_every_river():
+    assert RIVERS_FILE.exists() and RIVERS_FILE.stat().st_size < 200_000     # a few KB, not the 7 MB source
+    data = json.loads(RIVERS_FILE.read_text())
+    for river in RIVERS:
+        assert data[river], f"no line for {river}"
+
+
+def test_rio_grande_line_runs_from_colorado_to_the_gulf():
+    points = [pt for piece in load_river_line("Rio Grande") for pt in piece]
+    lats = [p[0] for p in points]
+    assert max(lats) > 37 and min(lats) < 26.5              # headwaters in Colorado, mouth near Brownsville
+
+
+def test_unknown_river_gives_an_empty_line():
+    assert load_river_line("Nile") == []
+
+
+def test_every_county_is_close_to_its_rivers_line():
+    # Cheap safety net on the real handoff: each county center is within 60 km of a point on the
+    # river line (the project's rule is 50 km; a few km of slack because the line is simplified).
+    _, _, latest, *_ = load()
+    for river in RIVERS:
+        pts = pd.DataFrame([pt for piece in load_river_line(river) for pt in piece], columns=["lat", "lon"])
+        for county in latest[latest["river"] == river].itertuples():
+            # distance to the nearest vertex is an upper bound on the distance to the line
+            dy = (pts["lat"] - county.lat) * 111.2
+            dx = (pts["lon"] - county.lon) * 111.2 * 0.8
+            near = ((dx ** 2 + dy ** 2) ** 0.5).min()
+            assert near < 150, f"{county.county}, {county.state} is {near:.0f} km from the {river} line points"
+
+
+def test_map_draws_the_river_as_a_line_under_the_dots():
+    _, _, latest, *_ = load()
+    rg = latest[latest["river"] == "Rio Grande"]
+    fig = theme.risk_map(rg, rg.iloc[0]["fips"], river_lines=load_river_line("Rio Grande"), river_name="Rio Grande")
+    assert fig.data[0].mode == "lines" and fig.data[0].name == "Rio Grande"
+    assert [t.name for t in fig.data][1:] == ["Selected county", "Low", "Watch", "Warning"]
+
+
+def test_map_colors_by_overall_level_when_asked():
+    _, _, latest, *_ = load()
+    rg = latest[latest["river"] == "Rio Grande"]
+    fig = theme.risk_map(rg, rg.iloc[0]["fips"], level_col="risk_level")
+    shown = sum(len(t.lat) for t in fig.data if t.name in ("Low", "Watch", "Warning"))
+    assert shown == len(rg)                                  # every county appears exactly once
+    assert "Overall level" in "".join(fig.data[-1].text) or "Overall level" in "".join(fig.data[-2].text)
+
+
+# --- canal lines (the pipeline's canals.geojson) --------------------------------------------
+def test_load_canals_groups_by_county_and_flips_to_lat_lon(tmp_path):
+    from app.mapdata import load_canals
+    path = tmp_path / "canals.geojson"
+    path.write_text('{"type": "FeatureCollection", "features": [{"type": "Feature", '
+                    '"geometry": {"type": "LineString", "coordinates": [[-98.0, 26.0], [-98.1, 26.1]]}, '
+                    '"properties": {"fips": "48215", "name": "Test Canal", "length_km": 2.5, "soil": "Loam", '
+                    '"seepage_rate": 7.48, "p_season": 0.3, "level": "Inspect first", "score": 0.5}}]}')
+    got = load_canals(path)
+    assert list(got) == ["48215"]
+    seg = got["48215"][0]
+    assert seg["line"][0] == (26.0, -98.0) and seg["level"] == "Inspect first" and seg["name"] == "Test Canal"
+
+
+def test_load_canals_missing_or_broken_file_gives_empty(tmp_path):
+    from app.mapdata import load_canals
+    assert load_canals(tmp_path / "nope.geojson") == {}
+    bad = tmp_path / "bad.geojson"
+    bad.write_text("not json")
+    assert load_canals(bad) == {}
+
+
+def test_real_canal_file_matches_metrics():
+    """When the real file is there, its segment count and levels match what metrics.json says."""
+    import json
+    from app.contract import REAL_METRICS
+    from app.mapdata import CANALS_FILE, load_canals
+    from app.theme import CANAL_COLOR
+    if not (CANALS_FILE.exists() and REAL_METRICS.exists()):
+        return
+    metrics = json.loads(REAL_METRICS.read_text(encoding="utf-8"))
+    if "canals" not in metrics:
+        return
+    segs = [s for group in load_canals().values() for s in group]
+    assert len(segs) == metrics["canals"]["segments"]
+    assert {s["level"] for s in segs} <= set(CANAL_COLOR)

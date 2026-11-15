@@ -1,0 +1,580 @@
+{
+  "contract_version": 2,
+  "generated_at": "2026-11-14T19:57:22+00:00",
+  "is_final": false,
+  "focus_river": "Rio Grande",
+  "training_scope": "Rio Grande counties only (DEMO)",
+  "n_rows": 16120,
+  "n_focus_rows": 4836,
+  "n_counties": 40,
+  "n_focus_counties": 12,
+  "horizon_weeks": 4,
+  "train_years": [
+    2000,
+    2014
+  ],
+  "val_years": [
+    2015,
+    2018
+  ],
+  "test_years": [
+    2019,
+    2026
+  ],
+  "latest_week": "2026-10-13",
+  "miss_cost": 3,
+  "policies": [
+    {
+      "name": "Our system",
+      "column": "alarm_system",
+      "cost": 603,
+      "precision": 0.864,
+      "recall": 0.993,
+      "alarms": 3935,
+      "caught": 3401,
+      "missed": 23,
+      "false_alarms": 534,
+      "auc": 0.8
+    },
+    {
+      "name": "Persistence (D2 or worse now)",
+      "column": "alarm_persistence",
+      "cost": 4119,
+      "precision": 0.913,
+      "recall": 0.619,
+      "alarms": 2319,
+      "caught": 2118,
+      "missed": 1306,
+      "false_alarms": 201,
+      "auc": null
+    },
+    {
+      "name": "D1 or worse now",
+      "column": "alarm_d1_now",
+      "cost": 1649,
+      "precision": 0.782,
+      "recall": 0.926,
+      "alarms": 4053,
+      "caught": 3169,
+      "missed": 255,
+      "false_alarms": 884,
+      "auc": null
+    },
+    {
+      "name": "Worsening",
+      "column": "alarm_worsening",
+      "cost": 3771,
+      "precision": 0.862,
+      "recall": 0.669,
+      "alarms": 2655,
+      "caught": 2289,
+      "missed": 1135,
+      "false_alarms": 366,
+      "auc": null
+    },
+    {
+      "name": "Typical for the time of year",
+      "column": "alarm_calendar",
+      "cost": 1412,
+      "precision": 0.708,
+      "recall": 1.0,
+      "alarms": 4836,
+      "caught": 3424,
+      "missed": 0,
+      "false_alarms": 1412,
+      "auc": null
+    }
+  ],
+  "headline": {
+    "system_cost": 603,
+    "persistence_cost": 4119,
+    "pct_cheaper_than_persistence": 85.4,
+    "cheapest_baseline_on_test": "alarm_calendar",
+    "cheapest_baseline_cost": 1412,
+    "honesty_check_pass": true
+  },
+  "onset": {
+    "rows": 1000,
+    "positives": 120,
+    "system_cost": 300,
+    "best_rule": "D1 now",
+    "best_rule_cost": 310,
+    "never_warn_cost": 360,
+    "precision": 0.4,
+    "recall": 0.3,
+    "auc": 0.7
+  },
+  "events": {
+    "n": 20,
+    "warned_within_4_weeks": 9,
+    "median_lead_weeks": 2.0
+  },
+  "cost_sensitivity": [
+    {
+      "miss_cost": 2,
+      "system_cost": 603,
+      "best_baseline_cost": 1412
+    }
+  ],
+  "year_by_year": [
+    {
+      "year": 2019,
+      "positives": 449,
+      "system_cost": 98,
+      "persistence_cost": 858
+    },
+    {
+      "year": 2020,
+      "positives": 442,
+      "system_cost": 79,
+      "persistence_cost": 569
+    },
+    {
+      "year": 2021,
+      "positives": 324,
+      "system_cost": 108,
+      "persistence_cost": 407
+    },
+    {
+      "year": 2022,
+      "positives": 599,
+      "system_cost": 17,
+      "persistence_cost": 486
+    },
+    {
+      "year": 2023,
+      "positives": 418,
+      "system_cost": 93,
+      "persistence_cost": 537
+    },
+    {
+      "year": 2024,
+      "positives": 401,
+      "system_cost": 103,
+      "persistence_cost": 417
+    },
+    {
+      "year": 2025,
+      "positives": 462,
+      "system_cost": 47,
+      "persistence_cost": 471
+    },
+    {
+      "year": 2026,
+      "positives": 329,
+      "system_cost": 58,
+      "persistence_cost": 374
+    }
+  ],
+  "per_river": [
+    {
+      "river": "Colorado",
+      "counties": 7,
+      "system_cost": 272,
+      "persistence_cost": 2440,
+      "best_rule": "D1 now",
+      "best_rule_cost": 769,
+      "pct_cheaper_than_best_rule": 64.6,
+      "own_river_cost": 258,
+      "precision": 0.901,
+      "recall": 0.994,
+      "auc": 0.78
+    },
+    {
+      "river": "Rio Grande",
+      "counties": 12,
+      "system_cost": 603,
+      "persistence_cost": 4119,
+      "best_rule": "D1 now",
+      "best_rule_cost": 1649,
+      "pct_cheaper_than_best_rule": 63.4,
+      "own_river_cost": 603,
+      "precision": 0.864,
+      "recall": 0.993,
+      "auc": 0.78
+    },
+    {
+      "river": "Mississippi",
+      "counties": 7,
+      "system_cost": 431,
+      "persistence_cost": 1401,
+      "best_rule": "D1 now",
+      "best_rule_cost": 1013,
+      "pct_cheaper_than_best_rule": 57.5,
+      "own_river_cost": 409,
+      "precision": 0.634,
+      "recall": 0.986,
+      "auc": 0.78
+    },
+    {
+      "river": "Ohio",
+      "counties": 7,
+      "system_cost": 187,
+      "persistence_cost": 175,
+      "best_rule": "Persistence",
+      "best_rule_cost": 175,
+      "pct_cheaper_than_best_rule": -6.9,
+      "own_river_cost": 177,
+      "precision": 0.24,
+      "recall": 1.0,
+      "auc": 0.78
+    },
+    {
+      "river": "Missouri",
+      "counties": 7,
+      "system_cost": 402,
+      "persistence_cost": 1375,
+      "best_rule": "D1 now",
+      "best_rule_cost": 982,
+      "pct_cheaper_than_best_rule": 59.1,
+      "own_river_cost": 381,
+      "precision": 0.649,
+      "recall": 0.978,
+      "auc": 0.78
+    }
+  ],
+  "season": {
+    "horizon_weeks": 26,
+    "target": "8 or more consecutive weeks at D2 or worse inside the next 26 weeks",
+    "test_years": [
+      2008,
+      2025
+    ],
+    "threshold": 0.25,
+    "focus": {
+      "rows": 2568,
+      "base_rate": 0.509,
+      "precision": 0.691,
+      "recall": 0.995,
+      "auc": 0.8,
+      "system_cost": 600,
+      "persistence_cost": 2123,
+      "d1_rule_cost": 1428,
+      "usual_cost": 1240,
+      "always_warn_cost": 1260,
+      "never_warn_cost": 3924,
+      "pct_cheaper_than_persistence": 71.7,
+      "beats_every_baseline": true,
+      "years_better_than_usual": "10/18"
+    },
+    "per_river": [
+      {
+        "river": "Colorado",
+        "system_cost": 406,
+        "persistence_cost": 1114,
+        "best_rule": "D1 now",
+        "best_rule_cost": 966,
+        "pct_cheaper_than_best_rule": 58.0,
+        "own_river_cost": 385
+      },
+      {
+        "river": "Rio Grande",
+        "system_cost": 600,
+        "persistence_cost": 2123,
+        "best_rule": "D1 now",
+        "best_rule_cost": 1428,
+        "pct_cheaper_than_best_rule": 58.0,
+        "own_river_cost": 600
+      },
+      {
+        "river": "Mississippi",
+        "system_cost": 211,
+        "persistence_cost": 169,
+        "best_rule": "Persistence",
+        "best_rule_cost": 169,
+        "pct_cheaper_than_best_rule": -24.9,
+        "own_river_cost": 200
+      },
+      {
+        "river": "Ohio",
+        "system_cost": 69,
+        "persistence_cost": 10,
+        "best_rule": "Persistence",
+        "best_rule_cost": 10,
+        "pct_cheaper_than_best_rule": -590.0,
+        "own_river_cost": 65
+      },
+      {
+        "river": "Missouri",
+        "system_cost": 228,
+        "persistence_cost": 191,
+        "best_rule": "Persistence",
+        "best_rule_cost": 191,
+        "pct_cheaper_than_best_rule": -19.4,
+        "own_river_cost": 216
+      }
+    ]
+  },
+  "year": {
+    "horizon_weeks": 52,
+    "target": "number of weeks at D2 or worse in the next 52 weeks",
+    "test_years": [
+      2008,
+      2025
+    ],
+    "focus": {
+      "rows": 2568,
+      "mean_weeks": 27.5,
+      "mae_system": 5.5,
+      "mae_same_as_now": 23.8,
+      "mae_last_year": 10.8,
+      "mae_usual": 6.7,
+      "beats_every_baseline": true,
+      "years_better_than_last_year": "9/18",
+      "years_better_than_usual": "11/18"
+    },
+    "per_river": [
+      {
+        "river": "Colorado",
+        "mae_system": 5.3,
+        "best_baseline": "Usual",
+        "mae_best_baseline": 6.5,
+        "mae_own_river": 5.0
+      },
+      {
+        "river": "Rio Grande",
+        "mae_system": 5.5,
+        "best_baseline": "Usual",
+        "mae_best_baseline": 6.7,
+        "mae_own_river": 5.5
+      },
+      {
+        "river": "Mississippi",
+        "mae_system": 3.6,
+        "best_baseline": "Usual",
+        "mae_best_baseline": 2.8,
+        "mae_own_river": 3.4
+      },
+      {
+        "river": "Ohio",
+        "mae_system": 2.6,
+        "best_baseline": "Same as last year",
+        "mae_best_baseline": 0.5,
+        "mae_own_river": 2.5
+      },
+      {
+        "river": "Missouri",
+        "mae_system": 4.0,
+        "best_baseline": "Usual",
+        "mae_best_baseline": 3.5,
+        "mae_own_river": 3.8
+      }
+    ]
+  },
+  "failure_examples": [
+    {
+      "product": "4-week alert",
+      "date": "2019-01-15",
+      "county": "Demo County RI3",
+      "state": "Texas",
+      "what_happened": "DEMO: the system stayed quiet but severe drought arrived within 4 weeks."
+    },
+    {
+      "product": "4-week alert",
+      "date": "2019-02-05",
+      "county": "Demo County RI3",
+      "state": "Texas",
+      "what_happened": "DEMO: the system warned but severe drought did not arrive within 4 weeks."
+    }
+  ],
+  "shuffled_auc_mean": 0.5,
+  "ablations": [
+    {
+      "name": "DEMO: without the Pacific El Nino index",
+      "product": "6-month outlook",
+      "result": "DEMO: no change in cost."
+    }
+  ],
+  "feature_importance": [
+    {
+      "feature": "nb_mean",
+      "importance": 0.4
+    },
+    {
+      "feature": "cls",
+      "importance": 0.3
+    }
+  ],
+  "limits": [
+    "DEMO DATA - these are not real results"
+  ],
+  "map_fields": {
+    "columns": {
+      "risk_level": "DEMO: fake map column",
+      "weeks_low": "DEMO: fake map column",
+      "weeks_high": "DEMO: fake map column",
+      "typical_drought_weeks": "DEMO: fake map column",
+      "longest_drought_weeks": "DEMO: fake map column",
+      "damage_months": "DEMO: fake map column",
+      "damage_usd_per_100_head": "DEMO: fake map column"
+    },
+    "feed_cost_per_head_month": 35.66,
+    "feed_cost_source": "DEMO placeholder, not a real source",
+    "tested": "DEMO DATA - these are not real estimates."
+  },
+  "trigger": {
+    "issue_months": [
+      1,
+      2,
+      3
+    ],
+    "threshold": 0.25,
+    "rows": 120,
+    "drought_seasons": 30,
+    "rules": [
+      {
+        "name": "Our forecast",
+        "fires": 40,
+        "caught": 24,
+        "missed": 6,
+        "false_alarms": 16,
+        "recall": 0.8,
+        "precision": 0.6
+      },
+      {
+        "name": "Our forecast with reservoirs",
+        "fires": 38,
+        "caught": 24,
+        "missed": 6,
+        "false_alarms": 14,
+        "recall": 0.8,
+        "precision": 0.631578947368421
+      },
+      {
+        "name": "D1 or worse now",
+        "fires": 50,
+        "caught": 25,
+        "missed": 5,
+        "false_alarms": 25,
+        "recall": 0.8333333333333334,
+        "precision": 0.5
+      },
+      {
+        "name": "D2 or worse now",
+        "fires": 30,
+        "caught": 18,
+        "missed": 12,
+        "false_alarms": 12,
+        "recall": 0.6,
+        "precision": 0.6
+      },
+      {
+        "name": "Seal every year",
+        "fires": 120,
+        "caught": 30,
+        "missed": 0,
+        "false_alarms": 90,
+        "recall": 1.0,
+        "precision": 0.25
+      }
+    ],
+    "value_sweep": [
+      {
+        "cost_ratio": 0.02,
+        "forecast": 0.48,
+        "forecast_reservoir": 0.475,
+        "d1_rule": 0.477,
+        "persistence": 0.38,
+        "seal_every_year": 0.48
+      },
+      {
+        "cost_ratio": 0.05,
+        "forecast": 0.45,
+        "forecast_reservoir": 0.445,
+        "d1_rule": 0.447,
+        "persistence": 0.35000000000000003,
+        "seal_every_year": 0.45
+      },
+      {
+        "cost_ratio": 0.1,
+        "forecast": 0.4,
+        "forecast_reservoir": 0.395,
+        "d1_rule": 0.397,
+        "persistence": 0.30000000000000004,
+        "seal_every_year": 0.4
+      },
+      {
+        "cost_ratio": 0.25,
+        "forecast": 0.25,
+        "forecast_reservoir": 0.245,
+        "d1_rule": 0.247,
+        "persistence": 0.15000000000000002,
+        "seal_every_year": 0.25
+      },
+      {
+        "cost_ratio": 0.5,
+        "forecast": 0.0,
+        "forecast_reservoir": -0.0050000000000000044,
+        "d1_rule": -0.0030000000000000027,
+        "persistence": -0.09999999999999998,
+        "seal_every_year": 0.0
+      }
+    ],
+    "forecast_beats_d1_rule": true,
+    "reservoir_forecast_beats_d1_rule": false
+  },
+  "reservoir": {
+    "systems": [
+      {
+        "name": "Amistad-Falcon",
+        "counties": 4,
+        "first_date": "2000-01-01",
+        "last_date": "2026-10-13"
+      },
+      {
+        "name": "Elephant Butte",
+        "counties": 4,
+        "first_date": "2000-01-01",
+        "last_date": "2026-10-13"
+      }
+    ],
+    "counties_without_reservoir": 4,
+    "note": "DEMO DATA - counties were matched to reservoirs at random."
+  },
+  "losses": {
+    "source": "DEMO DATA, not the real USDA files",
+    "years": [
+      2000,
+      2025
+    ],
+    "causes_included": [
+      "Drought"
+    ],
+    "total_usd": 1000000,
+    "by_year": [
+      {
+        "year": 2000,
+        "usd": 50000
+      },
+      {
+        "year": 2005,
+        "usd": 300000
+      },
+      {
+        "year": 2010,
+        "usd": 550000
+      },
+      {
+        "year": 2015,
+        "usd": 800000
+      },
+      {
+        "year": 2020,
+        "usd": 1050000
+      },
+      {
+        "year": 2025,
+        "usd": 1300000
+      }
+    ],
+    "by_county": [
+      {
+        "fips": "48215",
+        "county": "Demo County",
+        "state": "Texas",
+        "usd": 400000
+      }
+    ],
+    "note": "DEMO DATA. Insured losses only. Not all drought losses."
+  }
+}
