@@ -52,13 +52,16 @@ def issue_rows(panel):
     return monthly.dropna(subset=FEATURES_SEASON).reset_index(drop=True)
 
 
-def folds(table, label, horizon):
+def folds(table, label, horizon, first_year=OUTLOOK_TEST[0]):
     """Yield (year, train mask, test mask) for each test year.
 
     Training rows are those whose answer window ENDED before January 1 of the test year.
+    first_year : the system starts at 2008. Version 2 (v2.py) starts earlier, only so that it
+                 has past forecasts to judge its candidates on. A year's forecast does not
+                 depend on where the chain started.
     """
     window_end = table["date"] + pd.Timedelta(weeks=horizon)
-    for year in range(OUTLOOK_TEST[0], OUTLOOK_TEST[1] + 1):
+    for year in range(first_year, OUTLOOK_TEST[1] + 1):
         train = table[label].notna() & (window_end < pd.Timestamp(f"{year}-01-01"))
         test = table["date"].dt.year == year
         yield year, train, test
@@ -75,14 +78,14 @@ def predict(model, x):
     return model.predict_proba(x)[:, 1]
 
 
-def chain(table, label, horizon, features, make_model, train_on, predict_on):
+def chain(table, label, horizon, features, make_model, train_on, predict_on, first_year=OUTLOOK_TEST[0]):
     """Forward chaining. Returns one prediction per row (NaN outside the test years).
 
     train_on   : mask of rows the model may learn from (for example Rio Grande rows only)
     predict_on : mask of rows to predict
     """
     out = pd.Series(np.nan, index=table.index)
-    for _, train, test in folds(table, label, horizon):
+    for _, train, test in folds(table, label, horizon, first_year):
         fit_rows = train & train_on
         model = make_model().fit(table.loc[fit_rows, features], table.loc[fit_rows, label])
         rows = test & predict_on
