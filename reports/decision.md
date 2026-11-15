@@ -211,3 +211,10 @@ The round-3 declaration above names five items that had not been done when this 
 - **A weekly prospective log.** Not built. No forecast had been logged, so nothing can be scored from it yet.
 
 Nothing in the reported results depends on any of these. They were declared and not delivered.
+
+## Round 3: two results stated more completely (written Nov 15, 2026, after the results; every number is from the frozen files)
+
+Two results in `reports/frozen/round3/` were reported too briefly. Nothing is rerun or changed here.
+
+- **Budget ranking (`allocation.json`, averaged over k).** The forecast against rule B: +0.020, interval 0.001 to 0.046, 18 years. That interval excludes zero, so by the declared standard the forecast is ahead of rule B on the k-average. Two cautions belong with it: it is one of several comparisons made on the same years (the allocation file alone holds twelve against a named rule: rules A and B at five budgets and on the average), and a percentile interval from 18 years runs narrow. The forecast against rule A: +0.015, interval -0.003 to 0.035, not separated. Against the better of the two rules, picked after both were seen, it is not separated either.
+- **4-week alert against "D1 now" (`intervals_v1.json`).** System cost 1,912 against 2,333, a difference of -421 over 8 years. With single-year blocks the interval is -884 to 11, which includes zero: not separated. With two-year blocks it is -723 to -146, which excludes zero: system better. The two disagree. Both are shown, and neither was declared as the primary one, so this comparison is reported as unsettled rather than as a win.
