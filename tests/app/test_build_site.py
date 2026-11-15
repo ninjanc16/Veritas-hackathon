@@ -81,6 +81,109 @@ def test_scan_base_map_and_frozen_model_are_packed(site):
         assert set(frozen["live"]) == {c["fips"] for c in core["river"]}
 
 
+def test_forecast_effect_is_packed_one_row_per_district(site):
+    core = _read(site, "core.js")
+    metrics = json.loads((REPO_ROOT / "reports" / "metrics.json").read_text())
+    pipeline = metrics["districts"]["forecast_effect"]
+    packed = core["forecastEffect"]
+
+    # the overall row is the pipeline's, in the order [both, only with, only without, correlation, ranked]
+    o = pipeline["overall"]
+    assert packed["overall"] == [o["both_km"], o["only_forecast_km"], o["only_no_forecast_km"], o["rank_correlation"], o["ranked_km"]]
+    assert packed["budgetUsd"] == metrics["districts"]["budget_usd"]
+    # one row per district, in the order of core["districts"]
+    assert len(packed["districts"]) == len(core["districts"])
+    by_name = {r["district"]: r for r in pipeline["districts"]}
+    for district, row in zip(core["districts"], packed["districts"]):
+        assert row is None or row[0] == by_name[district["name"]]["both_km"]
+    # both plans spend the same budget on canals that cost the same per km, so they fund the same length
+    assert abs((o["both_km"] + o["only_forecast_km"]) - metrics["districts"]["sealed_km"]) < 0.2
+    # the long lists stay out of core["plan"], which keeps only the rule, the assumptions and the totals
+    assert "forecast_effect" not in core["plan"] and "districts" not in core["plan"]
+
+
+def test_frozen_results_are_packed_as_a_short_summary(site):
+    core = _read(site, "core.js")
+    frozen = core["frozen"]
+    folder = REPO_ROOT / "reports" / "frozen" / "round3"
+
+    # every comparison is one short list of plain values: [name, diff, lo, hi, lo2, hi2, years, lower is better]
+    rows = [row for group in frozen["groups"] for row in group["rows"]]
+    assert len(rows) >= 20
+    assert all(len(row) == 8 and not any(isinstance(v, (list, dict)) for v in row) for row in rows)
+    # a row is the file's own numbers (to 4 significant figures), for example the 6-month outlook against "D1 now"
+    intervals = json.loads((folder / "intervals_v1.json").read_text())
+    source = next(c for c in intervals["season"] if c["name"] == "6-month system cost minus D1 now")
+    packed = next(row for row in rows if row[0] == source["name"])
+    assert packed[1:4] == [source["block1"]["diff"], source["block1"]["lo"], source["block1"]["hi"]]
+    assert packed[6] == source["block1"]["n_years"] and packed[7] is True
+    # the allocation table: five budgets and the average, with the model minus each rule
+    allocation = json.loads((folder / "allocation.json").read_text())
+    assert [r["k"] for r in frozen["allocation"]["perK"]] == allocation["ks"]
+    average = frozen["allocation"]["average"]
+    assert average["model"] == round(allocation["average_over_k"]["mean"]["model"], 3)
+    assert average["vsB"]["lo"] > 0 and average["vsA"]["lo"] < 0 < average["vsA"]["hi"]
+    # the held-out seepage test, with the sentence as corrected by the second erratum
+    seepage = json.loads((folder / "seepage_calibration.json").read_text())
+    assert frozen["seepage"]["passes"] is seepage["passes"] is False
+    assert frozen["seepage"]["n"] == seepage["held_out"]["n_districts"]
+    assert "does not support the ranking either" in frozen["seepage"]["sentence"]
+    assert {e["file"] for e in frozen["errata"]} == {p.name for p in folder.glob("*errata*.json")}
+    # it is a summary: small, and with no per-year numbers
+    text = json.dumps(frozen, separators=(",", ":"))
+    assert len(text) < 12_000 and "per_year" not in text
+
+
+def test_a_results_file_with_its_own_site_summary_is_included(tmp_path):
+    # Arrange: a made-up later-round file that carries the rows it wants shown
+    from app.build_site import frozen_summary
+    (tmp_path / "holdout_rivers.json").write_text(json.dumps({
+        "what": "A made-up holdout.",
+        "site_summary": [{"name": "Holdout rivers: system cost minus D1 now", "value": -12.0, "lo": -40.0, "hi": 9.0,
+                          "n_years": 7, "verdict": "not separated"}],
+        # a comparison elsewhere in the same file is NOT picked up as well: the file chose what to show
+        "detail": [{"name": "one river", "block1": {"diff": 1.0, "lo": 0.5, "hi": 2.0, "n_years": 7}}]}))
+
+    # Act
+    summary = frozen_summary(tmp_path)
+
+    # Assert: the row is passed on as it is; the files that are not there are simply left out
+    assert summary["extra"] == [{"file": "holdout_rivers", "what": "A made-up holdout.", "rows": [
+        {"name": "Holdout rivers: system cost minus D1 now", "diff": -12.0, "lo": -40.0, "hi": 9.0, "n": 7,
+         "stated": "not separated", "lower": None}]}]
+    assert summary["groups"] == [] and summary["allocation"] is None and summary["seepage"] is None
+    assert frozen_summary(tmp_path / "no-such-folder") is None
+
+
+def test_reconciliation_is_plain_division_of_packed_and_published_figures(site):
+    core = _read(site, "core.js")
+    recon = core["reconcile"]
+    costs = json.loads((REPO_ROOT / "app" / "reference" / "costs.json").read_text())
+
+    # the programme benchmark: capital cost / (acre-feet a year x life), life 25 to 50 years
+    programme = costs["valley_program"]
+    assert recon["benchmark"]["lifeYears"] == [25, 50]
+    assert recon["benchmark"]["programmeUsdPerAf"] == [round(programme["usd"] / (programme["af_per_year"] * 50), 1),
+                                                       round(programme["usd"] / (programme["af_per_year"] * 25), 1)]
+    assert recon["benchmark"]["programmeUsdPerAf"] == [74.5, 149.1]
+    # the sealant: every ranked canal's cost / the water one application is modelled to keep, low to high
+    a = core["plan"]["assumptions"]
+    ranked = [c for c in core["canals"] if c[8] is not None]
+    gallons_a_day = sum(c[5] * c[4] * 3280.84 * a["wetted_width_ft"] for c in ranked)
+    kept_high = gallons_a_day * a["days_one_application_lasts"] * a["sealant_cut_high"] / costs["gallons_per_af"]
+    low, high = recon["benchmark"]["sealantUsdPerAf"]
+    assert abs(low - sum(c[9] for c in ranked) / kept_high) < 0.01 and low < high
+    # each district row: a share band that rises with the days, and the district's own 1998 loss
+    assert recon["bandsPct"] == [[10, 40], [40, 60]] and recon["days"][0] < recon["days"][1]
+    assert len(recon["districts"]) == 14                  # the districts the frozen calibration could match
+    for row in recon["districts"]:
+        assert 0 < row["seepShare"][0] < row["seepShare"][1]
+        assert 0 < row["lossShare"] < 1
+        assert core["districts"][row["district"]]["name"]  # points at a district on the map
+    san_benito = next(r for r in recon["districts"] if r["name"] == "CCID#2 (San Benito)")
+    assert san_benito["lossShare"] == 0.6                 # 40% efficiency in the 1998 table
+
+
 def test_the_build_refuses_inputs_that_break_the_contract(tmp_path, monkeypatch):
     # Arrange: a copy of the real metrics file with one required key removed
     broken = json.loads(contract.REAL_METRICS.read_text())

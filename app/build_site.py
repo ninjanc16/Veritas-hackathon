@@ -13,6 +13,10 @@ selects, rounds and renames. The exceptions, all simple:
     only OpenStreetMap has are added. See app/osm_canals.py. Those extra canals have no soil
     reading, so they are never ranked or priced.
   - The forecast model frozen at the end of 2019 is packed in from app/forecast_pre2020.py.
+  - A short summary of the frozen round-3 results (reports/frozen/round3, read only) is packed
+    for the Sources step: differences and their intervals, never the per-year numbers.
+  - Two divisions for the Sources step's reconciliation (see reconciliation() below): modelled
+    seepage as a share of each district's authorised water, and dollars per acre-foot.
 
 It first checks the pipeline's files against the data contract (app/contract.py) and refuses
 to build from files that break it.
@@ -35,6 +39,7 @@ sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT))                                                # so "from app import contract" works as a script
 from app import contract  # noqa: E402
 from farmdrought.canal_class import OSM_KINDS, dense, line_near, point_grid  # noqa: E402
+from farmdrought.costs import LINING_LIFE_YEARS  # noqa: E402  (plain arithmetic, imports nothing)
 RAW = ROOT / "data" / "raw"
 LIVE = ROOT / "data" / "live"        # the daily refresh saves its downloads here; data/raw is a fixed snapshot
 PROCESSED = ROOT / "data" / "processed"
@@ -51,6 +56,15 @@ LAKES = [("Amistad", "amistad.csv", -101.058, 29.450), ("Falcon", "falcon.csv", 
          ("Elephant Butte", "elephant-butte.csv", -107.19, 33.15)]   # dam positions, typed in by hand (approximate)
 # The four Lower Rio Grande Valley counties. The published farm-loss figures cover only these.
 VALLEY = ["48061", "48215", "48427", "48489"]
+FROZEN_ROUND3 = ROOT / "reports" / "frozen" / "round3"   # scored once, never rewritten; this script only reads it
+REFERENCE = ROOT / "app" / "reference"                   # published figures typed in from reports (districts.csv, costs.json)
+FEET_PER_KM = 3280.84                                    # the same value as src/farmdrought/config.py and sim/engine.js
+# The share of water a district loses on the way to the farm: the two bands named in
+# ARCHITECTURE.md section 4.5, in percent. They include evaporation, not seepage alone.
+LOSS_BANDS_PCT = [[10, 40], [40, 60]]
+# How long a lining programme is taken to last when its cost is spread over the water it keeps:
+# 25 years to the 50 years used in src/farmdrought/costs.py (ARCHITECTURE.md section 4.5).
+PROGRAMME_LIFE_YEARS = [25, LINING_LIFE_YEARS]
 
 
 def rounded(ring, digits):
@@ -424,6 +438,191 @@ def weekly_history(usdm, fips_list):
     }
 
 
+# ---------- What the forecast changes in the sealant plan (src/farmdrought/districts.py) ----------
+def forecast_effect(plan, district_names):
+    """The pipeline's comparison of the sealant plan with and without the forecast, made small.
+
+    Each row is [km funded in both plans, km only with the forecast, km only without it,
+    rank correlation, km that can be ranked]. "districts" holds one row per district, in the
+    order of core["districts"] (None for a district with no canal that can be ranked).
+    Returns None if the pipeline has not produced the comparison yet.
+    """
+    effect = plan.get("forecast_effect")
+    if effect is None:
+        return None
+    row = lambda r: [r["both_km"], r["only_forecast_km"], r["only_no_forecast_km"], r["rank_correlation"], r["ranked_km"]]
+    by_name = {r["district"]: row(r) for r in effect["districts"]}
+    return {"budgetUsd": effect["budget_usd"], "overall": row(effect["overall"]),
+            "districts": [by_name.get(name) for name in district_names]}
+
+
+# ---------- The frozen round-3 results, as a short summary (ARCHITECTURE.md section 5.5) ----------
+def short(x):
+    """A number made short for the page: one decimal for a large one (100 or more), and 4
+    significant figures for a small one, so a tiny value never rounds to exactly zero (the page
+    decides "separated or not" from the sign of the interval's ends)."""
+    if x is None:
+        return None
+    return round(x, 1) if abs(x) >= 100 else float(f"{x:.4g}")
+
+
+def interval_rows(node):
+    """Every comparison inside a frozen result, wherever it sits in the file.
+
+    A comparison is a dict with a "name" and a "block1" interval (years resampled one at a time);
+    most also have "block2" (years resampled in adjacent pairs). Each becomes one short list:
+      [name, diff (first-named minus second-named), lo, hi (block1), lo2, hi2 (block2),
+       n (years), lower (True if a lower number is better)]
+    The per-year numbers are left behind.
+    """
+    rows = []
+    if isinstance(node, dict):
+        if "name" in node and isinstance(node.get("block1"), dict):
+            one, two = node["block1"], node.get("block2") or {}
+            rows.append([node["name"], short(one["diff"]), short(one["lo"]), short(one["hi"]),
+                         short(two.get("lo")), short(two.get("hi")), one.get("n_years"), node.get("lower_is_better")])
+        else:
+            for value in node.values():
+                rows += interval_rows(value)
+    elif isinstance(node, list):
+        for value in node:
+            rows += interval_rows(value)
+    return rows
+
+
+def allocation_summary(data):
+    """The budget-ranking backtest: the share of funded counties that then had a drought season,
+    for each way of choosing them, and the model minus each rule with its interval.
+    One row per budget size k, and one for the average over k."""
+    def row(k, block):
+        versus = lambda key: {"diff": short(block[key]["interval"]["diff"]), "lo": short(block[key]["interval"]["lo"]),
+                              "hi": short(block[key]["interval"]["hi"]),
+                              "yearsBetter": block[key]["interval"]["years_model_better"]}
+        return {"k": k, **{name: round(block["mean"][name], 3) for name in ("model", "rule_a", "rule_b", "random", "oracle")},
+                "vsA": versus("model_minus_rule_a"), "vsB": versus("model_minus_rule_b")}
+    return {"nYears": data["n_years"], "counties": data["rows"] // data["n_years"],
+            "perK": [row(block["k"], block) for block in data["per_k"]],
+            "average": row(None, data["average_over_k"])}
+
+
+def seepage_summary(data, errata):
+    """The held-out test of the leak model: each model's median error and rank correlation on
+    hidden districts, the rival-minus-model gaps with their intervals, and whether it passed.
+    The sentence is the corrected one from the second erratum when that file is there."""
+    held = data["held_out"]
+    fixed = [e["sentence_as_it_should_read"] for e in errata if "sentence_as_it_should_read" in e]
+    return {"n": held["n_districts"], "passes": data["passes"], "sentence": fixed[-1] if fixed else data["sentence"],
+            "models": {name: {"medianError": round(m["median_abs_pct_error"], 3), "rankCorrelation": round(m["rank_correlation"], 2)}
+                       for name, m in held["models"].items()},
+            "gaps": {name: {"diff": short(g["gap"]), "lo": short(g["lo"]), "hi": short(g["hi"])} for name, g in held["gaps"].items()}}
+
+
+def frozen_summary(folder=FROZEN_ROUND3):
+    """A few kilobytes about the frozen round-3 results, for the Sources step. Read only.
+
+    groups     the comparisons in each results file, as interval_rows() finds them
+    extra      for any file that carries its own top-level "site_summary" list of rows
+               {name, value, lo, hi, n_years, verdict} (a holdout or a later round can add one):
+               those rows as they are, with the file's own "what" line. Such a file has chosen
+               what to show, so interval_rows() is not run on it as well.
+    allocation, seepage   the two results with their own shape
+    errata     what each erratum file says was wrong in the file it corrects
+    A file that is missing is simply left out. Returns None if the folder is not there.
+    """
+    if not folder.exists():
+        return None
+    read = lambda name: load_json(folder / name) if (folder / name).exists() else None
+    groups, extra, errata = [], [], []
+    # the reported system's own comparisons first, then the added ones, then any other file by name
+    first = ["intervals_v1", "trigger_annual", "calibration", "boosting"]
+    in_order = lambda path: (first.index(path.stem) if path.stem in first else len(first), path.name)
+    for path in sorted(folder.glob("*.json"), key=in_order):
+        data = load_json(path)
+        if "erratum_for" in data:
+            errata.append({"file": path.name, "for": Path(data["erratum_for"]).name, "wrong": data["what_is_wrong"]})
+            continue
+        if isinstance(data.get("site_summary"), list):
+            # "stated" is the file's own verdict word; "lower" (True if a lower number is better) only if the file gives it
+            extra.append({"file": path.stem, "what": data.get("what"), "rows": [
+                {"name": r.get("name"), "diff": short(r.get("value")), "lo": short(r.get("lo")), "hi": short(r.get("hi")),
+                 "n": r.get("n_years"), "stated": r.get("verdict"), "lower": r.get("lower_is_better")}
+                for r in data["site_summary"]]})
+            continue
+        # the top-level keys keep their order, so a file's sections stay in the order it wrote them
+        for key, value in data.items():
+            rows = interval_rows(value)
+            if rows:
+                groups.append({"file": path.stem, "section": key, "rows": rows})
+    allocation, seepage, boosting, calibration = (read(name + ".json") for name in ("allocation", "seepage_calibration", "boosting", "calibration"))
+    seepage_errata = [load_json(p) for p in sorted(folder.glob("seepage_calibration_errata*.json"))]
+    return {
+        "groups": groups, "extra": extra, "errata": errata,
+        "allocation": allocation_summary(allocation) if allocation else None,
+        "seepage": seepage_summary(seepage, seepage_errata) if seepage else None,
+        "boostingCost": boosting["cost"] if boosting else None,                     # 6-month cost of each: lower is better
+        "brier": {k: round(v, 4) for k, v in calibration["brier"].items()} if calibration else None,
+    }
+
+
+# ---------- Reconciliation (ARCHITECTURE.md section 4.5): two divisions, nothing fitted ----------
+def reconciliation(canals, district_names, plan):
+    """Two checks of the site's water figures against published ones. Both are plain division.
+
+    1. For each district in the 1998 table (app/reference/districts.csv) that has authorised
+       water and a match in the district map (district_crosswalk.csv): the site's modelled
+       seepage in a year as a share of that authorised water. Modelled seepage is the site's own
+       uncalibrated figure: each ranked canal's published rate for its soil x its length x the
+       assumed wetted width, for every day water is in the canal. Days are a band, our
+       assumption: from one sealant application (the plan's 90 days) to the season length the
+       frozen calibration run used. "lossShare" is the district's own 1998 figure,
+       1 - efficiency, which includes evaporation and spills.
+    2. Dollars per acre-foot: a lining programme's capital cost / (acre-feet a year x years it
+       lasts), beside the sealant's spend / water kept for every ranked canal. Whether the
+       programme's acre-feet figure is per year is NOT confirmed; the page says so.
+    """
+    costs = load_json(REFERENCE / "costs.json")
+    table = pd.read_csv(REFERENCE / "districts.csv")
+    crosswalk = pd.read_csv(REFERENCE / "district_crosswalk.csv").fillna("")
+    map_name = dict(zip(crosswalk["district"], crosswalk["map_district"]))
+    a = plan["assumptions"]
+    seepage = load_json(FROZEN_ROUND3 / "seepage_calibration.json") if (FROZEN_ROUND3 / "seepage_calibration.json").exists() else {}
+    days = [a["days_one_application_lasts"], seepage.get("assumptions", {}).get("season_days", 273)]
+    calibrated = seepage.get("description_only", {}).get("share_of_authorised_water", {})
+
+    # gallons a day leaking from each district's ranked canals, and from all of them together
+    gallons_a_day = defaultdict(float)
+    sealant_usd = 0.0
+    for c in canals:
+        if c[8] is not None:                                    # ranked: it has a seepage rate and a sealant cost
+            gallons_a_day[c[7]] += c[5] * c[4] * FEET_PER_KM * a["wetted_width_ft"]
+            sealant_usd += c[9]
+    rows = []
+    for r in table.itertuples():
+        name = map_name.get(r.district, "")
+        if not name or name not in district_names or pd.isna(r.authorized_af):
+            continue                                            # no match in the map, or no authorised water
+        per_day_af = gallons_a_day[district_names.index(name)] / costs["gallons_per_af"]
+        rows.append({"name": r.district, "district": district_names.index(name),
+                     "lossShare": round(1 - r.efficiency_pct / 100, 3),
+                     "seepShare": [round(per_day_af * d / r.authorized_af, 3) for d in days],
+                     "calibratedShare": None if r.district not in calibrated else round(calibrated[r.district], 3)})
+
+    programme = costs["valley_program"]
+    # water one application keeps, in acre-feet, at the low and the high end of the sealant's tested effect
+    kept_af = [sum(gallons_a_day.values()) * a["days_one_application_lasts"] * cut / costs["gallons_per_af"]
+               for cut in (a["sealant_cut_low"], a["sealant_cut_high"])]
+    return {
+        "days": days, "widthFt": a["wetted_width_ft"], "bandsPct": LOSS_BANDS_PCT, "districts": rows,
+        "benchmark": {
+            "programmeUsd": programme["usd"], "programmeAf": programme["af_per_year"], "programmeDistricts": programme["districts"],
+            "lifeYears": PROGRAMME_LIFE_YEARS,
+            # longest life first, so the list reads low to high
+            "programmeUsdPerAf": [round(programme["usd"] / (programme["af_per_year"] * years), 1) for years in reversed(PROGRAMME_LIFE_YEARS)],
+            "sealantUsdPerAf": [round(sealant_usd / kept_af[1], 2), round(sealant_usd / kept_af[0], 2)] if kept_af[0] > 0 else None,
+        },
+    }
+
+
 def write_js(path, variable, data):
     """Save data as a JavaScript file that sets one global variable."""
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -491,7 +690,11 @@ def build(out_dir=None):
         "seepageSource": metrics["canal_priority"]["seepage_rate_source"],
         "soilSource": metrics["canal_priority"]["soil_source"],
         "canalSource": metrics["canals"]["source"],
-        "plan": {k: v for k, v in plan.items() if k != "districts"},   # the sealant plan's rule, assumptions and totals
+        # the sealant plan's rule, assumptions and totals (the two long lists are packed on their own)
+        "plan": {k: v for k, v in plan.items() if k not in ("districts", "forecast_effect")},
+        "forecastEffect": forecast_effect(plan, district_names),      # the plan with and without the forecast
+        "frozen": frozen_summary(),                                    # the frozen round-3 results, in short
+        "reconcile": reconciliation(canals, district_names, plan),     # modelled seepage against published figures
         "threshold": metrics["trigger"]["threshold"],
         "trigger": metrics["trigger"],
         "season": metrics["season"]["focus"],

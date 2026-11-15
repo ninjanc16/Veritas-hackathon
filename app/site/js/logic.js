@@ -5,6 +5,7 @@
   TWO KINDS OF FUNCTION
     Plain ones need nothing but their arguments: esc, usd, num, pct, niceDate, workTime, gal,
     money, usesElephantButte, and the guards safeUrl, safeDecode, cssClass, finiteOrNull, percentOrNull, csvText, csvNumber.
+    For the Sources step: sig, signed, verdictFor, forecastEffectSentence, levelLabel, perMillionGal.
 
     Bound ones read the generated data (window.HG and window.HG_SIM in the browser). They come
     from makeLogic(data), so a test can hand in a small made-up data object instead:
@@ -217,7 +218,9 @@
   /* and no single year supplies more than this share of the gap between them. */
   const REPLAY_ONE_YEAR_SHARE = 0.5;
   /* The held-out test of the leak model, as the team reported it (reports/frozen/round3/seepage_calibration.json
-     in the pipeline). Fixed wording: nothing here is computed, and the site does not read that file. */
+     in the pipeline). Fixed wording: nothing here is computed. The Sources step also shows that file's own
+     figures (HG.frozen.seepage, packed by app/build_site.py); a test checks the two agree. The simulation
+     never reads them: it stays uncalibrated. */
   const HELD_OUT_SENTENCE = "We tested the leak model by hiding one district at a time and predicting its published 1998 water loss. " +
     "Across 14 districts its typical error was 32.7%, against 36.5% for canal length alone, and the two could not be told apart. " +
     "So the volumes and dollar figures here are not reliable and are not measurements. " +
@@ -299,6 +302,71 @@
     return '<div class="tableWrap"><table class="t replay"><tr><th>Policy</th><th class="r">Years sealed</th><th class="r">Sealant</th><th class="r">Water kept (1,000 af)</th><th class="r">Crop loss</th><th class="r">Saving vs nothing</th></tr>' +
       rows + "</table></div>";
   }
+
+  /* ---------- The Sources step: verdict words, plain sentences and labels ---------- */
+  /* A small number for a table: a whole number as it is, others whole above 100, two decimals above 1, three figures below. */
+  const sig = (v) => (v == null || isNaN(v) ? "n/a" : Number.isInteger(v) || Math.abs(v) >= 100 ? num(v) : Math.abs(v) >= 1 ? num(v, 2) : String(Number(v.toPrecision(3))));
+  /* The same with a plus sign on a number above zero, for a difference. */
+  const signed = (v) => (v > 0 ? "+" : "") + sig(v);
+  /*
+    The verdict word for one comparison, from its interval and nothing else.
+      row.diff, row.lo, row.hi   the difference (first-named minus second-named) and its interval
+      row.lo2, row.hi2           a second interval made another way (pairs of years), if there is one
+      row.lower                  true if a lower number is better, false if a higher one is
+    Rule: the first-named is "ahead" or "behind" only if the interval lies wholly on one side of
+    zero. If zero is inside it, or on its edge, the word is "not separated". If there are two
+    intervals and they disagree, the word is also "not separated", and the note says they
+    disagree. A row with no interval gets "no interval". A row that does not say which direction
+    is better can only be "separated": its own stated word (row.stated) is used only if it is
+    "ahead" or "behind", and only when the interval has already excluded zero. Whenever the
+    stated word differs from the word this rule gives, it is quoted in the note.
+  */
+  function verdictFor(row) {
+    const side = (lo, hi) => (lo == null || hi == null ? null : lo > 0 ? 1 : hi < 0 ? -1 : 0);
+    const one = side(row.lo, row.hi), two = side(row.lo2, row.hi2);
+    let word, note = "";
+    if (one == null) word = "no interval";
+    else if (one === 0) { word = "not separated"; if (two) note = "the interval from pairs of years excludes zero, this one does not: the two disagree"; }
+    else if (two != null && two !== one) { word = "not separated"; note = "the interval from pairs of years includes zero: the two disagree"; }
+    else if (typeof row.lower === "boolean") word = (row.lower ? one < 0 : one > 0) ? "ahead" : "behind";
+    else if (row.stated === "ahead" || row.stated === "behind") word = row.stated;
+    else { word = "separated"; if (!row.stated) note = "the results file does not say which direction is better"; }
+    // a results file's own word is never used in place of the rule above; if it differs, it is quoted
+    if (row.stated && row.stated !== word) note = (note ? note + "; " : "") + "the results file's own word is \"" + row.stated + "\"";
+    return { word, note };
+  }
+  /*
+    What the forecast changes in the sealant plan, in words. row is the pipeline's
+    [km funded in both plans, km only with the forecast, km only without it, rank correlation,
+    km that can be ranked]. A zero difference is said as plainly as a large one.
+  */
+  function forecastEffectSentence(row) {
+    if (!row) return "No canal here can be ranked, so there is nothing to compare.";
+    const both = row[0], onlyWith = row[1], onlyWithout = row[2], rho = row[3], km = (v) => num(v, 1) + " km";
+    const funded = onlyWith === 0 && onlyWithout === 0
+      ? (both === 0 ? "Neither plan funds any canal here at this budget, so the forecast changes nothing here."
+                    : "The forecast changes nothing here: the same " + km(both) + " is funded with it and without it.")
+      : "With the forecast in the ranking, " + km(onlyWith) + " is funded that would not be without it, and " + km(onlyWithout) +
+        " that would be funded without it is not. " + km(both) + " is funded either way.";
+    const order = rho == null ? "There are too few canals here to compare the two orders."
+      : rho === 1 ? "The two orders are identical (rank correlation 1)."
+      : "The two orders have a rank correlation of " + rho + " (1 would be the same order).";
+    return funded + " " + order;
+  }
+  /* The leak classes as the page words them. The data keeps the pipeline's own names (the map
+     colours and the tests are keyed by them); only the text shown changes. "Inspect first" read
+     like a tested priority. It is a modelled class: the forecast warns and the soil is leaky. */
+  const LEVEL_LABELS = { "Inspect first": "Leaky soil and forecast warning (modelled)" };
+  const levelLabel = (level) => (Object.prototype.hasOwnProperty.call(LEVEL_LABELS, level) ? LEVEL_LABELS[level] : level);
+  const LEVEL_NOTE = "\"" + LEVEL_LABELS["Inspect first"] + "\" is the highest modelled seepage class: the 6-month forecast warns for the county and the soil under the canal is leaky. " +
+    "It comes from the model, not from an inspection, and it is not a field-tested priority.";
+  /* What the stress test's forecast is. One sentence, shown with the stress test. Fixed wording. */
+  const STRESS_TEST_SENTENCE = "In these random futures the forecast model is not run: whether a warning is given before each season is drawn at random, " +
+    "using fixed rates for how often the forecast was right and how often it raised a false alarm in its test.";
+  /* Dollars per acre-foot as dollars per million gallons (the unit the page shows water in). */
+  const perMillionGal = (usdPerAf) => usdPerAf * 1e6 / ENGINE.GALLONS_PER_ACRE_FOOT;
+  /* The caveat that must be shown with the lining-programme benchmark. Fixed wording. */
+  const BENCHMARK_CAVEAT = "assumes the published 44,000 acre-feet is a yearly figure; not confirmed";
 
   /*
     The functions that read the data.
@@ -470,5 +538,7 @@
   return { usd, num, pct, niceDate, esc, safeUrl, safeDecode, cssClass, TIER_CLASSES, SEVERITY_CLASSES, finiteOrNull, percentOrNull, csvText, csvNumber,
            workTime, gal, money, usesElephantButte, REPLAY_POLICIES, replay,
            band, rangeText, rangeCell, thousandAf, replayBands, replayBandsSentence, replayBandsLines, replayBandsTable,
-           sharedForecastSentence, SCORED_TEST_SENTENCE, HELD_OUT_SENTENCE, LOSSES_1998_SENTENCE, TWIN_CAPTION, makeLogic };
+           sharedForecastSentence, SCORED_TEST_SENTENCE, HELD_OUT_SENTENCE, LOSSES_1998_SENTENCE, TWIN_CAPTION,
+           sig, signed, verdictFor, forecastEffectSentence, LEVEL_LABELS, levelLabel, LEVEL_NOTE, STRESS_TEST_SENTENCE,
+           perMillionGal, BENCHMARK_CAVEAT, makeLogic };
 });

@@ -90,8 +90,13 @@ def assign_districts(canals, districts):
     return [find(row) for row in canals.itertuples()]
 
 
-def sealant_plan(canals, budget=SEALANT_BUDGET_USD):
+def sealant_plan(canals, budget=SEALANT_BUDGET_USD, use_forecast=True):
     """Add the sealant columns to the canal table. Returns the table.
+
+    use_forecast=True (the default) ranks by score = seepage rate x chance of a drought season.
+    use_forecast=False ranks by seepage rate alone: the county's drought chance is not looked at.
+    Which canals can be treated, and what each one costs, is the same either way. Only the order
+    changes. forecast_effect() below runs both and reports what the forecast changed.
 
     A canal can be treated ("eligible") if it is inside a district, is not a drain and its soil
     has a published seepage rate. In leaks.py those are exactly the canals with a score above 0.
@@ -106,7 +111,10 @@ def sealant_plan(canals, budget=SEALANT_BUDGET_USD):
     eligible = (canals["district"] != "") & (canals["score"] > 0)
     canals["seal_sqft"] = (canals["length_km"] * FEET_PER_KM * WETTED_WIDTH_FT).where(eligible)
     canals["seal_usd"] = canals["seal_sqft"] * SEALANT_USD_PER_SQFT
-    order = canals[eligible].sort_values(["score", "seepage_rate", "id"], ascending=[False, False, True]).index
+    if use_forecast:
+        order = canals[eligible].sort_values(["score", "seepage_rate", "id"], ascending=[False, False, True]).index
+    else:   # the same list, leakiest soil first; ties go to the lower id, as above
+        order = canals[eligible].sort_values(["seepage_rate", "id"], ascending=[False, True]).index
     canals["seal_rank"] = pd.Series(range(1, len(order) + 1), index=order)
     running_total = canals.loc[order, "seal_usd"].cumsum()
     canals["funded"] = False
@@ -115,6 +123,57 @@ def sealant_plan(canals, budget=SEALANT_BUDGET_USD):
     lost_af = canals["seepage_rate"] * canals["seal_sqft"] * SEALANT_DAYS / GALLONS_PER_ACRE_FOOT
     canals["saved_af_low"], canals["saved_af_high"] = lost_af * SEALANT_CUT[0], lost_af * SEALANT_CUT[1]
     return canals
+
+
+def rank_correlation(rank_a, rank_b):
+    """Spearman's rank correlation between two orders of the same canals. 1 = the same order,
+    0 = unrelated, -1 = exactly reversed. None when there are fewer than two canals, or when
+    one of the orders has no spread, because then there is nothing to compare.
+
+    Both lists are ranked again from 1 first, so a part of a longer list (one district's canals
+    out of all of them) can be handed in as it is.
+    """
+    a, b = pd.Series(list(rank_a)).rank(), pd.Series(list(rank_b)).rank()
+    if len(a) < 2 or a.std() == 0 or b.std() == 0:
+        return None
+    return round(float(a.corr(b)), 3)
+
+
+def forecast_effect(canals, budget=SEALANT_BUDGET_USD):
+    """What the drought forecast changes in the sealant plan.
+
+    The plan is made twice with the same canals and the same budget: once ranked by seepage rate
+    x chance of a drought season (the plan the site shows), and once ranked by seepage rate alone.
+    For all districts together ("overall") and for each district it reports:
+      both_km             canal funded in both plans
+      only_forecast_km    canal funded only when the forecast is used
+      only_no_forecast_km canal funded only when it is not
+      rank_correlation    Spearman's correlation between the two orders (1 = the same order)
+      ranked_km           canal that can be ranked at all
+    It is a description of the rule, not a test: nothing here says which plan saves more water.
+    A small or zero difference is reported as it is.
+    """
+    with_forecast = sealant_plan(canals, budget, use_forecast=True)
+    without = sealant_plan(canals, budget, use_forecast=False)
+    table = pd.DataFrame({
+        "district": with_forecast["district"], "km": with_forecast["length_km"],
+        "rank_with": with_forecast["seal_rank"], "rank_without": without["seal_rank"],
+        "funded_with": with_forecast["funded"], "funded_without": without["funded"]})
+    table = table[table["rank_with"].notna()]                 # only the canals that can be ranked
+
+    def describe(rows):
+        km = lambda keep: round(float(rows.loc[keep, "km"].sum()), 1)
+        return {"ranked_km": round(float(rows["km"].sum()), 1),
+                "both_km": km(rows["funded_with"] & rows["funded_without"]),
+                "only_forecast_km": km(rows["funded_with"] & ~rows["funded_without"]),
+                "only_no_forecast_km": km(~rows["funded_with"] & rows["funded_without"]),
+                "rank_correlation": rank_correlation(rows["rank_with"], rows["rank_without"])}
+
+    return {"budget_usd": budget,
+            "what": "The sealant plan made twice with the same budget: ranked by seepage rate x chance of a drought "
+                    "season, and ranked by seepage rate alone. A description of the rule, not a test of it.",
+            "overall": describe(table),
+            "districts": [{"district": name, **describe(rows)} for name, rows in sorted(table.groupby("district"))]}
 
 
 def risk_level(p):
@@ -201,6 +260,8 @@ def run_districts(latest, budget=SEALANT_BUDGET_USD):
         "saved_af_low": int(round(funded["saved_af_low"].sum())),
         "saved_af_high": int(round(funded["saved_af_high"].sum())),
         "districts": rows,
+        # ADDED: the same plan with and without the forecast in the ranking (see forecast_effect)
+        "forecast_effect": forecast_effect(canals, budget),
         "note": "Texas districts only: we found no public boundary file for New Mexico or Colorado districts. "
                 "The plan assumes every canal is bare earth, 20 feet of wetted width and full of water for 90 "
                 "days. None of that was measured, and lined canals are not excluded because no data says which "

@@ -102,7 +102,7 @@ img { max-width: 100%; display: block; }
 .progress { position: fixed; top: 0; left: 0; height: 3px; width: 100%; transform-origin: 0 50%; transform: scaleX(0); background: linear-gradient(90deg, var(--river), #7cd1ff); z-index: 60; }
 .nav { position: fixed; top: 0; left: 0; right: 0; z-index: 50; transition: background .3s, box-shadow .3s; }
 .nav .wrap { display: flex; align-items: center; justify-content: space-between; height: 64px; }
-.nav.solid { background: rgba(8, 18, 22, .94); backdrop-filter: blur(8px); box-shadow: 0 2px 16px rgba(0, 0, 0, .2); }
+.nav.solid { background: rgba(8, 18, 22, .94); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); box-shadow: 0 2px 16px rgba(0, 0, 0, .2); }
 .nav nav { display: flex; align-items: center; gap: 22px; }
 .nav nav a:not(.btn) { color: #fff; opacity: .8; text-decoration: none; font-size: .92rem; }
 .nav nav a:not(.btn):hover { opacity: 1; }
@@ -524,5 +524,48 @@ ul.plain { margin: 0; padding-left: 18px; font-size: .84rem; } ul.plain li { mar
   #simCases .wide { display: none; }
   #simBar .sbtn { white-space: nowrap; } #simSkip { padding: 6px 10px; font-size: 14px; }
   #simDate { display: none; }
+  /* On a short phone 62% of the screen is too little for the two stacked panels: their three
+     figures ran into each other. The picture gets a floor on its height instead. */
+  .stage.sim { height: max(62vh, 540px); }
 }
 @media (prefers-reduced-motion: reduce) { .cine, #vig { transition: none; } }
+
+/* ---- Sources tables and keyboard focus ---- */
+/* Keyboard focus: anything reached with Tab shows a clear outline. :focus-visible means the
+   outline appears for keyboard use and not after a mouse click. */
+:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
+/* A table row that works as a button: the outline goes inside the row so the scroll box does not clip it. */
+table.t tr[tabindex]:focus-visible { outline-offset: -3px; }
+table.t tr[tabindex]:focus-visible td { background: var(--soft); }
+.photos img[tabindex] { cursor: zoom-in; }
+/* The panel is only focused by the page itself (after a redraw), so it needs no outline. */
+#view:focus { outline: none; }
+/* Tables of frozen results: a heading row for each group, and a note under a verdict word. */
+table.t.frozen th.grp { text-align: left; background: var(--soft); color: var(--head); font-weight: 600; }
+table.t.frozen td small.rng { display: block; }
+table.t.frozen td.r small.rng { white-space: nowrap; }             /* an interval stays on one line */
+table.t.frozen td.v, table.t.frozen th.v { padding-left: 14px; }   /* the verdict column, set apart from the numbers */
+table.t.frozen td.v small.rng { white-space: normal; }
+table.t.frozen th.r { white-space: normal; }   /* long column headings wrap, so the table fits the panel */
+/* Reconciliation bar charts. Each row: a name, a track from 0 to 100%, and the figures. */
+.recon { margin: 8px 0 6px; }
+.recon .rrow { display: grid; grid-template-columns: 9.5em minmax(0, 1fr) 7.5em; gap: 8px; align-items: center; font-size: .8rem; padding: 2px 0; }
+.recon .rrow.on .rname { font-weight: 700; color: var(--head); }
+.recon .rname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recon .rnum { text-align: right; white-space: nowrap; }
+.recon .rnum small { display: block; color: var(--muted); }
+.recon .rtrack { position: relative; height: 16px; background: var(--soft); border-radius: 2px; }
+.recon .rtrack i { position: absolute; top: 0; bottom: 0; }
+.recon .pub.p0, .reconKey .pub.p0 { background: color-mix(in srgb, var(--muted) 28%, transparent); }   /* published band 1 */
+.recon .pub.p1, .reconKey .pub.p1 { background: color-mix(in srgb, var(--muted) 55%, transparent); }   /* published band 2 */
+.recon .seep, .reconKey .seep { background: var(--blue); top: 4px; bottom: 4px; border-radius: 2px; }   /* the modelled range */
+.recon .seep.prog { background: var(--muted); }                                                         /* the published programme */
+.recon .own, .reconKey .own { width: 3px; margin-left: -1px; background: var(--ink); }                  /* the district's 1998 loss */
+.recon .cal { width: 8px; height: 8px; top: 4px; bottom: auto; margin-left: -4px; border-radius: 50%; background: var(--card); border: 2px solid var(--ink); box-sizing: border-box; }
+.recon .axis .rtrack { background: none; height: 14px; }
+.recon .axis u { position: absolute; transform: translateX(-50%); text-decoration: none; font-size: .68rem; color: var(--muted); }
+.reconKey { margin-bottom: 6px; }
+.reconKey i { position: static; display: inline-block; width: 14px; height: 10px; margin-right: 5px; vertical-align: -1px; }
+.reconKey i.own { width: 3px; margin-left: 0; }
+.reconKey i.cal { width: 8px; height: 8px; border-radius: 50%; background: var(--card); border: 2px solid var(--ink); box-sizing: border-box; }
+@media (max-width: 620px) { .recon .rrow { grid-template-columns: 6.5em minmax(0, 1fr) 6em; } .recon .rname { white-space: normal; } }

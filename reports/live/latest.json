@@ -1524,6 +1524,259 @@
         "first_canals": []
       }
     ],
+    "forecast_effect": {
+      "budget_usd": 100000,
+      "what": "The sealant plan made twice with the same budget: ranked by seepage rate x chance of a drought season, and ranked by seepage rate alone. A description of the rule, not a test of it.",
+      "overall": {
+        "ranked_km": 4808.0,
+        "both_km": 279.7,
+        "only_forecast_km": 101.0,
+        "only_no_forecast_km": 101.0,
+        "rank_correlation": 0.775
+      },
+      "districts": [
+        {
+          "district": "Adams Gardens Irrigation District 19",
+          "ranked_km": 81.0,
+          "both_km": 3.4,
+          "only_forecast_km": 0.0,
+          "only_no_forecast_km": 0.0,
+          "rank_correlation": 1.0
+        },
+        {
+          "district": "Bayview Irrigation District 11",
+          "ranked_km": 55.2,
+          "both_km": 15.6,
+          "only_forecast_km": 0.0,
+          "only_no_forecast_km": 0.0,
+          "rank_correlation": 1.0
+        },
+        {
+          "district": "Brownsville Irrigation District",
+          "ranked_km": 111.2,
+          "both_km": 0.1,
+          "only_forecast_km": 29.4,
+          "only_no_forecast_km": 0.0,
+          "rank_correlation": 1.0
+        },
+        {
+          "district": "Cameron County Irrigation District 16",
+          "ranked_km": 7.3,
+          "both_km": 1.4,
+          "only_forecast_km": 0.0,
+          "only_no_forecast_km": 0.0,
+          "rank_correlation": 1.0
+        },
+        {
+          "district": "Cameron County Irrigation District 2",
+          "ranked_km": 672.5,
+          "both_km": 109.7,
+          "only_forecast_km": 8.8,
+          "only_no_forecast_km": 0.0,
+          "rank_correlation": 0.998
+        },
+        {
+          "district": "Cameron County Irrigation District 6",
+          "ranked_km": 228.1,
+          "both_km": 71.3,
+          "only_forecast_km": 35.3,
+          "only_no_forecast_km": 0.0,
+          "rank_correlation": 1.0
+        },
+        {
+          "district": "Cameron County Water Improvement District 10",
+          "ranked_km": 39.7,
+          "both_km": 9.9,
+          "only_forecast_km": 0.0,
+          "only_no_forecast_km": 0.0,
+          "rank_correlation": 1.0
+        },
+        {
+          "district": "Delta Lake Irrigation District",
+          "ranked_km": 616.1,
+          "both_km": 0.0,
+          "only_forecast_km": 10.9,
+          "only_no_forecast_km": 0.0,
+          "rank_correlation": 0.982
+        },
+        {
+          "district": "Donna Irrigation District Hidalgo County 1",
+          "ranked_km": 259.7,
+          "both_km": 0.8,
+          "only_forecast_km": 0.0,
+          "only_no_forecast_km": 0.0,
+          "rank_correlation": 1.0
+        },
+        {
+          "district": "El Paso County Tornillo WID",
+          "ranked_km": 31.1,
+          "both_km": 0.0,
+          "only_forecast_km": 0.0,
+          "only_no_forecast_km": 11.2,
+          "rank_correlation": 1.0
+        },
+        {
+          "district": "El Paso County WCID 4",
+          "ranked_km": 5.2,
+          "both_km": 0.0,
+          "only_forecast_km": 0.0,
+          "only_no_forecast_km": 0.5,
+          "rank_correlation": 1.0
+        },
+        {
+          "district": "El Paso County Water Improvement District 1",
+          "ranked_km": 378.5,
+          "both_km": 0.0,
+          "only_forecast_km": 0.0,
+          "only_no_forecast_km": 89.3,
+          "rank_correlation": 1.0
+        },
+        {
+          "district": "Engelman Irrigation District",
+          "ranked_km": 44.1,
+          "both_km": 0.0,
+          "only_forecast_km": 0.0,
+          "only_no_forecast_km": 0.0,
+          "rank_correlation": 1.0
+        },
+        {
+          "district": "Fort Hancock WCID",
+          "ranked_km": 11.9,
+          "both_km": 4.4,
+          "only_forecast_km": 0.0,
+          "only_no_forecast_km": 0.0,
+          "rank_correlation": 1.0
+        },
+        {
+          "district": "Harlingen Irrigation District-Cameron County-1",
+          "ranked_km": 215.8,
+          "both_km": 7.3,
+          "only_forecast_km": 0.0,
+          "only_no_forecast_km": 0.0,
+          "rank_correlation": 1.0
+        },
+        {
+          "district": "Hidalgo & Cameron Counties Irrigation District 9",
+          "ranked_km": 554.2,
+          "both_km": 3.4,
+          "only_forecast_km": 0.0,
+          "only_no_forecast_km": 0.0,
+          "rank_correlation": 0.994
+        },
+        {
+          "district": "Hidalgo County Irrigation District 1",
+          "ranked_km": 152.3,
+          "both_km": 0.0,
+          "only_forecast_km": 0.0,
+          "only_no_forecast_km": 0.0,
+          "rank_correlation": 1.0
+        },
+        {
+          "district": "Hidalgo County Irrigation District 16",
+          "ranked_km": 33.1,
+          "both_km": 3.3,
+          "only_forecast_km": 0.0,
+          "only_no_forecast_km": 0.0,
+          "rank_correlation": 1.0
+        },
+        {
+          "district": "Hidalgo County Irrigation District 2",
+          "ranked_km": 270.0,
+          "both_km": 0.0,
+          "only_forecast_km": 0.0,
+          "only_no_forecast_km": 0.0,
+          "rank_correlation": 1.0
+        },
+        {
+          "district": "Hidalgo County Irrigation District 5",
+          "ranked_km": 32.8,
+          "both_km": 7.4,
+          "only_forecast_km": 0.0,
+          "only_no_forecast_km": 0.0,
+          "rank_correlation": 1.0
+        },
+        {
+          "district": "Hidalgo County Irrigation District 6",
+          "ranked_km": 69.6,
+          "both_km": 0.0,
+          "only_forecast_km": 0.0,
+          "only_no_forecast_km": 0.0,
+          "rank_correlation": 1.0
+        },
+        {
+          "district": "Hidalgo County WCID 18",
+          "ranked_km": 5.0,
+          "both_km": 1.4,
+          "only_forecast_km": 0.0,
+          "only_no_forecast_km": 0.0,
+          "rank_correlation": 1.0
+        },
+        {
+          "district": "Hidalgo County WCID 19",
+          "ranked_km": 7.1,
+          "both_km": 0.0,
+          "only_forecast_km": 0.0,
+          "only_no_forecast_km": 0.0,
+          "rank_correlation": 1.0
+        },
+        {
+          "district": "Hudspeth County Conservation & Reclamation District 1",
+          "ranked_km": 148.4,
+          "both_km": 0.9,
+          "only_forecast_km": 0.0,
+          "only_no_forecast_km": 0.0,
+          "rank_correlation": 1.0
+        },
+        {
+          "district": "La Feria Irrigation District Cameron County 3",
+          "ranked_km": 201.9,
+          "both_km": 9.3,
+          "only_forecast_km": 0.0,
+          "only_no_forecast_km": 0.0,
+          "rank_correlation": 1.0
+        },
+        {
+          "district": "Maverick County WCID 1",
+          "ranked_km": 257.0,
+          "both_km": 13.9,
+          "only_forecast_km": 13.5,
+          "only_no_forecast_km": 0.0,
+          "rank_correlation": 1.0
+        },
+        {
+          "district": "Rio Grande Palms Water District",
+          "ranked_km": 43.4,
+          "both_km": 15.3,
+          "only_forecast_km": 3.2,
+          "only_no_forecast_km": 0.0,
+          "rank_correlation": 1.0
+        },
+        {
+          "district": "Santa Cruz Irrigation District 15",
+          "ranked_km": 102.5,
+          "both_km": 1.1,
+          "only_forecast_km": 0.0,
+          "only_no_forecast_km": 0.0,
+          "rank_correlation": 1.0
+        },
+        {
+          "district": "United Irrigation District",
+          "ranked_km": 110.6,
+          "both_km": 0.0,
+          "only_forecast_km": 0.0,
+          "only_no_forecast_km": 0.0,
+          "rank_correlation": 1.0
+        },
+        {
+          "district": "Valley Acres Irrigation District",
+          "ranked_km": 62.7,
+          "both_km": 0.0,
+          "only_forecast_km": 0.0,
+          "only_no_forecast_km": 0.0,
+          "rank_correlation": 0.947
+        }
+      ]
+    },
     "note": "Texas districts only: we found no public boundary file for New Mexico or Colorado districts. The plan assumes every canal is bare earth, 20 feet of wetted width and full of water for 90 days. None of that was measured, and lined canals are not excluded because no data says which are lined. The sealant price is materials only. The sealant has not been field-tested on the Rio Grande. Water saved is a rough range, not a forecast."
   }
 }

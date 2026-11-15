@@ -1084,3 +1084,114 @@ test("the picture's caption is fixed wording and is shown whenever the picture i
   assert.ok(twin.indexOf('"In this illustrative run, sealing early kept " + money(kept) + " of crops"') >= 0);
   assert.ok(!/Sealing early "? ?\+? ?\(?.{0,20}saves/.test(twin) && twin.indexOf("saves ") < 0, "no \"saves\" on the picture");
 });
+
+/* ---------- The Sources step: verdict words, the forecast's effect on the plan, labels ---------- */
+test("a verdict word comes only from whether the interval excludes zero", () => {
+  // lower is better (a cost): an interval wholly below zero puts the first-named ahead
+  assert.deepStrictEqual(L.verdictFor({ lo: -745, hi: -237, lo2: -779, hi2: -214, lower: true }), { word: "ahead", note: "" });
+  assert.strictEqual(L.verdictFor({ lo: 475, hi: 1539, lo2: 555, hi2: 1415, lower: true }).word, "behind");
+  // higher is better (a share): the same intervals read the other way round
+  assert.strictEqual(L.verdictFor({ lo: 0.001, hi: 0.046, lower: false }).word, "ahead");
+  assert.strictEqual(L.verdictFor({ lo: -0.0049, hi: -0.0015, lower: false }).word, "behind");
+  // zero inside the interval, or exactly on its edge, is a tie whatever the difference looks like
+  assert.strictEqual(L.verdictFor({ diff: -1079, lo: -2211, hi: 23, lower: true }).word, "not separated");
+  assert.strictEqual(L.verdictFor({ diff: 0.0185, lo: 0, hi: 0.0556, lower: false }).word, "not separated");
+  assert.strictEqual(L.verdictFor({ lo: -0.5, hi: 0, lower: true }).word, "not separated");
+  // two intervals that disagree are a tie, and the note says so (the 4-week alert against "D1 now")
+  const split = L.verdictFor({ lo: -884, hi: 11.02, lo2: -723, hi2: -146, lower: true });
+  assert.strictEqual(split.word, "not separated");
+  assert.ok(/disagree/.test(split.note));
+  const other = L.verdictFor({ lo: -5, hi: -1, lo2: -6, hi2: 1, lower: true });
+  assert.strictEqual(other.word, "not separated");
+  assert.ok(/disagree/.test(other.note));
+  // no interval, no verdict
+  assert.strictEqual(L.verdictFor({ diff: 3, lo: null, hi: null, lower: true }).word, "no interval");
+  assert.strictEqual(L.verdictFor({ diff: 3 }).word, "no interval");
+  // a row that does not say which direction is better: its own word is used only once zero is excluded
+  assert.strictEqual(L.verdictFor({ lo: -1, hi: 2, stated: "ahead" }).word, "not separated");
+  assert.strictEqual(L.verdictFor({ lo: 1, hi: 2, stated: "ahead" }).word, "ahead");
+  assert.strictEqual(L.verdictFor({ lo: 1, hi: 2, stated: "behind" }).word, "behind");
+  assert.strictEqual(L.verdictFor({ lo: 1, hi: 2, stated: "a clear win" }).word, "separated");
+  assert.strictEqual(L.verdictFor({ lo: 1, hi: 2 }).word, "separated");
+  // a file's own word never replaces the rule; where it differs it is quoted beside the verdict
+  assert.deepStrictEqual(L.verdictFor({ lo: 0.234, hi: 0.775, lower: false, stated: "agrees" }), { word: "ahead", note: "the results file's own word is \"agrees\"" });
+  assert.deepStrictEqual(L.verdictFor({ lo: -1, hi: 2, lower: true, stated: "a clear win" }), { word: "not separated", note: "the results file's own word is \"a clear win\"" });
+  assert.deepStrictEqual(L.verdictFor({ lo: -819, hi: 1537, lower: true, stated: "not separated" }), { word: "not separated", note: "" });
+});
+
+test("numbers in the results tables: whole, two decimals or three figures, with a sign on a difference", () => {
+  assert.strictEqual(L.sig(-19823), "-19,823");
+  assert.strictEqual(L.sig(11.025), "11.03");
+  assert.strictEqual(L.sig(-59), "-59");                                   // a whole number gets no decimals
+  assert.strictEqual(L.sig(0.001111), "0.00111");
+  assert.strictEqual(L.sig(0), "0");
+  assert.strictEqual(L.sig(null), "n/a");
+  assert.strictEqual(L.signed(0.0202), "+0.0202");
+  assert.strictEqual(L.signed(-421), "-421");
+  assert.strictEqual(L.signed(0), "0");
+});
+
+test("what the forecast changes is said plainly, including when it changes nothing", () => {
+  // [km in both, km only with the forecast, km only without it, rank correlation, km ranked]
+  assert.strictEqual(L.forecastEffectSentence([279.7, 101, 101, 0.775, 4808]),
+    "With the forecast in the ranking, 101.0 km is funded that would not be without it, and 101.0 km that would be funded without it is not. " +
+    "279.7 km is funded either way. The two orders have a rank correlation of 0.775 (1 would be the same order).");
+  assert.strictEqual(L.forecastEffectSentence([15.6, 0, 0, 1, 55.2]),
+    "The forecast changes nothing here: the same 15.6 km is funded with it and without it. The two orders are identical (rank correlation 1).");
+  assert.strictEqual(L.forecastEffectSentence([0, 0, 0, 0.947, 62.7]),
+    "Neither plan funds any canal here at this budget, so the forecast changes nothing here. The two orders have a rank correlation of 0.947 (1 would be the same order).");
+  assert.ok(/too few canals/.test(L.forecastEffectSentence([1.2, 0, 0, null, 1.2])));
+  assert.strictEqual(L.forecastEffectSentence(null), "No canal here can be ranked, so there is nothing to compare.");
+});
+
+test("the top leak class is worded as a modelled class, and the other classes keep their names", () => {
+  assert.strictEqual(L.levelLabel("Inspect first"), "Leaky soil and forecast warning (modelled)");
+  for (const level of ["Watch", "Low", "Unknown soil", "Drain"]) assert.strictEqual(L.levelLabel(level), level);
+  assert.ok(/not a field-tested priority/.test(L.LEVEL_NOTE) && /highest modelled seepage class/.test(L.LEVEL_NOTE));
+  // The page never prints the old words: every place a class is shown goes through levelLabel.
+  const page = fs.readFileSync(path.join(__dirname, "platform.js"), "utf8");
+  assert.ok(page.indexOf("Inspect first") < 0);
+  assert.ok(page.indexOf("U.esc(levelLabel(c.level))") >= 0 && page.indexOf("U.esc(levelLabel(l))") >= 0);
+});
+
+test("the stress test says its forecast is drawn at random, and the benchmark carries its caveat", () => {
+  assert.strictEqual(L.STRESS_TEST_SENTENCE, "In these random futures the forecast model is not run: whether a warning is given before each season is drawn at random, " +
+    "using fixed rates for how often the forecast was right and how often it raised a false alarm in its test.");
+  assert.strictEqual(L.BENCHMARK_CAVEAT, "assumes the published 44,000 acre-feet is a yearly figure; not confirmed");
+  const page = fs.readFileSync(path.join(__dirname, "platform.js"), "utf8");
+  assert.ok(page.indexOf("U.esc(window.HGLogic.STRESS_TEST_SENTENCE)") >= 0);
+  assert.ok(page.indexOf("U.esc(window.HGLogic.BENCHMARK_CAVEAT)") >= 0);
+  // The engine really does draw the warning from the two rates (sim/engine.js).
+  const engine = fs.readFileSync(path.join(__dirname, "..", "sim", "engine.js"), "utf8");
+  assert.ok(engine.indexOf("warned[y] = library[from].dry ? rng() < opt.recall : rng() < opt.falseAlarm;") >= 0);
+  close(L.perMillionGal(325851 / 1e6), 1);                                 // $1 per million gallons
+  close(L.perMillionGal(74.5), 74.5 * 1e6 / E.GALLONS_PER_ACRE_FOOT);
+});
+
+test("the packed frozen summary agrees with the fixed sentences and holds no per-year lists", () => {
+  const HG = realData().HG, fz = HG.frozen;
+  // the held-out sentence's three figures are the frozen file's own
+  assert.strictEqual(fz.seepage.n, 14);
+  assert.strictEqual((fz.seepage.models.M1.medianError * 100).toFixed(1), "32.7");
+  assert.strictEqual((fz.seepage.models.length.medianError * 100).toFixed(1), "36.5");
+  assert.strictEqual(fz.seepage.passes, false);
+  assert.strictEqual(L.verdictFor({ lo: fz.seepage.gaps.length_minus_M1.lo, hi: fz.seepage.gaps.length_minus_M1.hi, lower: false }).word, "not separated");
+  // every comparison is a short list of eight plain values: no per-year numbers travel to the page
+  const rows = [].concat.apply([], fz.groups.map((g) => g.rows));
+  assert.ok(rows.length >= 20);
+  rows.forEach((r) => { assert.strictEqual(r.length, 8); r.forEach((v) => assert.ok(v === null || typeof v !== "object")); });
+  // the two results the decision log spells out, read straight from the packed rows
+  const find = (name) => { const a = rows.find((r) => r[0] === name); return { lo: a[2], hi: a[3], lo2: a[4], hi2: a[5], lower: a[7] }; };
+  assert.strictEqual(L.verdictFor(find("6-month system cost minus D1 now")).word, "not separated");
+  assert.strictEqual(L.verdictFor(find("4-week system cost minus D1 now")).word, "not separated");     // its two intervals disagree
+  assert.strictEqual(L.verdictFor(find("4-week system cost minus Persistence")).word, "ahead");
+  const avg = fz.allocation.average;
+  assert.strictEqual(L.verdictFor({ lo: avg.vsA.lo, hi: avg.vsA.hi, lower: false }).word, "not separated");
+  assert.strictEqual(L.verdictFor({ lo: avg.vsB.lo, hi: avg.vsB.hi, lower: false }).word, "ahead");
+  assert.strictEqual(avg.vsB.yearsBetter, 4);
+  // what the forecast changes: one row for all districts and one per district
+  assert.strictEqual(HG.forecastEffect.districts.length, HG.districts.length);
+  assert.strictEqual(HG.forecastEffect.overall.length, 5);
+  // the site still carries no calibration for the simulation
+  assert.strictEqual(HG.calibration, undefined);
+});

@@ -43,8 +43,10 @@
 
   <main class="shell" id="shell">
     <section class="stage" id="stage">
-      <canvas id="map"></canvas>
-      <canvas id="twin"></canvas>
+      <!-- The two canvases are pictures: a screen reader is told what each one is. Everything on
+           the map can also be reached from the lists and tables in the panel on the right. -->
+      <canvas id="map" role="img" aria-label="Map of Texas: drought by county, the Rio Grande, irrigation districts and canals. The same districts and canals are listed in the panel."></canvas>
+      <canvas id="twin" role="img" aria-label="Simulation picture: one district shown twice, without and with canal sealing. The figures are in the panel."></canvas>
       <div id="vig" class="mapOnly"></div><div class="cine t"></div><div class="cine b"></div>
       <div id="bar"></div>
       <!-- Map controls -->
@@ -69,13 +71,14 @@
       <div id="simBar" class="simOnly"><button class="sbtn main" id="simPlay">Play</button><button class="sbtn" id="simSkip">Skip to the end</button><input type="range" id="simSeek" min="0" max="1" value="0" aria-label="Week"><span id="simDate"></span></div>
     </section>
     <aside class="panel">
-      <nav class="stepper" id="stepper">
+      <nav class="stepper" id="stepper" aria-label="Steps">
         <button data-step="risk"><b>1</b>Risk profile</button>
         <button data-step="budget"><b>2</b>Budget plan</button>
         <button data-step="sim"><b>3</b>Simulation</button>
         <button data-step="sources"><b>4</b>Sources</button>
       </nav>
-      <div class="view" id="view"></div>
+      <!-- tabindex -1: the panel can be given the keyboard focus by the page after it is redrawn -->
+      <div class="view" id="view" tabindex="-1"></div>
     </aside>
   </main>
 
@@ -104,7 +107,7 @@
     </div>
   </div>
 
-  <div id="lightbox"><div><img alt=""><p></p></div></div>
+  <div id="lightbox" role="dialog" aria-label="Enlarged photo. Press Escape or click to close."><div><img alt=""><p></p></div></div>
 
   <script src="data/core.js"></script>
   <script src="data/sim.js"></script>

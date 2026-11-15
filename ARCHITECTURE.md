@@ -6,8 +6,7 @@ last stretch of the hackathon. It is meant to be handed out one section at a tim
 **Status of this document.** This is the plan as written before the build. It has since been carried out; section 12 at the end lists where the plan was wrong and what was built instead. Read section 12 before relying on anything above it.
 It was then checked three times: every path and number against the repo; a cross-review in which
 each reviewer read the others' sections; and a final read. The cross-review found 30 problems,
-all corrected here. Section 11 lists what was checked and what was not. Nothing in this plan has
-been implemented yet.
+all corrected here. Section 11 lists what was checked and what was not.
 
 ---
 
