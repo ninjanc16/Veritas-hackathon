@@ -231,6 +231,7 @@
   <div class="pbody" id="pbody">
     <div class="facts">
       <div class="abstract after" id="abstract"></div>
+      <section><h2>Open issues today</h2><p class="lead" id="issuelead"></p><div id="issues"></div></section>
       <section class="after"><h2>Most affected counties</h2><p class="lead">Ranked by the probability of a drought season. Select a county to go to it on the map and read its geography.</p><div id="toplist"></div><div id="dossier" style="margin-top:14px"></div></section>
       <section id="s-chain"><h2>Method and findings</h2><p class="lead">Each step feeds the next. The forecast says when, the canal map says where, the soil says how leaky.</p><ol class="chain" id="chain"></ol></section>
       <section class="after"><h2>The canals</h2><p class="lead">The object of the scan. Select a row to go to it on the map.</p><div id="canalfacts"></div></section>
@@ -867,8 +868,22 @@ function buildPanel() {
     ["County judges and commissioners courts", "Local drought and disaster declarations."],
   ];
   for (const [name, text] of who) $("#who").appendChild(el("div", "who", `<h3>${name}</h3><p>${text}</p>`));
-  buildPlan();
+  buildPlan(); buildIssues();
   if (selected) select(selected, false);
+}
+// Today's issues: each one comes from a fixed rule over public data (src/farmdrought/issues.py)
+function buildIssues() {
+  const I = D.issues, tier = { Critical: 1, Important: 2, Context: 3 }, box = $("#issues");
+  $("#issuelead").textContent = `${I.list.length} things to act on in the Texas reach, worked out by fixed rules from public data${I.at ? " at " + I.at.slice(0, 16).replace("T", " ") + " UTC" : ""}. Select one to go to it on the map.${I.notReached.length ? " Not reached this run: " + I.notReached.map((n) => n.split(" (")[0]).join(", ") + "." : ""}`;
+  box.innerHTML = "";
+  for (const it of I.list) {
+    const row = el("div", "fact k" + tier[it.severity], `<b>${it.severity.toUpperCase()}: ${it.title}</b><br>${it.detail}<br><span class="muted" style="font-size:12.5px">Who: ${it.who}. Source: ${it.source}, ${it.as_of.slice(0, 16).replace("T", " ")}.</span>`);
+    row.style.cursor = "pointer";
+    row.onclick = () => { const d = districtBy[it.district], c = countyBy[it.where[0]]; if (d) goTo(d.box); else if (c) select(c); };
+    box.appendChild(row);
+  }
+  if (!I.list.length) box.appendChild(el("p", "muted", "No rule fired for the Texas reach in this run."));
+  box.appendChild(el("p", "cap", `${I.note} ${cite("model", "usdm", "twdb")}`));
 }
 // The sealant plan: a budget slider, the totals, and one row per district
 function buildPlan() {

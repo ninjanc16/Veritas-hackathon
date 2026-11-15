@@ -249,6 +249,12 @@ def main():
     out["refresh"] = {"at": refresh["refreshed_at"],
                       "newest": {name: source.get("newest", "") for name, source in refresh["sources"].items()}}
 
+    # --- 4d. Today's issues for the Texas reach (written by src/farmdrought/issues.py)
+    issues_file = REPORTS / "issues.json"
+    feed = json.loads(issues_file.read_text()) if issues_file.exists() else {"generated_at": "", "issues": [], "not_reached": [], "note": ""}
+    out["issues"] = {"at": feed["generated_at"], "notReached": feed["not_reached"], "note": feed["note"],
+                     "list": [i for i in feed["issues"] if "Texas" in i["states"]]}
+
     # --- 5. Reservoir storage, latest reading in each Texas Water Development Board file
     lakes = []
     for name, filename, lon, lat in RESERVOIRS:
