@@ -26,6 +26,7 @@ from farmdrought.prob_calibration import (brier, calibrate_by_past, calibration_
                                           reliability)
 from farmdrought.trigger import run_trigger, run_trigger_annual
 from farmdrought import seepage_calibration as seepage
+from farmdrought import prospective
 from farmdrought.uncertainty import direction, excludes_zero, resample_years, year_block_bootstrap
 
 YEARS = list(range(2008, 2020))
@@ -1917,3 +1918,50 @@ def test_frozen_gate_names_a_changed_a_missing_and_an_unlisted_file(tmp_path):
     assert added_later == ["reports/frozen/round3/three.json"]
     assert (tmp_path / "reports" / "frozen.sha256").read_text().startswith(listed_before)
     assert check_frozen(tmp_path) == ["reports/frozen/round3/one.json (changed)", "reports/frozen/round3/two.json (missing)"]
+
+
+# ---------------------------------------------------------------------------------------------
+# The prospective log (section 3.8): forecasts written down before the truth is known
+# ---------------------------------------------------------------------------------------------
+def made_up_latest(week="2027-01-05", p_season=0.31):
+    return pd.DataFrame({"date": pd.to_datetime([week, week]), "fips": ["48061", "48215"], "county": ["Cameron", "Hidalgo"],
+                         "state": ["Texas", "Texas"], "river": ["Rio Grande", "Rio Grande"], "cls": [2, 3],
+                         "p_model": [0.12, 0.81], "p_season": [p_season, 0.74], "weeks_model": [11.5, 30.25]})
+
+
+MADE_UP_FROZEN = {"alert_threshold": 0.37, "frozen": {"git_commit": "abc", "score_through": "2026-11-10",
+                                                      "manifest_sha256": "f35"}}
+
+
+def test_prospective_entry_records_each_forecast_and_when_it_can_be_scored():
+    # Arrange / Act
+    record = prospective.entry(made_up_latest(), MADE_UP_FROZEN, "d0d0", logged_at="2027-01-07T09:00:00+00:00")
+
+    # Assert: the three horizons, each with the date its answer is known (issue date + 4, 26, 52 weeks)
+    assert record["issue_date"] == "2027-01-05" and record["manifest_sha256"] == "f35"
+    assert [(f["horizon_weeks"], f["answer_known_after"]) for f in record["forecasts"]] == [
+        (4, "2027-02-02"), (26, "2027-07-06"), (52, "2028-01-04")]
+    assert record["forecasts"][0]["alarm_threshold"] == 0.37 and record["forecasts"][1]["alarm_threshold"] == 0.25
+    assert record["counties"][1] == {"fips": "48215", "county": "Hidalgo", "state": "Texas", "river": "Rio Grande",
+                                     "cls": 3, "p_model": 0.81, "p_season": 0.74, "weeks_model": 30.25}
+    assert "NOTHING HERE IS SCORED YET" in record["header"]
+    assert record["model_version"]["frozen_results_code_commit"] == "abc"
+
+
+def test_prospective_log_only_appends_and_never_rewrites_a_week(tmp_path):
+    # Arrange
+    first = prospective.entry(made_up_latest("2027-01-05"), MADE_UP_FROZEN, "d0d0")
+    revised = prospective.entry(made_up_latest("2027-01-05", p_season=0.99), MADE_UP_FROZEN, "d0d0")
+    next_week = prospective.entry(made_up_latest("2027-01-12"), MADE_UP_FROZEN, "d1d1")
+
+    # Act
+    path = prospective.log_week(first, folder=tmp_path)
+    before = path.read_bytes()
+    with pytest.raises(FileExistsError, match="2027-01-05.json is already logged"):
+        prospective.log_week(revised, folder=tmp_path)             # the same week, with a changed forecast
+    prospective.log_week(next_week, folder=tmp_path)
+
+    # Assert: the first record stands byte for byte, and the new week sits beside it
+    assert path.read_bytes() == before
+    assert json.loads(path.read_text())["counties"][0]["p_season"] == 0.31
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["2027-01-05.json", "2027-01-12.json"]

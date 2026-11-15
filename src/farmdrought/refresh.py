@@ -182,6 +182,7 @@ def _main():
     report["outputs_rebuilt"] = "--download-only" not in sys.argv and any(changed(name) for name in sources)
     if report["outputs_rebuilt"]:
         run("-m", "farmdrought.export")      # predict only: this week's forecast, never the scores
+        run("-m", "farmdrought.prospective") # write the new forecast down before its answer is known
     if "--download-only" not in sys.argv:
         # The issues list reads live weather alerts and the rain forecast, so it is rebuilt on
         # every run, even on a day when no saved file changed.
