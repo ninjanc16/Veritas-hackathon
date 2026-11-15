@@ -3,8 +3,10 @@
 data/manifest.json holds the sha256 of every file under data/raw (all folders) and of
 notebooks/oni.txt, plus the scoring cut-off (config.SCORE_THROUGH). export.evaluate() refuses to
 run when any of those files differs from the manifest: a frozen result must come from the exact
-inputs it names. The daily refresh overwrites files in data/raw, so after a refresh the check
-fails ON PURPOSE. export.predict() (this week's forecast) does not check the manifest.
+inputs it names. The daily refresh never writes data/raw or notebooks/oni.txt: it saves its
+downloads in data/live (see refresh.py and config.live_data), so this check keeps passing after
+a refresh. export.predict() (this week's forecast) reads data/live and does not check the
+manifest. A few files under data/raw are not scored inputs and are left out (NOT_SCORED_INPUTS).
 
 Run it with:  PYTHONPATH=src python -m farmdrought.manifest          (check, and list differences)
               PYTHONPATH=src python -m farmdrought.manifest build    (write a new manifest)
