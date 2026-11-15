@@ -374,6 +374,12 @@ details.assume summary { font-weight: 700; cursor: pointer; }
 .back { background: none; border: 0; color: var(--blue); padding: 0; font-weight: 600; font-size: .86rem; margin-bottom: 8px; }
 .flag { display: inline-block; font-size: .7rem; font-weight: 700; border-radius: 4px; padding: 1px 6px; border: 1px solid var(--watch); color: var(--watch); margin-left: 6px; white-space: nowrap; }
 
+/* The simulation's headline: what acting saves. */
+.saveHero { background: color-mix(in srgb, var(--low) 10%, var(--card)); border: 1px solid var(--low); border-radius: var(--radius); padding: 16px 18px; margin: 12px 0; }
+.saveHero span { display: block; font-size: .76rem; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); }
+.saveHero b { display: block; font-family: var(--serif); font-size: clamp(2.4rem, 4vw, 3.4rem); line-height: 1.1; color: var(--low); }
+.saveHero small { display: block; color: var(--muted); font-size: .84rem; }
+
 /* The first-visit chooser: who are you? */
 .onboard { position: fixed; inset: 0; z-index: 2000; background: radial-gradient(1200px 700px at 30% 0%, #12404d, #081216); color: #fff; overflow-y: auto; display: none; }
 .onboard.open { display: block; animation: fadeIn .4s; }

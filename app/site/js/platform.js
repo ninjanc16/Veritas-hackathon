@@ -195,9 +195,9 @@
   }
   const costAll = () => U.planFor(scopeCanals(), 0, null).costAll;
   function defaultBudget() {
-    const all = costAll();
-    if (state.scope === STATE) return Math.min(all, HG.plan.budget_usd);
-    return Math.max(100, Math.round(all * 0.25 / 100) * 100);
+    // Start with every treatable canal funded. The simulation shows each extra dollar of sealant
+    // still returns far more than it costs, so the full network is the plan the numbers favour.
+    return maxBudget();
   }
   const maxBudget = () => Math.max(100, Math.ceil(costAll() / 100) * 100);
   const budgetStep = () => (maxBudget() > 200000 ? 5000 : maxBudget() > 20000 ? 500 : 100);
@@ -339,6 +339,7 @@
     ["reliefShare", 0, 1, 0.05, (v) => Math.round(v * 100) + "%"],
     ["crews", 1, 10, 1, (v) => v],
     ["kmPerCrewDay", 1, 20, 1, (v) => v + " km"],
+    ["applications", 1, 3, 1, (v) => v],
   ];
 
   /* What the engine needs for the current scope: its weekly record, its canals and the money at stake. */
@@ -457,10 +458,30 @@
         cutoffYear: 2020, recall: hit.recall, falseAlarm: hit.falseAlarm,
         shocks: on.filter((s) => s.shock).map((s) => s.shock), secondDryYear: on.some((s) => s.secondDryYear) });
       const base = run.policies[0].draws, endYear = Number(TODAY.slice(0, 4)) + 5;
+      // The headline: what acting saves in the middle future, and what each sealant dollar returns.
+      const median = (list) => list.slice().sort((a, b) => a - b)[Math.floor(list.length / 2)];
+      const actDraws = run.policies[2].draws;
+      const saved = median(actDraws.map((t, k) => base[k].cost - t.cost)), kept = median(actDraws.map((t, k) => base[k].loss - t.loss));
+      const spent = run.policies[2].summary.spend.mid, behind = actDraws.filter((t, k) => t.cost > base[k].cost).length;
+      // The same question at other budgets (fewer futures, to stay quick): does more sealing still pay?
+      const top = maxBudget(), levels = [0, 0.1, 0.25, 0.5, 0.75, 1].map((f) => Math.round(top * f));
+      const curve = levels.map((b) => {
+        if (b === 0) return 0;
+        const r = E.fromToday(scope, [{ trigger: "never" }, { trigger: "forecast" }], Object.assign({}, over, { budget: b }), {
+          startDate: TODAY, pctNow: res.pct == null ? 50 : res.pct, pNow: scope.pNow, years: 5, draws: 120, seed: 11, cutoffYear: 2020,
+          recall: hit.recall, falseAlarm: hit.falseAlarm, shocks: on.filter((x) => x.shock).map((x) => x.shock), secondDryYear: on.some((x) => x.secondDryYear) });
+        return median(r.policies[1].draws.map((t, k) => r.policies[0].draws[k].cost - t.cost));
+      });
+      const heroHtml = '<div class="saveHero"><span>Acting on the forecast saves, to ' + endYear + "</span><b>" + money(saved) + "</b>" +
+        "<small>in the middle of 300 futures: " + money(kept) + " of crops kept for " + money(spent) + " of sealant" + (spent > 0 ? ", about $" + U.num(kept / spent) + " back for each $1" : "") + ". Acting ends behind in " + behind + " of 300 futures.</small></div>";
+      const curveHtml = "<h3>Saving by sealing budget</h3><div class=\"chart\">" +
+        lineChart([{ name: "Five-year saving against doing nothing, middle future", color: U.TIER_COLOR.Low, values: curve }], levels.map((b) => money(b)), money) +
+        '<p class="credit" style="margin:6px 0 8px">Budget in each year you act. Sealant is cheap next to lost crops, so the saving keeps rising until every treatable canal is funded (' + U.usd(top) + "). For scale, a Texas A&amp;M study put the water that better canals could save across 28 Valley districts at 54,000 to 223,000 acre-feet a year.</p>" +
+        (state.budget < top ? '<button class="btn small" data-act="fullBudget">Fund every treatable canal: ' + U.usd(top) + " a year</button>" : "") + "</div>";
       html = '<div class="card small"><b>Starts today, ' + U.niceDate(TODAY) + ".</b> " + scope.system + " reservoirs at " + (res.pct == null ? "n/a" : res.pct + "%") + " (" + (res.live ? "live reading" : "saved reading") + " of " + U.niceDate(res.date) + "). " +
         "Chance of a drought season in the next 6 months: <b>" + U.pct(scope.pNow) + "</b>, from a model that " + (FROZEN ? "stopped learning on " + U.niceDate(FROZEN.trainedOn.to) + " and is reading the Drought Monitor week of " + U.niceDate(FROZEN.liveWeek) : "was tested on later years") + ". " +
         "Futures are built from " + run.libraryYears.length + " real years, " + run.libraryYears[0] + " to " + run.libraryYears[run.libraryYears.length - 1] + " (" + run.dryYears.length + " of them had a drought season). Nothing from 2020 on is used to build them." +
-        (on.length ? " <b>Added: " + on.map((s) => s.label.toLowerCase() + " (" + s.note + ")").join("; ") + ".</b>" : "") + "</div>" + html +
+        (on.length ? " <b>Added: " + on.map((s) => s.label.toLowerCase() + " (" + s.note + ")").join("; ") + ".</b>" : "") + "</div>" + heroHtml + html + curveHtml +
         "<h3>Total cost to " + endYear + ": crops lost plus sealing</h3><div class=\"futures\">" + POLICIES.map((pol, i) => {
           const s = run.policies[i].summary.cost;
           const gains = run.policies[i].draws.map((t, k) => base[k].cost - t.cost).sort((a, b) => a - b);
@@ -568,6 +589,7 @@
     if (act === "closeCanal") { state.canal = null; refresh(false); }
     if (act === "csv") downloadCsv();
     if (act === "resetAssume") { state.overrides = {}; renderSim(); }
+    if (act === "fullBudget") { state.budget = maxBudget(); renderSim(); }
     if (act === "canal") { state.canal = Number(t.dataset.id); map.flyToCanal(state.canal); refresh(false); }
   });
   $("lightbox").onclick = () => $("lightbox").classList.remove("on");

@@ -53,6 +53,7 @@
     jobsPerMillion:{ value: 16.95,  tag: "published",  label: "Jobs at risk per $1 million of crop revenue lost" },
     kmPerCrewDay:  { value: 6,      tag: "assumption", label: "Kilometres of canal one crew seals in a working day" },
     crews:         { value: 2,      tag: "assumption", label: "Crews working at the same time" },
+    applications:  { value: 1,      tag: "assumption", label: "Sealant applications in a season you act (each lasts about 90 days)" },
   };
 
   /* Plain values out of DEFAULTS, with any overrides on top. */
@@ -129,6 +130,7 @@
       let sealedUntil = -1;       // index of the last week the sealant still works
       let workStartsAt = null;    // for the "declared" policy: the week the paperwork is done
       let decided = false;        // the pre-season decision is made once a year
+      let applied = 0;            // sealant applications so far this year
 
       weeks.forEach((week, i) => {
         d2Run = week.cls != null && week.cls >= D2 ? d2Run + 1 : 0;
@@ -138,7 +140,7 @@
         if (out.declaredWeek == null && d2Run >= 8) out.declaredWeek = i;
 
         // --- The decision. A policy may only look at this week and earlier weeks. ---
-        let act = false;
+        let act = false, reapplied = false;
         if (!out.acted && plan.spent > 0) {
           const t = policy.trigger;
           if (!decided && week.month >= p.decisionMonth && (t === "forecast" || t === "d1" || t === "always")) {
@@ -153,7 +155,13 @@
           }
         }
         if (act) {
-          out.acted = true; out.actedWeek = i; out.spend += plan.spent;
+          out.acted = true; out.actedWeek = i; out.spend += plan.spent; applied = 1;
+          sealedUntil = i + weeksActive - 1;
+        }
+        // A further application once the last one has worn off, if the plan allows it and the
+        // season is still running. Each one is paid for in full.
+        if (out.acted && !act && i === sealedUntil + 1 && applied < p.applications && inSeason(week)) {
+          applied += 1; out.spend += plan.spent; reapplied = true;
           sealedUntil = i + weeksActive - 1;
         }
 
@@ -174,7 +182,7 @@
         out.loss += (missing - recovered) * valuePerAf;
         out.weekly.push({ date: week.date, month: week.month, pct: week.pct, cls: week.cls, forecast: week.forecast,
                           demand, missing, recovered, saved, sealed: i <= sealedUntil,
-                          spend: act ? plan.spent : 0, loss: (missing - recovered) * valuePerAf });
+                          spend: act || reapplied ? plan.spent : 0, loss: (missing - recovered) * valuePerAf });
       });
 
       out.relief = out.loss * p.reliefShare;                       // public money paid AFTER the loss
