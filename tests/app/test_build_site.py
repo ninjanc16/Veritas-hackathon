@@ -143,3 +143,57 @@ def test_site_size_gate_passes_today_and_names_a_file_that_grew():
     assert len(found) == 2 and "core.js is 3.30 MB, over its limit of 3.2 MB" in found[0]
     assert "new.jpg is 1.20 MB, over its limit of 1.0 MB" in found[1]
     assert any("in all" in line for line in gate.problems({"app/site/a.bin": 0.9 * gate.MB} | {f"app/site/{i}": 0.9 * gate.MB for i in range(60)}))
+
+
+def load_tool(name):
+    """Load a script from tools/ as a module (tools is not a package)."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(name, REPO_ROOT / "tools" / f"{name}.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_hash_list_gate_catches_a_changed_or_removed_line_against_the_base_branch(tmp_path):
+    # Arrange: a temporary git repository whose main branch holds a list of two hashes
+    import shutil
+    import subprocess
+    if shutil.which("git") is None:
+        pytest.skip("git is not installed, so a temporary repository cannot be made")
+    gate = load_tool("hash_list_gate")
+
+    def git(*args):
+        subprocess.run(["git", "-c", "user.name=Test", "-c", "user.email=test@example.com", *args],
+                       cwd=tmp_path, check=True, capture_output=True)
+
+    listed = tmp_path / "reports" / "frozen.sha256"
+    listed.parent.mkdir()
+    listed.write_text("aaa  reports/frozen/one.json\nbbb  reports/frozen/two.json\n")
+    git("init", "-q", "-b", "main")
+    git("add", ".")
+    git("commit", "-q", "-m", "base")
+    git("checkout", "-q", "-b", "work")
+    name = "reports/frozen.sha256"
+
+    # Act / Assert: a new line is allowed
+    listed.write_text(listed.read_text() + "ccc  reports/frozen/three.json\n")
+    found, notes = gate.check("main", [name], cwd=str(tmp_path))
+    assert found == [] and "all 2 lines from the base are unchanged; 1 new line(s)" in notes[0]
+    # editing a scored file's hash line (the way to slip a changed result past the local check) is caught
+    listed.write_text("aaa  reports/frozen/one.json\nZZZ  reports/frozen/two.json\nccc  reports/frozen/three.json\n")
+    assert gate.check("main", [name], cwd=str(tmp_path))[0] == [
+        "reports/frozen.sha256: the recorded hash of reports/frozen/two.json was changed"]
+    # so is dropping a line, and so is deleting the list and building it again without that file
+    listed.write_text("aaa  reports/frozen/one.json\n")
+    assert gate.check("main", [name], cwd=str(tmp_path))[0] == [
+        "reports/frozen.sha256: the line for reports/frozen/two.json was removed"]
+    listed.unlink()
+    assert gate.check("main", [name], cwd=str(tmp_path))[0] == [
+        "reports/frozen.sha256 was deleted; it existed on the base branch"]
+    # a list that the base does not have, and a base that does not exist, pass and say why
+    (tmp_path / "reports" / "prospective.sha256").write_text("ddd  reports/prospective/2027-01-05.json\n")
+    found, notes = gate.check("main", ["reports/prospective.sha256"], cwd=str(tmp_path))
+    assert found == [] and "does not exist on the base" in notes[0]
+    for missing in ("", "0000000000000000000000000000000000000000", "origin/no-such-branch"):
+        found, notes = gate.check(missing, [name], cwd=str(tmp_path))
+        assert found == [] and "nothing was checked" in notes[0]

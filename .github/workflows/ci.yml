@@ -52,9 +52,18 @@ jobs:
 
   frozen-gate:
     # Scored results and the inputs they were scored on must not change. Needs no libraries.
+    #
+    # Two different checks, and only the last is a real barrier:
+    #   - "match" steps compare the files with the hash lists IN THIS SAME COMMIT. Anyone who
+    #     edits a scored file and its hash line together, or deletes a list and builds it again,
+    #     passes them. They guard against accidents only (and are what the local command does).
+    #   - the "base branch" step compares each hash list with the list on the base branch: a
+    #     line that was there must still be there, unchanged. New lines are allowed.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0     # the base-branch step needs history
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
@@ -62,6 +71,20 @@ jobs:
         run: PYTHONPATH=src python -m farmdrought.manifest
       - name: Frozen results match reports/frozen.sha256
         run: PYTHONPATH=src python -m farmdrought.manifest frozen
+      - name: No recorded hash changed or disappeared since the base branch
+        run: |
+          # Pull request: the branch it will merge into. Push to main: the commit main was at before.
+          # Push to another branch: where it left main, if origin/main exists.
+          BASE=""
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="origin/${{ github.base_ref }}"
+          elif [ "${{ github.ref_name }}" = "main" ]; then
+            BASE="${{ github.event.before }}"
+          elif git rev-parse -q --verify origin/main > /dev/null; then
+            BASE="$(git merge-base HEAD origin/main)"
+          fi
+          echo "base: ${BASE:-none}"
+          python tools/hash_list_gate.py "$BASE" reports/frozen.sha256
 
   size-gate:
     # Prints the website's file sizes and fails if one grew past its limit (tools/site_size.py).

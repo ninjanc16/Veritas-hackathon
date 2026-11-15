@@ -231,3 +231,7 @@ A cheap version of the model comparison in ARCHITECTURE.md section 3.6. No GRU. 
 - **What counts as a win.** Only an interval that excludes zero, by the direction label already used in round 3. A tie or a loss is reported as plainly as a win.
 - **Once.** It is run one time. After any number is seen only a crash may be fixed. The forest stays the reported system whatever the result.
 - **What was already known when this was written.** The frozen forest costs 2,324 and "D1 now" 2,382 on these rows. No boosting model had been trained on this data.
+
+## What the frozen gate does and does not stop (written Nov 15, 2026)
+
+`reports/frozen.sha256` lists the hash of every scored file, and `python -m farmdrought.manifest frozen` checks the files against it. That local command compares the working tree with itself. It catches an accident, such as a script that rewrites a scored file. It does not stop someone who changes a scored file and its hash line in the same commit, or who deletes the list and builds it again. The barrier against that is in CI: a step that compares the list with the list on the base branch and fails if any line that was there has changed or gone (`tools/hash_list_gate.py`). That step has not yet run on GitHub.
