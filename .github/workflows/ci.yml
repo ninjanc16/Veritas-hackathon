@@ -30,6 +30,8 @@ jobs:
         run: PYTHONPATH=src python -m pytest tests/pipeline -q
       - name: Simulation tests
         run: node app/site/sim/engine.test.js
+      - name: Site logic tests
+        run: node app/site/js/logic.test.js
 
   banned-words:
     runs-on: ubuntu-latest

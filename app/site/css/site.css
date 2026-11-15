@@ -301,6 +301,8 @@ dl.key { margin: 0; font-size: .84rem; } dl.key dt { font-weight: 600; color: va
 table.t input[type=checkbox] { accent-color: var(--blue); pointer-events: none; }
 #simBar { position: absolute; left: 14px; right: 14px; bottom: 10px; display: flex; gap: 10px; align-items: center; z-index: 3; }
 #simBar input[type=range] { flex: 1; min-width: 0; }
+/* The caption on the simulation picture: it sits just above the play bar, in the room js/twin.js leaves for it. */
+#twinCaption { position: absolute; left: 14px; right: 14px; bottom: 52px; margin: 0; z-index: 3; text-align: center; font-size: 12.5px; line-height: 1.35; color: var(--ink); pointer-events: none; }
 #simDate { font-size: 15px; min-width: 118px; text-align: right; color: var(--ink); }
 .shocks { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
 .shocks span { color: var(--muted); font-size: .82rem; width: 100%; }
@@ -442,6 +444,16 @@ table.t td { padding: 6px 8px 6px 0; }
 table.t td.r, table.t th.r { padding-right: 0; padding-left: 8px; }
 table.t td.save { color: var(--low); font-weight: 600; }
 table.t tr.off td { opacity: .5; }
+/* The replay table has six columns in a narrow panel: headings may wrap onto two lines, policy
+   names wrap, and numbers stay on one line. If the panel is narrower still (a phone), the table
+   scrolls sideways inside its own box and the page does not get wider. */
+.tableWrap { overflow-x: auto; max-width: 100%; }
+table.t.replay th { vertical-align: bottom; }
+table.t.replay th.r { white-space: normal; }
+/* A range in a table cell: the middle on its own line, the low and high in small text under it.
+   The small text may break at its spaces, so a column is never wider than one figure. */
+.rmid { display: block; }
+.rng { display: block; white-space: normal; font-size: .72rem; line-height: 1.3; color: var(--muted); }
 .scroll { border-radius: 0; }
 .saveHero span { letter-spacing: .1em; font-size: .7rem; }
 .saveHero b { font-weight: 600; font-variant-numeric: tabular-nums lining-nums; }

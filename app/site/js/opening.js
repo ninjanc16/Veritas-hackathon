@@ -27,7 +27,7 @@
     // The name, in two parts so the second can be set differently. The map opens out of
     // the letter at `eye` (a position in the first part).
     name: ["Rio", "IQ"], eye: 2,
-    line: "A planning tool for the irrigation districts on the Texas Rio Grande. It forecasts drought six months ahead, maps every canal, and lists which ones to seal first.",
+    line: "A planning tool for the irrigation districts on the Texas Rio Grande. It forecasts drought six months ahead, maps every canal, and puts the canals in a modelled order for sealing.",
     cue: "Scroll to follow the river",
     photo: { src: "photos/opening-santa-elena.jpg", what: "Santa Elena Canyon, Big Bend, Texas. Mexico is on the left bank.",
              by: "Carol M. Highsmith, Library of Congress", url: "https://commons.wikimedia.org/wiki/File:The_sheer_faces_of_Santa_Elena_Canyon,_deep_in_Big_Bend_National_Park_in_Brewster_County,_Texas,_frame_the_Rio_Grande_River._Mexico_is_to_the_left,_the_United_States_to_the_right_LCCN2014630611.tif" },
@@ -74,7 +74,7 @@
       source: ["Christian Science Monitor, May 2001", "https://csmonitor.com/2001/0521/p3s1.html"] },
     { id: "texas", kicker: "Where RioIQ works", title: "RioIQ covers the Texas stretch",
       body: ["Fourteen Texas counties sit on the river. Their irrigation districts move its water to farms through canals, and unlined canals leak into the soil.",
-             "RioIQ shows each district which canals to seal first and what that costs."],
+             "RioIQ shows each district a modelled order for sealing its canals and what that would cost."],
       ghost: "RIOIQ",
       links: [["See this week’s numbers", "#texas", ""], ["Open the platform", "app.html", "ghost"]] },
   ];

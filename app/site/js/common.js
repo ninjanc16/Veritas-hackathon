@@ -4,6 +4,8 @@
   The data itself comes from two generated files (see app/build_site.py):
     window.HG      maps, this week's forecasts, canals, districts, test results
     window.HG_SIM  weekly history from 2008 on, for the simulation
+
+  The formatting and planning rules are in js/logic.js (window.HGLogic), which must load first.
 */
 (function () {
   "use strict";
@@ -69,19 +71,8 @@
     liningExample: { text: "Hidalgo County Irrigation District No. 1 application to Reclamation, 2023", url: "https://www.usbr.gov/watersmart/weeg/docs/2023/HidalgoCountyIDNo1_508.pdf" },
   };
 
-  /* ---------- Formatting ---------- */
-  const usd = (x) => {
-    if (x == null || isNaN(x)) return "n/a";
-    const a = Math.abs(x), sign = x < 0 ? "-" : "";
-    if (a >= 1e9) return sign + "$" + (a / 1e9).toFixed(2) + " billion";
-    if (a >= 1e6) return sign + "$" + (a / 1e6).toFixed(a >= 1e8 ? 0 : 1) + " million";
-    return sign + "$" + Math.round(a).toLocaleString("en-US");
-  };
-  const num = (x, digits) => (x == null || isNaN(x)) ? "n/a"
-    : Number(x).toLocaleString("en-US", { maximumFractionDigits: digits || 0, minimumFractionDigits: digits || 0 });
-  const pct = (p) => (p == null ? "n/a" : Math.round(p * 100) + "%");
-  const niceDate = (iso) => new Date(iso + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  /* ---------- Formatting: the functions live in js/logic.js, which has no page code and is tested ---------- */
+  const { usd, num, pct, niceDate, esc, workTime } = window.HGLogic;
 
   /* ---------- Canals as objects (the data file stores them as short lists to stay small) ---------- */
   const KINDS = ["Irrigation canal", "Ditch", "Drain"];        // what OpenStreetMap calls the line (null = it does not say)
@@ -97,70 +88,10 @@
   const riverByFips = {};
   HG.river.forEach((c) => { riverByFips[c.fips] = c; });
 
-  /* The advice that goes with a chance of a drought season (the same cut-offs as the canal plan). */
-  function actionFor(p) {
-    if (p >= HG.threshold) return { key: "seal", title: "Seal and repair before the season",
-      text: "The chance of a drought season is over the warning line. Walk the top canals, confirm they are unlined, and seal before the first irrigation." };
-    if (p >= HG.threshold / 2) return { key: "inspect", title: "Inspect and prepare",
-      text: "Not over the warning line yet. Inspect the top canals and line up sealant so you can act quickly if the forecast rises." };
-    return { key: "none", title: "No extra action",
-      text: "The chance of a drought season is low. In a normal year canal leakage also refills groundwater, so sealing is not needed." };
-  }
-  const tierFor = (p) => (p >= HG.threshold ? "Warning" : p >= HG.threshold / 2 ? "Watch" : "Low");
-
-  /*
-    The budget plan. scopeCanals = the canals to choose from. pOverride = a "what if" chance of a
-    drought season (null = use the model's forecast, which gives exactly the pipeline's order).
-    Rule: rank by seepage rate x chance of drought, pay from the top down, stop at the first
-    canal the money left cannot cover.
-  */
-  function planFor(scopeCanals, budget, pOverride) {
-    const a = HG.plan.assumptions;
-    const treatable = scopeCanals.filter((c) => c.rank != null);
-    const ordered = treatable.slice().sort(pOverride == null
-      ? (x, y) => x.rank - y.rank
-      : (x, y) => (y.rate - x.rate) || (x.rank - y.rank));
-    const p = { widthFt: a.wetted_width_ft, usdPerSqft: a.sealant_usd_per_sqft };
-    const result = window.HGEngine.fundCanals(ordered, budget, p);
-    const days = a.days_one_application_lasts;
-    return {
-      ordered, funded: result.funded, fundedIds: new Set(result.funded.map((c) => c.id)),
-      spent: result.spent, km: result.km,
-      savedLow: window.HGEngine.savedAcreFeet(result.gallonsPerDay, days, a.sealant_cut_low),
-      savedHigh: window.HGEngine.savedAcreFeet(result.gallonsPerDay, days, a.sealant_cut_high),
-      costAll: ordered.reduce((s, c) => s + c.usd, 0),
-      sqft: result.km * window.HGEngine.FEET_PER_KM * a.wetted_width_ft,
-    };
-  }
-
-  /*
-    The three numbers that matter for one canal segment (or any list of them):
-      usd      what the sealant costs (materials only; the pipeline's price per square foot)
-      days     how long the job takes: km / (km one crew seals a day x crews). An assumption.
-      afLow, afHigh  acre-feet of water kept in one application, across the range sealant tests found
-      worthLow, worthHigh  what that water is worth to farms IF there is a shortage to fill
-                           (net crop revenue per acre-foot; in a full year saved water earns nothing)
-    params: { kmPerCrewDay, crews } from the simulation's assumptions.
-  */
-  const USD_PER_AF = PUBLISHED.worstCaseRevenue / PUBLISHED.valleyIrrigationAf;   // about $367, our own division
-  function canalNumbers(list, params) {
-    const a = HG.plan.assumptions, E = window.HGEngine;
-    let km = 0, usd = 0, gallonsPerDay = 0;
-    list.forEach((c) => {
-      const sqft = c.km * E.FEET_PER_KM * a.wetted_width_ft;
-      km += c.km; usd += sqft * a.sealant_usd_per_sqft; gallonsPerDay += sqft * (c.rate || 0);
-    });
-    const afLow = E.savedAcreFeet(gallonsPerDay, a.days_one_application_lasts, a.sealant_cut_low);
-    const afHigh = E.savedAcreFeet(gallonsPerDay, a.days_one_application_lasts, a.sealant_cut_high);
-    return { km, usd, days: km / (params.kmPerCrewDay * params.crews), crewDays: km / params.kmPerCrewDay,
-             afLow, afHigh, worthLow: afLow * USD_PER_AF, worthHigh: afHigh * USD_PER_AF };
-  }
-  /* "3 hours", "2 days", "6 weeks": a length of working time (8-hour days, 5-day weeks) in plain words. */
-  function workTime(days) {
-    if (days < 1) return Math.max(1, Math.round(days * 8)) + (Math.round(days * 8) <= 1 ? " hour" : " hours");
-    if (days < 15) return (days < 3 ? days.toFixed(1) : Math.round(days)) + " days";
-    return Math.round(days / 5) + " weeks";
-  }
+  /* The rules that read the data (advice, tier, budget plan, canal numbers) are in js/logic.js too.
+     They are bound to the real data here, once, and published under the names they always had. */
+  const logic = window.HGLogic.makeLogic({ HG, SIM: window.HG_SIM, canals, published: PUBLISHED }, window.HGEngine);
+  const { actionFor, tierFor, planFor, canalNumbers, USD_PER_AF } = logic;
 
   /* Path to one of a county's photos. kind = "county" (aerial), "drought" (close-up) or "ground". */
   const photo = (fips, kind) => "photos/" + fips + "-" + kind + ".jpg";
@@ -175,5 +106,5 @@
 
   window.HGU = { DM_COLOR, DM_TEXT, TIER_COLOR, LEVEL_COLOR, PUBLISHED, USD_PER_AF, usd, num, pct, niceDate, esc,
                  canals, countyByFips, riverByFips, actionFor, tierFor, planFor, canalNumbers, workTime, photo, el,
-                 readTheme, setTheme, theme: () => theme };
+                 readTheme, setTheme, theme: () => theme, logic };
 })();
