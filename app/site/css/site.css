@@ -269,13 +269,13 @@ body.app { height: 100vh; display: flex; flex-direction: column; overflow: hidde
 .stage.flow #simSteps { display: flex; }
 .stage.flow:not(.sim) #simPrompt { display: block; }
 .stage.cards #simCards { display: flex; }
-.stage.flow #views, .stage.flow #actions, .stage.flow #hud { display: none !important; }
+.stage.flow #actions, .stage.flow #hud, .stage.sim #views { display: none !important; }
 #simSteps { position: absolute; left: 16px; top: 14px; gap: 6px; z-index: 4; }
 #simSteps button { background: color-mix(in srgb, var(--card) 94%, transparent); border: 1px solid var(--line); border-radius: 4px; padding: 6px 12px; font: 500 15px var(--serif); color: var(--muted); }
 #simSteps button b { color: var(--blue); margin-right: 6px; }
 #simSteps button.on { border-color: var(--blue); color: var(--ink); font-weight: 700; }
 #simSteps button:disabled { opacity: .45; cursor: default; }
-#simPrompt { position: absolute; left: 50%; top: 62px; transform: translateX(-50%); z-index: 3; text-align: center; pointer-events: none; width: min(92%, 640px); text-shadow: 0 0 8px var(--map), 0 0 8px var(--map), 0 0 8px var(--map); }
+#simPrompt { position: absolute; left: 50%; top: 104px; transform: translateX(-50%); z-index: 3; text-align: center; pointer-events: none; width: min(92%, 640px); text-shadow: 0 0 8px var(--map), 0 0 8px var(--map), 0 0 8px var(--map); }
 #simPrompt b { display: block; font-size: clamp(20px, 2.4vw, 30px); line-height: 1.15; color: var(--head); }
 #simPrompt span { font-size: 15px; font-style: italic; color: var(--muted); }
 #simCards { position: absolute; right: 14px; top: 58px; bottom: 12px; width: min(330px, 44%); flex-direction: column; gap: 8px; justify-content: center; z-index: 4; }
@@ -294,6 +294,9 @@ body.app { height: 100vh; display: flex; flex-direction: column; overflow: hidde
 @media (max-height: 900px) { .scase p.tiny { display: none; } }
 .scase .gain { font-size: 14px; font-weight: 700; color: var(--low); margin-top: 3px; } .scase .gain.bad { color: var(--warning); }
 .scase .go { font-size: 13.5px; font-weight: 700; color: var(--blue); }
+.pickBar { display: flex; gap: 6px; margin: 10px 0 8px; } .pickBar input { flex: 1; min-width: 0; background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: 3px; padding: 8px 10px; font: inherit; }
+dl.key { margin: 0; font-size: .84rem; } dl.key dt { font-weight: 600; color: var(--head); margin-top: 8px; } dl.key dd { margin: 0; color: var(--muted); }
+#simSteps button { color: var(--ink); }
 #simCases { position: absolute; right: 14px; top: 14px; display: flex; gap: 4px; z-index: 4; } #simCases .sbtn { padding: 5px 9px; font-size: 14px; }
 table.t input[type=checkbox] { accent-color: var(--blue); pointer-events: none; }
 #simBar { position: absolute; left: 14px; right: 14px; bottom: 10px; display: flex; gap: 10px; align-items: center; z-index: 3; }

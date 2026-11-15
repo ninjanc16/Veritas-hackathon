@@ -1,0 +1,239 @@
+/*
+  opening.css: the opening of the intro page (index.html only).
+
+  A title page, then one pinned screen that travels the Rio Grande from its source to the
+  sea as the reader scrolls. js/opening.js builds and moves it; data/river.js is its map.
+
+  It has its own warm, dark palette on purpose, so it reads as the prologue. The rest of
+  the page keeps the tokens in site.css. Everything here is scoped under .opening.
+*/
+.opening {
+  --night: #0a0807;
+  --cream: #f3e3bd;
+  --amber: #e8a94c;
+  --magenta: #e0489f;
+  --jade: #7fd6b4;
+  --display: "Fraunces", "Iowan Old Style", Georgia, serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", monospace;
+  --settle: cubic-bezier(.16, 1, .3, 1);
+  position: relative;
+  background: var(--night);
+  color: var(--cream);
+}
+/* The headings below the opening share its display face, so the page reads as one piece. */
+body.intro { --serif: "Fraunces", "Times New Roman", Times, Georgia, serif; overflow-x: hidden; }
+body.intro h1, body.intro h2, body.intro h3 { font-weight: 500; letter-spacing: -.01em; }
+
+.opening .pin { --k: 1; position: sticky; top: 0; height: 100vh; height: 100svh; overflow: hidden; }
+.opening .pin, .opening .mapLayer {
+  background:
+    radial-gradient(90% 70% at 70% 45%, #2a1710 0%, transparent 70%),
+    radial-gradient(60% 50% at 15% 90%, #2b1326 0%, transparent 70%), var(--night);
+}
+.opening p { margin: 0; }
+.opening .lbl { font-family: var(--mono); font-size: .72rem; letter-spacing: .16em; text-transform: uppercase; }
+.opening .srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.opening :focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; border-radius: 2px; }
+
+/* ---------- Title page ----------
+   One photograph of the river, edge to edge, with the name set on top of it. */
+.opening .title { position: absolute; inset: 0; overflow: hidden; background: var(--night); }
+.opening .backdrop { position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; object-fit: cover; object-position: 62% 40%; transform: scale(1.04); will-change: transform; }
+.opening .shade { position: absolute; inset: 0; background:
+  linear-gradient(0deg, rgba(10, 8, 7, .94) 0%, rgba(10, 8, 7, .78) 26%, rgba(10, 8, 7, .12) 58%, rgba(10, 8, 7, .5) 100%),
+  linear-gradient(90deg, rgba(10, 8, 7, .55), transparent 55%); }
+.opening .wordWrap { position: absolute; left: 20px; right: 20px; bottom: 268px; }
+.opening .titleLabel { color: rgba(243, 227, 189, .85); margin-bottom: 14px; }
+.opening .word { margin: 0; position: relative; display: inline-block; font-family: var(--display); font-weight: 400; font-size: min(27vw, 34svh); line-height: .86; letter-spacing: -.035em; color: #fff7e4; text-shadow: 0 4px 60px rgba(10, 8, 7, .55); }
+.opening .word em { font-style: italic; font-weight: 300; color: var(--amber); letter-spacing: -.02em; margin-left: .03em; }
+.opening .rest { position: absolute; left: 20px; right: 20px; bottom: 28px; display: grid; gap: 14px; }
+.opening .line { max-width: 34rem; font-family: var(--display); font-weight: 300; font-size: 1.1rem; line-height: 1.4; color: var(--cream); }
+.opening .credit { font-size: .74rem; line-height: 1.5; color: rgba(243, 227, 189, .62); max-width: 30rem; }
+.opening .credit a { color: inherit; text-underline-offset: 3px; }
+.opening .cue { display: flex; align-items: center; gap: 12px; color: rgba(243, 227, 189, .85); }
+.opening .cue span { display: inline-block; height: 36px; width: 1px; background: rgba(243, 227, 189, .7); transform-origin: top; animation: openingCue 2.2s var(--settle) infinite; }
+@keyframes openingCue { 0% { transform: scaleY(0); } 60%, 100% { transform: scaleY(1); opacity: 0; } }
+
+/* ---------- The map ---------- */
+.opening .mapLayer { position: absolute; inset: 0; clip-path: circle(0 at 50% 50%); will-change: clip-path; }
+.opening .mapLayer svg { width: 100%; height: 100%; display: block; }
+.opening .mexico { fill: rgba(243, 227, 189, .022); stroke: rgba(243, 227, 189, .16); stroke-width: calc(1px / var(--k)); }
+.opening .state { fill: rgba(243, 227, 189, .035); stroke: rgba(243, 227, 189, .3); stroke-width: calc(1px / var(--k)); transition: fill 1.2s, stroke 1.2s; }
+.opening .regionName { font-family: var(--mono); font-size: calc(11px / var(--k)); letter-spacing: .3em; fill: rgba(243, 227, 189, .3); text-anchor: middle; }
+.opening .county { fill: transparent; stroke: rgba(243, 227, 189, .12); stroke-width: calc(1px / var(--k)); transition: fill .9s var(--settle), stroke .9s var(--settle); cursor: crosshair; }
+.opening .county.lit { fill: rgba(232, 169, 76, .24); stroke: rgba(232, 169, 76, .9); animation: openingArrive 1.1s var(--settle); }
+.opening .county:hover { fill: rgba(243, 227, 189, .4); }
+@keyframes openingArrive { 0% { fill: rgba(243, 227, 189, .95); } }
+.opening .riverGhost, .opening .riverGlow, .opening .riverCore { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.opening .riverGhost { stroke: rgba(243, 227, 189, .16); stroke-width: calc(1px / var(--k)); stroke-dasharray: calc(2px / var(--k)) calc(5px / var(--k)); }
+.opening .riverGlow, .opening .riverCore { stroke-dasharray: 1; stroke-dashoffset: 1; }
+.opening .riverGlow { stroke: rgba(232, 169, 76, .28); stroke-width: calc(16px / var(--k)); }
+.opening .riverCore { stroke: var(--cream); stroke-width: calc(2.6px / var(--k)); }
+/* Anything that must keep its size on screen while the map zooms. */
+.opening .unscale { transform: scale(calc(1 / var(--k))); }
+.opening .drop { fill: #fff; }
+.opening .place circle { fill: var(--night); stroke: var(--cream); stroke-width: 1.5px; }
+.opening .head .dot { fill: var(--cream); }
+.opening .head .pulse { fill: none; stroke: var(--amber); stroke-width: 1.5px; transform-origin: center; transform-box: fill-box; animation: openingPulse 1.8s ease-out infinite; }
+.opening .head .pulse2 { animation-delay: .9s; }
+@keyframes openingPulse { from { transform: scale(.4); opacity: 1; } to { transform: scale(1.9); opacity: 0; } }
+.opening .tributary { fill: none; stroke: rgba(127, 214, 180, .75); stroke-width: calc(1.4px / var(--k)); stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 1; transition: stroke-dashoffset 2.2s var(--settle); }
+.opening .tributary.lit { stroke-dashoffset: 0; }
+/* The Forgotten Reach: the river drawn broken. */
+.opening .riverDry { fill: none; stroke: var(--night); stroke-width: calc(3.4px / var(--k)); stroke-dasharray: 1; stroke-dashoffset: 1; stroke-linecap: butt; }
+.opening .mark { opacity: 0; transition: opacity .8s; }
+.opening .mark.lit { opacity: 1; }
+.opening .mark text { font-family: var(--mono); font-size: 10.5px; letter-spacing: .05em; fill: var(--cream); paint-order: stroke; stroke: var(--night); stroke-width: 4px; }
+.opening .reservoir rect { fill: var(--jade); stroke: var(--night); stroke-width: 1.5px; }
+.opening .reservoir text { fill: var(--jade); text-anchor: middle; }
+.opening .dryLabel text { fill: var(--magenta); }
+/* The last chapter: the camera has risen. Small labels would collide, and only the Texas
+   reach stays lit, because that is where the rest of the page works. */
+.opening .whole .place, .opening .whole .dryLabel, .opening .whole .reservoir text { opacity: 0; }
+.opening .whole .county.lit:not(.tx) { fill: transparent; stroke: rgba(243, 227, 189, .12); }
+.opening .whole .county.lit.tx { fill: rgba(56, 200, 245, .26); stroke: #38c8f5; }
+.opening .whole .state.tx { fill: rgba(56, 200, 245, .07); stroke: rgba(56, 200, 245, .7); }
+
+/* The large word behind the map. */
+.opening .ghostDrift { position: absolute; inset: 0; overflow: hidden; pointer-events: none; will-change: transform; }
+.opening .ghostWord { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); white-space: nowrap; padding-left: 30vw; font-family: var(--display); font-weight: 600; font-size: min(30vw, 52svh); line-height: 1; letter-spacing: -.03em; color: transparent; -webkit-text-stroke: 1px rgba(243, 227, 189, .11); opacity: 0; transition: opacity .8s; }
+.opening .ghostWord.on { opacity: 1; }
+
+/* ---------- The story beside the river ---------- */
+.opening .panels { position: absolute; left: 0; right: 0; bottom: 0; padding: 0 12px 20px; display: grid; align-items: end; pointer-events: none; }
+.opening .chapter { grid-area: 1 / 1; padding: 22px 20px 24px; background: linear-gradient(180deg, rgba(10, 8, 7, .72), rgba(10, 8, 7, .9)); backdrop-filter: blur(10px); border-top: 1px solid rgba(243, 227, 189, .2);
+  opacity: 0; transform: translateY(26px); filter: blur(8px); visibility: hidden; transition: opacity .42s var(--settle), transform .42s var(--settle), filter .42s var(--settle), visibility 0s .42s; }
+.opening .chapter.on { opacity: 1; transform: none; filter: none; visibility: visible; pointer-events: auto; transition-delay: .1s, .1s, .1s, 0s; }
+.opening .chapter .kick { color: var(--amber); }
+.opening .chapter .kick span { color: rgba(243, 227, 189, .55); margin-right: .6em; }
+.opening .chapter h2 { margin: 12px 0 0; font-family: var(--display); font-weight: 300; font-size: clamp(1.6rem, 3.2vw, 3rem); line-height: 1.03; letter-spacing: -.02em; color: var(--cream); }
+.opening .chapter .body { margin-top: 14px; max-width: 28rem; font-size: .94rem; line-height: 1.4; color: rgba(243, 227, 189, .9); }
+.opening .chapter .src { margin-top: 18px; max-width: 28rem; font-size: .82rem; color: rgba(243, 227, 189, .6); }
+.opening .chapter .src a { color: rgba(243, 227, 189, .85); text-underline-offset: 4px; text-decoration-color: rgba(243, 227, 189, .3); }
+.opening .chapter .src a:hover { text-decoration-color: var(--amber); }
+.opening .chapter dl { margin: 20px 0 0; max-width: 28rem; display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; border-top: 1px solid rgba(243, 227, 189, .15); padding-top: 12px; font-size: .875rem; }
+.opening .chapter dt { color: rgba(243, 227, 189, .55); }
+.opening .chapter dd { margin: 0; color: var(--cream); }
+.opening .chapter dd a { color: rgba(243, 227, 189, .85); text-decoration-color: rgba(243, 227, 189, .3); text-underline-offset: 4px; }
+.opening .chapter dd a:hover { text-decoration-color: var(--amber); }
+.opening .chapter .goLinks { margin-top: 22px; display: flex; flex-wrap: wrap; gap: 12px; }
+.opening .chapter .goLinks .btn.ghost { color: var(--cream); }
+
+/* The photo window: a real aerial photo of the ground at this stop. */
+.opening .lens { position: absolute; margin: 0; opacity: 0; pointer-events: none; will-change: transform, opacity; }
+.opening .lens .glass { position: absolute; inset: 0; border-radius: 50%; overflow: hidden; border: 1.5px solid var(--cream); box-shadow: 0 0 0 6px rgba(10, 8, 7, .55), 0 18px 60px rgba(0, 0, 0, .6); background: var(--night); }
+.opening .lens img { position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; object-fit: cover; opacity: 0; transition: opacity .5s; filter: saturate(1.15) contrast(1.05); }
+.opening .lens img.on { opacity: 1; }
+.opening .lens figcaption { position: absolute; left: 50%; top: 100%; transform: translateX(-50%); margin-top: 14px; white-space: nowrap; text-align: center; font-size: .6rem; line-height: 1.7; color: rgba(243, 227, 189, .8); pointer-events: auto; }
+.opening .lens figcaption a { color: rgba(243, 227, 189, .55); text-underline-offset: 3px; }
+.opening .leader { position: absolute; height: 1px; transform-origin: 0 50%; background: linear-gradient(90deg, rgba(243, 227, 189, 0) 26px, rgba(243, 227, 189, .7) 60px, rgba(243, 227, 189, .7)); opacity: 0; pointer-events: none; }
+
+/* Pressures collected so far. */
+.opening .pressures { position: absolute; right: 64px; bottom: 32px; width: 16rem; display: none; opacity: 0; transition: opacity .7s; }
+.opening .pressures.on { opacity: 1; }
+.opening .pressures .lbl { color: rgba(243, 227, 189, .55); }
+.opening .pressures .lbl b { color: var(--magenta); font-weight: 400; }
+.opening .pressures ol { list-style: none; margin: 8px 0 0; padding: 0; }
+.opening .pressures li { position: relative; padding: .28rem 0 .28rem 1.1rem; font-size: .82rem; line-height: 1.25; color: rgba(243, 227, 189, .6); display: none; }
+.opening .pressures li.on { display: block; animation: openingIn .6s var(--settle) both; }
+.opening .pressures li.now { color: var(--magenta); }
+.opening .pressures li::before { content: ""; position: absolute; left: 0; top: .72em; width: .5rem; height: 1px; background: currentColor; }
+@keyframes openingIn { from { opacity: 0; transform: translateY(10px); } }
+
+/* Instrument readout, chapter rail, tooltip. */
+.opening .readout { position: absolute; right: 16px; top: 78px; text-align: right; color: rgba(243, 227, 189, .7); opacity: 0; transition: opacity .5s; font-variant-numeric: tabular-nums; }
+.opening .readout.on { opacity: 1; }
+.opening .readout p + p { margin-top: 4px; }
+.opening .readout .coords { color: var(--jade); }
+.opening .readout b { color: var(--cream); font-weight: 400; }
+.opening .readout .latest { text-transform: none; letter-spacing: 0; color: rgba(243, 227, 189, .55); }
+.opening .rail { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); display: none; opacity: 0; pointer-events: none; transition: opacity .5s; }
+.opening .rail.on { opacity: 1; pointer-events: auto; }
+.opening .rail ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.opening .rail button { position: relative; display: block; width: 26px; height: 20px; background: none; border: 0; padding: 0; }
+.opening .rail button::before { content: ""; position: absolute; right: 6px; top: 50%; width: 8px; height: 1.5px; background: rgba(243, 227, 189, .35); transition: width .3s var(--settle), background-color .3s; }
+.opening .rail button.done::before { background: rgba(243, 227, 189, .7); }
+.opening .rail button.now::before, .opening .rail button:hover::before, .opening .rail button:focus-visible::before { width: 18px; background: var(--amber); }
+.opening .railTip { position: absolute; right: 32px; top: 50%; transform: translateY(-50%); white-space: nowrap; font-family: var(--mono); font-size: .68rem; letter-spacing: .06em; text-transform: uppercase; color: var(--cream); background: var(--night); padding: .2rem .5rem; opacity: 0; pointer-events: none; transition: opacity .2s; }
+.opening .rail button:hover .railTip, .opening .rail button:focus-visible .railTip { opacity: 1; }
+.opening .tip { position: fixed; z-index: 30; transform: translate(-50%, -160%); white-space: nowrap; background: var(--cream); color: var(--night); padding: 6px 12px; font-size: .875rem; font-weight: 600; pointer-events: none; display: none; }
+
+/* A soft light that follows the pointer, and film grain so the flat darks have tooth. */
+.opening .glow { position: absolute; left: 0; top: 0; width: 520px; height: 520px; border-radius: 50%; background: radial-gradient(closest-side, rgba(232, 169, 76, .16), transparent); mix-blend-mode: screen; pointer-events: none; will-change: transform; }
+@media (hover: none) { .opening .glow { display: none; } }
+.opening .grain { position: absolute; inset: 0; pointer-events: none; opacity: .16; mix-blend-mode: overlay; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+
+@media (max-width: 639px) {
+  .opening .titleLabel { font-size: .62rem; }
+  .opening .readout { top: 72px; }
+  body.intro .brand small { display: none; }
+  body.intro .nav nav a:not(.btn) { display: none; }
+  body.intro .nav .btn.small { white-space: nowrap; }
+  .opening .readout .latest, .opening .lens figcaption { display: none; }
+}
+@media (min-width: 640px) {
+  .opening .wordWrap, .opening .rest { left: 40px; right: 40px; }
+  .opening .wordWrap { bottom: 210px; }
+  .opening .line { font-size: 1.3rem; }
+  .opening .panels { padding: 0 32px 20px; }
+  .opening .readout { right: 64px; }
+  .opening .rail { display: block; }
+}
+@media (min-width: 1024px) {
+  .opening .wordWrap { left: 64px; right: auto; bottom: 64px; }
+  .opening .word { font-size: min(23vw, 46svh); }
+  /* The description, the photo credit and the cue sit bottom right, like a caption. */
+  .opening .rest { left: auto; right: 64px; bottom: 72px; width: min(30vw, 26rem); }
+  .opening .line { font-size: 1.22rem; }
+  .opening .panels { top: 0; right: auto; width: min(42vw, 35rem); padding: 0 0 0 64px; align-items: center; }
+  .opening .chapter { padding: 0; background: none; backdrop-filter: none; border: 0; }
+  .opening .chapter .body { font-size: 1rem; line-height: 1.6; }
+}
+@media (min-width: 1280px) { .opening .pressures { display: block; } }
+
+/* The title bar sits on the opening's own dark while it is on screen. */
+body.intro .nav.solid { background: rgba(10, 8, 7, .9); }
+body.intro .nav:not(.solid) { background: linear-gradient(180deg, rgba(10, 8, 7, .6), transparent); }
+/* The bar lines up with the opening's own margins instead of the narrower text column. */
+body.intro .nav .wrap { max-width: none; padding: 0 20px; }
+@media (min-width: 640px) { body.intro .nav .wrap { padding: 0 40px; } }
+@media (min-width: 1024px) { body.intro .nav .wrap { padding: 0 64px; } }
+
+/* The section after the opening: what used to be the page's first screen. */
+body.intro .hero .wrap { padding-top: 120px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .opening .chapter, .opening .ghostWord, .opening .county, .opening .tributary, .opening .mark { transition: none; }
+}
+
+/* ---------- Two sections further down the intro page ----------
+   "How RioIQ works": three rows, each a real photograph beside a short paragraph.
+   "What we don't know": one photograph and four plain notes. */
+body.intro figure { margin: 0; }
+body.intro figcaption { margin-top: 10px; font-size: .76rem; line-height: 1.5; color: var(--muted); }
+body.intro figcaption a { color: inherit; text-underline-offset: 3px; }
+body.intro .how { margin-top: 64px; display: grid; gap: 88px; }
+body.intro .howRow { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 56px; align-items: center; }
+body.intro .howRow:nth-child(even) figure { order: 2; }
+body.intro .howRow img { width: 100%; height: auto; aspect-ratio: 3 / 2; object-fit: cover; border-radius: 3px; }
+body.intro .howRow:nth-child(2) img { aspect-ratio: 16 / 10; }
+body.intro .howNo { display: block; font-family: var(--serif); font-style: italic; font-weight: 300; font-size: 1.25rem; color: var(--blue); }
+body.intro .howRow h3 { font-size: clamp(1.6rem, 2.6vw, 2.2rem); margin: 6px 0 14px; }
+body.intro .howRow p { margin: 0; color: var(--ink); opacity: .86; font-size: 1.04rem; line-height: 1.65; max-width: 40ch; }
+
+body.intro .limitsGrid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 72px; align-items: start; }
+body.intro .limitsGrid figure { position: sticky; top: 96px; }
+body.intro .limitsGrid img { width: 100%; height: auto; aspect-ratio: 4 / 5; object-fit: cover; border-radius: 3px; }
+body.intro .limitsGrid .intro { margin-bottom: 28px; }
+body.intro .honest { display: block; margin: 0; }
+body.intro .honest > div { padding: 22px 0 22px 26px; border: 0; border-left: 2px solid var(--watch); border-radius: 0; background: none; box-shadow: none; font-size: 1rem; line-height: 1.6; color: var(--muted); }
+body.intro .honest > div + div { margin-top: 18px; }
+body.intro .honest b { display: block; margin-bottom: 4px; font-family: var(--serif); font-weight: 500; font-size: 1.3rem; line-height: 1.25; color: var(--head); }
+@media (max-width: 900px) {
+  body.intro .how { gap: 56px; margin-top: 40px; }
+  body.intro .howRow { grid-template-columns: 1fr; gap: 20px; }
+  body.intro .howRow:nth-child(even) figure { order: 0; }
+  body.intro .limitsGrid { grid-template-columns: 1fr; gap: 32px; }
+  body.intro .limitsGrid figure { position: static; }
+  body.intro .limitsGrid img { aspect-ratio: 3 / 2; }
+}

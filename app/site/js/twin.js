@@ -1,65 +1,51 @@
 /*
-  twin.js: the moving picture of the simulation. One irrigation district, drawn twice.
+  twin.js: the picture of the simulation. The same district (or group of districts), twice.
 
-      left    the district if nothing is done to its canals
-      right   the same district if canals are sealed when the forecast warns
+      left    if nothing is done to the canals
+      right   if canals are sealed when the forecast warns
 
-  Both sides get the same reservoir, the same weather and the same weeks. The layout follows
-  the team's simulation design (visuals/simulation): one district splits in two and the two
-  halves are played side by side.
+  Both sides get the same reservoir, the same weather and the same weeks.
 
-  WHAT IS REAL AND WHAT IS A PICTURE
-    Real (from sim/engine.js, week by week):
-      - the share of the water farms asked for that arrives (it sets how many fields are dry)
-      - which canals are sealed and when, the dollars lost, the dollars spent, the water kept
-      - the district boundary and every canal line (real map data)
-    A picture only:
-      - WHICH squares go dry. The district is tiled with squares and the right share of them
-        is coloured dry; the model does not know which farm loses water.
-      - the dots on the canals. Red dots show an unsealed canal leaking, white dots a sealed
-        stretch holding its water. The amounts are in the numbers, not in the dots.
+  HOW TO READ IT (the picture is kept deliberately simple)
+    - At the top is the one thing that drives everything: how full the reservoir is.
+    - Each district shape is a gauge. The green part, rising from the bottom, is the share
+      of the water farms asked for that reached them this week. The brown part is what did
+      not arrive. More green on the right means sealing got more water to the farms.
+    - Canal lines are red while they leak and white once they are sealed.
+    - Under each side are three plain numbers: water reaching farms, crops lost or saved,
+      and water leaked or saved, in gallons.
+
+  Every number comes from sim/engine.js. Nothing in the picture is measured in the field.
 
   window.HGTwin.create({ canvas, stage, onTick }) returns { load, play, pause, seek, playing, readTheme }.
 */
 (function () {
   "use strict";
+  const GALLONS_PER_ACRE_FOOT = 325851;
 
   function create(opt) {
     const canvas = opt.canvas, stage = opt.stage, ctx = canvas.getContext("2d");
     const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
     const SECONDS = 34;                       // how long the whole run takes to play
-    const MAX_DOTS = 260;                     // leak dots per side
-    let W = 0, H = 0, dpr = 1, data = null, at = 0, playing = false, last = 0, split = 0, clock = 0;
-    let zoom = 1;                             // both panels move in on the canals while the right side is sealed
-    const ZOOM = 2;
-    let shape = null;                         // the district in flat kilometres: rings, canals, fields, box
+    let W = 0, H = 0, dpr = 1, data = null, at = 0, playing = false, last = 0;
+    let shape = null;                         // the districts as flat shapes
     let panels = [];                          // the two drawing areas, rebuilt on resize
-    const dots = [[], []];                    // leak dots, left side and right side
+    const shown = [1, 1];                     // the green level drawn on each side (it glides to the real value)
     const C = {};
 
     function readTheme() {
       const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
       Object.assign(C, { map: css("--map"), card: css("--card"), text: css("--ink"), head: css("--head"), muted: css("--muted"),
-                         rule: css("--line"), accent: css("--blue"), river: css("--river"), hl: css("--hl"), casing: css("--casing"),
-                         low: css("--low"), watch: css("--watch"), warning: css("--warning"), inspect: css("--inspect"),
-                         unknown: css("--unknown"), wet: css("--wet"), dry: css("--dry"), dead: css("--dead"), serif: css("--serif") });
-      C.level = { "Inspect first": C.inspect, Watch: C.watch, Low: C.low };
+                         rule: css("--line"), accent: css("--blue"), hl: css("--hl"), low: css("--low"), watch: css("--watch"),
+                         warning: css("--warning"), wet: css("--wet"), dry: css("--dry"), serif: css("--serif"), sans: css("--sans") });
     }
     readTheme();
 
-    /* ---------- Colour helpers ---------- */
-    const rgb = (hex) => [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
-    function mix(a, b, t) {
-      const x = rgb(a), y = rgb(b);
-      return "rgb(" + [0, 1, 2].map((k) => Math.round(x[k] + (y[k] - x[k]) * t)).join(",") + ")";
-    }
-    const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
-
-    /* ---------- The district as flat shapes ----------
-       Longitude and latitude are turned into kilometres east and south of the district's
-       centre. A district is small, so this simple flattening is accurate enough to draw. */
+    /* ---------- The districts as flat shapes ----------
+       Longitude and latitude become kilometres east and south of each district's centre.
+       One district keeps its real shape. Several are laid out in a grid, each scaled to
+       fill its own cell, so small districts stay readable (they are not to scale). */
     function build(d) {
-      // Flatten each district about its own centre.
       const flatPart = (part) => {
         let lon0 = 0, lat0 = 0, n = 0;
         part.rings.forEach((r) => r.forEach((p) => { lon0 += p[0]; lat0 += p[1]; n++; }));
@@ -68,47 +54,23 @@
         const flat = (line) => line.map((p) => [(p[0] - lon0) * kx, -(p[1] - lat0) * ky]);
         const rings = part.rings.map(flat); let half = 0;
         rings.forEach((r) => r.forEach((p) => { half = Math.max(half, Math.abs(p[0]), Math.abs(p[1])); }));
-        return { rings, half, canals: part.canals.map((c) => ({ pts: flat(c.line), funded: c.funded, ranked: c.ranked, level: c.level, weight: c.km * (c.rate || 0) })) };
+        return { rings, half, canals: part.canals.map((c) => ({ pts: flat(c.line), funded: c.funded, ranked: c.ranked })) };
       };
       const parts = d.parts.slice().sort((a, b) => (b.km || 0) - (a.km || 0)).map(flatPart);
-      // One district keeps its real shape and size. Several districts are laid out in a grid,
-      // each one scaled to fill its own cell, so small districts stay readable (not to scale).
       const many = parts.length > 1, cols = Math.ceil(Math.sqrt(parts.length * 0.8));
-      const rings = [], canals = [];
+      const box = [1e9, 1e9, -1e9, -1e9];
       parts.forEach((part, k) => {
         const f = many ? 0.44 / part.half : 1, ox = many ? k % cols : 0, oy = many ? Math.floor(k / cols) : 0;
         const move = (line) => line.map((q) => [q[0] * f + ox, q[1] * f + oy]);
-        part.rings.forEach((r) => rings.push(move(r)));
-        part.canals.forEach((c) => canals.push(Object.assign(c, { pts: move(c.pts) })));
+        part.rings = part.rings.map(move);
+        part.canals.forEach((c) => { c.pts = move(c.pts); });
+        part.top = 1e9; part.bottom = -1e9;                          // how tall this district is, for its gauge
+        part.rings.forEach((r) => r.forEach((p) => {
+          part.top = Math.min(part.top, p[1]); part.bottom = Math.max(part.bottom, p[1]);
+          box[0] = Math.min(box[0], p[0]); box[1] = Math.min(box[1], p[1]); box[2] = Math.max(box[2], p[0]); box[3] = Math.max(box[3], p[1]);
+        }));
       });
-      const box = [1e9, 1e9, -1e9, -1e9];
-      rings.forEach((r) => r.forEach((p) => { box[0] = Math.min(box[0], p[0]); box[1] = Math.min(box[1], p[1]); box[2] = Math.max(box[2], p[0]); box[3] = Math.max(box[3], p[1]); }));
-      // Tile the district with squares ("fields"). Each gets a fixed random number from 0 to 1;
-      // a field is dry in a week when the share of water that arrived is below its number.
-      const inside = (x, y) => {
-        let hit = false;
-        for (const r of rings) for (let i = 0, j = r.length - 1; i < r.length; j = i++) {
-          if ((r[i][1] > y) !== (r[j][1] > y) && x < (r[j][0] - r[i][0]) * (y - r[i][1]) / (r[j][1] - r[i][1]) + r[i][0]) hit = !hit;
-        }
-        return hit;
-      };
-      let step = Math.sqrt((box[2] - box[0]) * (box[3] - box[1]) / (many ? 1500 : 700)), fields = [];
-      for (let tries = 0; tries < 4; tries++) {
-        fields = [];
-        for (let y = box[1] + step / 2; y < box[3]; y += step) for (let x = box[0] + step / 2; x < box[2]; x += step) if (inside(x, y)) fields.push({ x, y });
-        if (fields.length >= 180 && fields.length <= (many ? 900 : 520)) break;
-        step *= Math.sqrt(fields.length / 330) || 0.7;
-      }
-      let seed = 12345;                                             // a fixed seed: the same squares every time
-      fields.forEach((f) => { seed = (seed * 1664525 + 1013904223) >>> 0; f.u = seed / 4294967296; });
-      // Leak dots start on ranked canals; leakier and longer canals get more of them.
-      const leaky = canals.filter((c) => c.ranked && c.weight > 0 && c.pts.length > 1);
-      let total = 0; leaky.forEach((c) => { total += c.weight; c.upTo = total; });
-      // Where the sealed canals are: the middle of all their points. The picture zooms in on it.
-      let fx = 0, fy = 0, fn = 0;
-      canals.filter((c) => c.funded).forEach((c) => c.pts.forEach((q) => { fx += q[0]; fy += q[1]; fn++; }));
-      const focus = fn ? [fx / fn, fy / fn] : [(box[0] + box[2]) / 2, (box[1] + box[3]) / 2];
-      return { rings, box, canals, fields, step, leaky, total, focus };
+      return { parts, box };
     }
 
     /* ---------- Layout: two panels side by side (stacked on a phone) ---------- */
@@ -118,170 +80,144 @@
       W = r.width; H = r.height; dpr = Math.min(window.devicePixelRatio || 1, 2);
       canvas.width = W * dpr; canvas.height = H * dpr;
       if (!shape) return;
-      const narrow = W < 620, top = narrow ? 118 : 128, bottom = 58, gap = 12, side = 14;
+      const narrow = W < 620, top = narrow ? 104 : 118, bottom = 58, gap = 12, side = 14;
       const boxes = narrow
         ? [0, 1].map((k) => ({ x: side, y: top + k * ((H - top - bottom + gap) / 2), w: W - 2 * side, h: (H - top - bottom - gap) / 2 }))
         : [0, 1].map((k) => ({ x: side + k * ((W - 2 * side + gap) / 2), y: top, w: (W - 2 * side - gap) / 2, h: H - top - bottom }));
       panels = boxes.map((b) => {
-        // Fit the district into the part of the panel above the numbers.
-        const head = 34, foot = narrow ? 64 : 104, mw = b.w - 20, mh = b.h - head - foot;
+        // The districts sit above the three numbers; on a phone they sit to the left of them.
+        const head = 40, foot = narrow ? 8 : 132, mw = narrow ? b.w * 0.36 : b.w - 24, mh = b.h - head - foot;
         const k = Math.min(mw / (shape.box[2] - shape.box[0]), mh / (shape.box[3] - shape.box[1])) * 0.94;
-        const cx = (shape.box[0] + shape.box[2]) / 2, cy = (shape.box[1] + shape.box[3]) / 2;
-        const sx = (x) => (x - cx) * k + b.w / 2, sy = (y) => (y - cy) * k + head + mh / 2;     // relative to the panel corner
+        const cx = (shape.box[0] + shape.box[2]) / 2, cy = (shape.box[1] + shape.box[3]) / 2, mx = narrow ? 10 + mw / 2 : b.w / 2;
+        const sx = (x) => (x - cx) * k + mx, sy = (y) => (y - cy) * k + head + mh / 2;     // relative to the panel corner
         const path = (lines, close) => { const p = new Path2D(); lines.forEach((l) => { l.forEach((q, i) => (i ? p.lineTo(sx(q[0]), sy(q[1])) : p.moveTo(sx(q[0]), sy(q[1])))); if (close) p.closePath(); }); return p; };
-        const pick = (test) => path(shape.canals.filter(test).map((c) => c.pts));
-        return Object.assign({ k, sx, sy, narrow, foot, head, mh,
-          outline: path(shape.rings, true),
-          all: pick((c) => c.ranked),                                 // every canal the model can rank
-          other: pick((c) => !c.ranked),                              // canals with no soil data: drawn, never sealed
-          byLevel: ["Low", "Watch", "Inspect first"].map((lv) => ({ color: C.level[lv], path: pick((c) => c.ranked && c.level === lv) })),
-          funded: pick((c) => c.funded) }, b);
+        const canals = [].concat.apply([], shape.parts.map((part) => part.canals));
+        return Object.assign({ narrow, head, foot, mw, mh,
+          parts: shape.parts.map((part) => ({ path: path(part.rings, true), top: sy(part.top), bottom: sy(part.bottom) })),
+          outline: path([].concat.apply([], shape.parts.map((part) => part.rings)), true),
+          all: path(canals.filter((c) => c.ranked).map((c) => c.pts)),          // canals the model can rank
+          other: path(canals.filter((c) => !c.ranked).map((c) => c.pts)),       // canals with no soil reading
+          funded: path(canals.filter((c) => c.funded).map((c) => c.pts)) }, b);
       });
     }
     new ResizeObserver(layout).observe(stage);
 
     /* ---------- The week being shown ---------- */
     const index = () => Math.min(data.weeks.length - 1, Math.floor(at));
-    function arrives(w, s) { return w.demand > 0 ? Math.max(0, 1 - (s.missing - s.recovered) / w.demand) : null; }   // null = outside the season
+    /* Share of the water farms asked for that reached them. null = outside the irrigation season. */
+    function arrives(w, s) { return w.demand > 0 ? Math.max(0, 1 - (s.missing - s.recovered) / w.demand) : null; }
 
-    /* ---------- Dots on the canals ----------
-       A red dot is water leaking out of an unsealed canal. A white dot marks a sealed stretch
-       holding its water. On a sealed canal the sealant's tested share of dots turn white. */
-    function spawn(sideDots, sealedNow) {
-      if (!shape.total || sideDots.length >= MAX_DOTS) return;
-      const r = Math.random() * shape.total, c = shape.leaky.find((x) => x.upTo >= r) || shape.leaky[0];
-      const fixed = c.funded && sealedNow && Math.random() < data.cut;
-      const i = Math.floor(Math.random() * (c.pts.length - 1)), u = Math.random(), a = c.pts[i], b = c.pts[i + 1], ang = Math.random() * 6.283;
-      sideDots.push({ x: a[0] + (b[0] - a[0]) * u, y: a[1] + (b[1] - a[1]) * u, dx: Math.cos(ang), dy: Math.sin(ang), life: 1, fixed });
-    }
-    function stepDots(dt) {
-      const w = data.weeks[index()];
-      [w.left, w.right].forEach((s, k) => {
-        if (w.demand > s.missing) for (let n = 0; n < 3; n++) if (Math.random() < dt * 60) spawn(dots[k], s.sealed);   // only a canal with water in it can leak
-        dots[k].forEach((d) => { d.life -= dt * 0.9; });
-        dots[k] = dots[k].filter((d) => d.life > 0);
-      });
-    }
-
-    /* ---------- Drawing ---------- */
+    /* ---------- Words and numbers ---------- */
     function text(s, x, y, size, color, o) {
       o = o || {};
-      ctx.font = (o.italic ? "italic " : "") + (o.weight || 400) + " " + size + "px " + C.serif;
+      ctx.font = (o.weight || 400) + " " + size + "px " + (o.serif ? C.serif : C.sans);
       ctx.textAlign = o.align || "left"; ctx.textBaseline = "middle"; ctx.globalAlpha = o.alpha == null ? 1 : o.alpha;
       ctx.fillStyle = color; ctx.fillText(s, x, y);
     }
-    const money = (v) => (v >= 1e9 ? "$" + (v / 1e9).toFixed(2) + "B" : v >= 1e6 ? "$" + (v / 1e6).toFixed(v >= 1e8 ? 0 : 1) + "M" : v >= 1e4 ? "$" + Math.round(v / 1e3) + "k" : "$" + Math.round(v).toLocaleString("en-US"));
-    const num = (v) => Math.round(v).toLocaleString("en-US");
+    const money = (v) => (v >= 1e9 ? "$" + (v / 1e9).toFixed(2) + " billion" : v >= 1e6 ? "$" + (v / 1e6).toFixed(v >= 1e8 ? 0 : 1) + " million" : "$" + Math.round(v).toLocaleString("en-US"));
+    function gallons(acreFeet) {
+      const g = acreFeet * GALLONS_PER_ACRE_FOOT;
+      return g >= 1e9 ? (g / 1e9).toFixed(g >= 1e10 ? 0 : 1) + " billion gallons" : g >= 1e6 ? Math.round(g / 1e6) + " million gallons" : Math.round(g).toLocaleString("en-US") + " gallons";
+    }
 
-    function drawPanel(p, k, w, i) {
+    function drawPanel(p, k, w, dt) {
       const s = k ? w.right : w.left, sum = k ? w.sumR : w.sumL, share = arrives(w, s), right = k === 1;
-      // Where the panel sits: both start in the middle and slide apart as the district "splits".
-      const e = ease(split), mid = p.narrow ? p.x : (W - p.w) / 2, x = mid + (p.x - mid) * e, y = p.y;
-      ctx.save(); ctx.translate(x, y);
+      ctx.save(); ctx.translate(p.x, p.y);
       ctx.globalAlpha = 1; ctx.fillStyle = C.card; ctx.fillRect(0, 0, p.w, p.h);
-      ctx.strokeStyle = right ? C.accent : C.rule; ctx.lineWidth = right ? 2 : 1; ctx.strokeRect(0.5, 0.5, p.w - 1, p.h - 1);
+      ctx.strokeStyle = right ? C.low : C.rule; ctx.lineWidth = right ? 2 : 1; ctx.strokeRect(0.5, 0.5, p.w - 1, p.h - 1);
+      text(right ? "If canals are sealed early" : "If nothing is done", 14, 20, p.narrow ? 15 : 18, right ? C.low : C.head, { weight: 600, serif: true });
 
-      // Zoom: while canals are sealed, both panels move in on them (the same view on both sides,
-      // so the comparison stays fair). Lines are thinned by the same factor so they keep their width.
-      ctx.save();
-      ctx.beginPath(); ctx.rect(1, p.head - 4, p.w - 2, p.mh + 8); ctx.clip();
-      const t = (zoom - 1) / (ZOOM - 1), fx = p.sx(shape.focus[0]), fy = p.sy(shape.focus[1]), z = zoom;
-      ctx.translate(fx + (p.w / 2 - fx) * t, fy + (p.head + p.mh / 2 - fy) * t); ctx.scale(z, z); ctx.translate(-fx, -fy);
-
-      // 1. Fields: the main thing to look at. Watered fields are green; dry ones are brown and
-      //    darken the longer they have been dry (looking back 26 weeks). On the right, a field
-      //    that is dry on the left but watered here is drawn brighter: sealing kept it going.
-      const size = Math.max(2.5, shape.step * p.k * 0.93), side = k ? "right" : "left", recent = [];
-      const other = arrives(w, w.left);                               // what the do-nothing side gets this week
-      for (let j = Math.max(0, i - 25); j <= i; j++) { const v = arrives(data.weeks[j], data.weeks[j][side]); if (v != null) recent.push(v); }
-      for (const f of shape.fields) {
-        let age = 0; for (const v of recent) if (v < f.u) age++;
-        age = recent.length ? age / recent.length : 0;
-        const kept = right && share != null && share >= f.u && other < f.u;
-        if (share == null) { ctx.globalAlpha = 0.3; ctx.fillStyle = mix(C.wet, C.dry, age * 0.6); }           // off season: fields rest
-        else if (share < f.u) { ctx.globalAlpha = 0.95; ctx.fillStyle = mix(C.dry, C.dead, Math.min(1, age * 1.15)); }
-        else { ctx.globalAlpha = kept ? 1 : 0.8; ctx.fillStyle = kept ? C.low : mix(C.wet, C.dry, age * 0.4); }
-        ctx.fillRect(p.sx(f.x) - size / 2, p.sy(f.y) - size / 2, size, size);
+      // 1. Each district is a gauge: green from the bottom up for the water that arrived.
+      //    The level glides to its new value so it does not jump from week to week.
+      const want = share == null ? 1 : share;
+      shown[k] = reduced ? want : shown[k] + (want - shown[k]) * Math.min(1, dt * 6);
+      for (const part of p.parts) {
+        ctx.save(); ctx.clip(part.path, "evenodd");
+        const height = part.bottom - part.top, level = part.bottom - height * shown[k];
+        ctx.globalAlpha = share == null ? 0.35 : 1;                  // faded outside the season: fields are resting
+        ctx.fillStyle = C.dry; ctx.fillRect(0, part.top - 2, p.w, height + 4);
+        ctx.fillStyle = C.wet; ctx.fillRect(0, level, p.w, part.bottom - level + 2);
+        ctx.restore();
       }
-      ctx.globalAlpha = 0.95; ctx.strokeStyle = C.text; ctx.lineWidth = 1.6; ctx.stroke(p.outline);
-
-      // 2. Canals. Red = unsealed and leaking. White = sealed. Both sides start red; only the
-      //    acting side ever turns white. Canals with no soil reading stay thin and grey.
+      // 2. Canals over the top: red while they leak, white once sealed. Then the outline.
       ctx.lineJoin = ctx.lineCap = "round";
-      const running = share != null && w.demand > s.missing;         // is any water in the canals this week?
-      ctx.globalAlpha = 0.35; ctx.strokeStyle = C.unknown; ctx.lineWidth = 0.8; ctx.stroke(p.other);
-      ctx.globalAlpha = running ? 0.95 : 0.45; ctx.strokeStyle = C.warning; ctx.lineWidth = 1.5; ctx.stroke(p.all);
-      if (s.sealed) {
-        ctx.globalAlpha = 0.3; ctx.strokeStyle = C.low; ctx.lineWidth = 6; ctx.stroke(p.funded);                // a soft green glow
-        ctx.globalAlpha = 1; ctx.strokeStyle = C.hl; ctx.lineWidth = 1.9; ctx.stroke(p.funded);
-      }
-      for (const d of dots[k]) {
-        const far = d.fixed ? 0 : (1 - d.life) * 9;
-        ctx.globalAlpha = Math.min(1, d.life * 1.4); ctx.fillStyle = d.fixed ? C.hl : C.warning;
-        ctx.beginPath(); ctx.arc(p.sx(d.x) + d.dx * far, p.sy(d.y) + d.dy * far, d.fixed ? 2.2 * d.life + 0.6 : 1.7, 0, 7); ctx.fill();
-      }
-      ctx.restore();                                               // end of the clipped map
+      ctx.globalAlpha = 0.3; ctx.strokeStyle = C.map; ctx.lineWidth = 0.8; ctx.stroke(p.other);
+      ctx.globalAlpha = share == null ? 0.4 : 0.9; ctx.strokeStyle = C.warning; ctx.lineWidth = 1.2; ctx.stroke(p.all);
+      if (s.sealed) { ctx.globalAlpha = 1; ctx.strokeStyle = C.hl; ctx.lineWidth = 1.5; ctx.stroke(p.funded); }
+      ctx.globalAlpha = 0.95; ctx.strokeStyle = C.text; ctx.lineWidth = 1.4; ctx.stroke(p.outline);
+      if (right && s.sealed) text("canals sealed", p.w - 14, 20, 13, C.hl, { weight: 600, align: "right" });
 
-      // 3. The numbers. Left: what is lost. Right: what acting has saved. Few words on purpose.
-      const a = Math.min(1, e * 1.5), base = p.h - p.foot, big = p.narrow ? 26 : 38, med = p.narrow ? 18 : 24;
-      const savedSoFar = Math.max(0, w.sumL.loss - w.sumR.loss);     // crops the right side kept that the left side lost
-      text(right ? data.rightName : data.leftName, 12, 18, p.narrow ? 16 : 18, right ? C.accent : C.head, { weight: 700, alpha: a });
-      text(share == null ? "off season" : Math.round((1 - share) * 100) + "% of fields dry", p.w - 12, 18, 14, share != null && share < 0.999 ? (right && share > other + 0.005 ? C.watch : C.warning) : C.muted, { weight: 600, align: "right", alpha: a });
-      text(money(right ? savedSoFar : sum.loss), 12, base + 26, big, right ? C.low : C.warning, { weight: 700 });
-      text(right ? "crops saved" : "crops lost", 12, base + (p.narrow ? 48 : 56), 13.5, C.muted);
-      text(num(right ? sum.saved : sum.leak), p.w - 12, base + 30, med, right ? C.low : C.warning, { weight: 700, align: "right" });
-      text(right ? "acre-feet kept in canals" : "acre-feet leaked", p.w - 12, base + (p.narrow ? 48 : 56), 13.5, C.muted, { align: "right" });
-      if (!p.narrow && right) text("still leaking: " + num(sum.leak) + " acre-feet", p.w - 12, base + 78, 12.5, C.muted, { align: "right" });
+      // 3. Three plain numbers. Label on the left, value on the right.
+      const rows = [
+        ["Share of the water farms asked for that arrives", share == null ? "off season" : Math.round(share * 100) + "%", share == null ? C.muted : share > 0.999 ? C.low : right && share > arrives(w, w.left) + 0.005 ? C.watch : C.warning],
+        right ? ["Crops saved so far", money(Math.max(0, w.sumL.loss - w.sumR.loss)), C.low] : ["Crops lost so far", money(sum.loss), C.warning],
+        right ? ["Water saved from leaking", gallons(sum.saved), C.low] : ["Water leaked out of canals", gallons(sum.leak), C.warning],
+      ];
+      if (p.narrow) {
+        const x = 10 + p.mw + 14, step = (p.h - p.head) / 3;
+        rows.forEach((r, n) => { const y = p.head + step * n + step / 2; text(n ? r[0] : "Water reaching farms", x, y - 9, 11.5, C.muted); text(r[1], x, y + 9, n === 1 ? 17 : 14, r[2], { weight: 600 }); });
+      } else {
+        const y0 = p.h - p.foot + 22;
+        rows.forEach((r, n) => {
+          const y = y0 + n * 38;
+          ctx.globalAlpha = 1; ctx.fillStyle = C.rule; ctx.fillRect(14, y - 19, p.w - 28, 1);
+          text(r[0], 14, y, 14, C.muted); text(r[1], p.w - 14, y, n === 1 ? 22 : 16, r[2], { weight: 600, align: "right", serif: n === 1 });
+        });
+      }
       ctx.restore();
     }
 
-    function draw() {
+    function draw(dt) {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.globalAlpha = 1; ctx.clearRect(0, 0, W, H);
       if (!data || !panels.length) return;
-      const i = index(), w = data.weeks[i], narrow = panels[0].narrow, tone = C[data.tone] || C.watch;
-      // Header: which future this is (left) and the week and reservoir (right).
-      if (!narrow) text(data.caseName, 14, 70, 24, tone, { weight: 700 });
-      if (!narrow && data.parts.length > 1) text(data.parts.length + " districts, each drawn to fill its own cell", 14, 96, 13.5, C.muted);
-      text(w.date.slice(0, 4), W - 14, narrow ? 64 : 70, narrow ? 24 : 34, C.head, { weight: 700, align: "right" });
-      text("reservoirs " + w.pct.toFixed(0) + "% full", narrow ? 14 : W - 14, narrow ? 86 : 96, 13.5, w.pct < data.fullAt ? C.warning : C.muted, { align: narrow ? "left" : "right" });
-      panels.forEach((p, k) => drawPanel(p, k, w, i));
-      // The verdict, once the run has finished.
-      if (i >= data.weeks.length - 1 && split >= 1) {
+      const i = index(), w = data.weeks[i], narrow = panels[0].narrow, y = narrow ? 76 : 80;
+      // The driver, at the top: the date, and how full the reservoir is, as a bar with the
+      // level marked below which farms start getting less than they asked for.
+      const month = new Date(w.date + "T12:00:00").toLocaleDateString("en-US", { month: "short", year: "numeric" });
+      text(month, 14, y, narrow ? 20 : 26, C.head, { weight: 600, serif: true });
+      const bw = narrow ? W - 150 : Math.min(360, W * 0.34), bx = W - 14 - bw, short = w.pct < data.fullAt;
+      ctx.globalAlpha = 1; ctx.fillStyle = C.card; ctx.fillRect(bx, y - 2, bw, 10);
+      ctx.fillStyle = short ? C.warning : C.accent; ctx.fillRect(bx, y - 2, bw * Math.max(0, Math.min(1, w.pct / 100)), 10);
+      ctx.fillStyle = C.text; ctx.fillRect(bx + bw * data.fullAt / 100, y - 6, 1.5, 18);
+      text("Reservoir " + Math.round(w.pct) + "% full", bx, y - 16, 13.5, short ? C.warning : C.text, { weight: 600 });
+      if (!narrow) text("below the mark (" + data.fullAt + "%), farms get less water than they asked for", bx + bw, y + 22, 12, C.muted, { align: "right" });
+      panels.forEach((p, k) => drawPanel(p, k, w, dt));
+      // The result, once the run has finished.
+      if (i >= data.weeks.length - 1) {
         const diff = (w.sumL.loss + w.sumL.spend) - (w.sumR.loss + w.sumR.spend), small = Math.abs(diff) < 1000;
-        const label = small ? "No measurable difference" : "Acting " + (diff > 0 ? "saves " : "costs ") + money(Math.abs(diff)) + (diff > 0 ? "" : " more");
-        ctx.font = "700 " + (narrow ? 16 : 20) + "px " + C.serif;
-        const tw = ctx.measureText(label).width + 30, ty = narrow ? panels[1].y - 6 : panels[0].y + 56;
-        ctx.globalAlpha = 1; ctx.fillStyle = C.map; ctx.strokeStyle = small ? C.muted : diff > 0 ? C.low : C.warning; ctx.lineWidth = 2;
+        const label = small ? "No measurable difference" : "Sealing early " + (diff > 0 ? "saves " : "costs ") + money(Math.abs(diff)) + (diff > 0 ? "" : " more");
+        const size = narrow ? 15 : 20, color = small ? C.muted : diff > 0 ? C.low : C.warning;
+        ctx.font = "600 " + size + "px " + C.serif;
+        const tw = ctx.measureText(label).width + 30, ty = narrow ? panels[1].y - 6 : panels[0].y + 62;
+        ctx.globalAlpha = 1; ctx.fillStyle = C.map; ctx.strokeStyle = color; ctx.lineWidth = 2;
         ctx.fillRect(W / 2 - tw / 2, ty - 20, tw, 40); ctx.strokeRect(W / 2 - tw / 2, ty - 20, tw, 40);
-        text(label, W / 2, ty, narrow ? 16 : 20, small ? C.muted : diff > 0 ? C.low : C.warning, { weight: 700, align: "center" });
+        text(label, W / 2, ty, size, color, { weight: 600, align: "center", serif: true });
       }
     }
 
     function frame(now) {
-      const dt = Math.min(0.05, (now - last) / 1000 || 0); last = now; clock += dt;
+      const dt = Math.min(0.05, (now - last) / 1000 || 0); last = now;
       if (data && stage.offsetParent !== null && canvas.offsetParent !== null) {
-        if (split < 1) split = reduced ? 1 : Math.min(1, split + dt / 1.4);        // the district splits in two first
-        else if (playing) {
+        if (playing) {
           at = Math.min(data.weeks.length - 1, at + dt * data.weeks.length / SECONDS);
           if (at >= data.weeks.length - 1) playing = false;
           opt.onTick(index(), playing);
         }
-        const want = 1;                                                              // no zoom: the whole district stays in view
-        if (!reduced) stepDots(dt);
-        zoom = reduced ? want : zoom + (want - zoom) * Math.min(1, dt * 2.5);
-        draw();
+        draw(dt);
       }
       requestAnimationFrame(frame);
     }
     requestAnimationFrame(frame);
 
     return {
-      /* next: { parts: [{ rings, km, canals: [{ line, km, rate, level, ranked, funded }] }], weeks: [{ date, pct, demand, left, right, sumL, sumR }],
-                 caseName, caseNote, tone, system, fullAt, cut, leftName, rightName, leftNote, rightNote } */
-      load(next) { data = next; shape = build(next); at = 0; split = 0; zoom = 1; dots[0] = []; dots[1] = []; playing = false; layout(); opt.onTick(0, false); },
+      /* next: { parts: [{ rings, km, canals: [{ line, ranked, funded }] }], fullAt,
+                 weeks: [{ date, pct, demand, left, right, sumL, sumR }] }
+         left / right are the engine's weekly rows; sumL / sumR are running totals with
+         loss ($), spend ($), saved, recovered and leak (acre-feet). */
+      load(next) { data = next; shape = build(next); at = 0; shown[0] = shown[1] = 1; playing = false; layout(); opt.onTick(0, false); },
       play() { if (!data) return; if (at >= data.weeks.length - 1) at = 0; playing = true; opt.onTick(index(), true); },   // tell the page at once, so the button reads Pause
       pause() { playing = false; if (data) opt.onTick(index(), false); },
-      seek(i) { at = i; split = 1; if (data) opt.onTick(index(), playing); },
+      seek(i) { at = i; if (data) opt.onTick(index(), playing); },
       playing: () => playing,
       readTheme() { readTheme(); layout(); },
     };

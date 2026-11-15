@@ -481,9 +481,11 @@
     function inRing(x, y, r) { let inside = false; for (let i = 0, j = r.length - 2; i < r.length; j = i, i += 2) if ((r[i + 1] > y) !== (r[j + 1] > y) && x < ((r[j] - r[i]) * (y - r[i + 1])) / (r[j + 1] - r[i + 1]) + r[i]) inside = !inside; return inside; }
     function pick(sx, sy) {
       const w = toWorld(sx, sy), rel = cam.k / kTexas;
-      const canal = rel > 4 ? nearestCanal(w[0], w[1], 7) : null;
+      // When the page is asking the user to pick districts (want.pick), canals are not clickable:
+      // a tap anywhere inside a district means that district.
+      const canal = rel > 4 && !want.pick ? nearestCanal(w[0], w[1], 7) : null;
       if (canal) return { canal };
-      const district = rel > 2.5 ? G.districts.find((d) => d.i !== want.scope && d.rings.some((r) => inRing(w[0], w[1], r))) : null;
+      const district = rel > 2.5 || want.pick ? G.districts.find((d) => d.i !== want.scope && d.rings.some((r) => inRing(w[0], w[1], r))) : null;
       if (district) return { district };
       const county = G.counties.find((c) => w[0] >= c.box[0] && w[0] <= c.box[2] && w[1] >= c.box[1] && w[1] <= c.box[3] && c.rings.some((r) => inRing(w[0], w[1], r)));
       return county ? { county } : null;
@@ -495,7 +497,12 @@
       const tw = tip.offsetWidth, th = tip.offsetHeight;
       tip.style.left = Math.max(8, Math.min(W - tw - 8, sx + 16)) + "px"; tip.style.top = Math.max(8, Math.min(H - th - 8, sy + 16)) + "px";
     }
-    canvas.addEventListener("pointerdown", (e) => { if (scanning) return; dragFrom = { x: e.clientX, y: e.clientY, cx: cam.x, cy: cam.y, moved: false }; canvas.setPointerCapture(e.pointerId); });
+    canvas.addEventListener("pointerdown", (e) => {
+      if (scanning) return;
+      dragFrom = { x: e.clientX, y: e.clientY, cx: cam.x, cy: cam.y, moved: false }; canvas.setPointerCapture(e.pointerId);
+      // A finger has no hover, so work out what is under the tap here.
+      const r = canvas.getBoundingClientRect(); hover = pick(e.clientX - r.left, e.clientY - r.top);
+    });
     canvas.addEventListener("pointermove", (e) => {
       const r = canvas.getBoundingClientRect(), sx = e.clientX - r.left, sy = e.clientY - r.top, ll = unproject(...toWorld(sx, sy));
       coords.textContent = Math.abs(ll[1]).toFixed(3) + "°N  " + Math.abs(ll[0]).toFixed(3) + "°W";

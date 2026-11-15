@@ -65,8 +65,14 @@
   /* ---------- Small HTML pieces ---------- */
   const kpi = (label, value, small) => '<div class="kpi"><span>' + label + "</span><b>" + value + "</b>" + (small ? "<small>" + small + "</small>" : "") + "</div>";
   const chip = (tier, text) => '<span class="chip ' + tier + '"><i></i>' + (text || tier) + "</span>";
-  const af = (n) => U.num(n.afLow) + " to " + U.num(n.afHigh);
-  const afMid = (n) => U.num((n.afLow + n.afHigh) / 2, (n.afLow + n.afHigh) / 2 < 10 ? 1 : 0);
+  /* Water is shown in gallons, which people can picture. The engine works in acre-feet
+     (the unit water agencies use: 1 acre-foot = 325,851 gallons), so it is converted here. */
+  function gal(acreFeet, long) {
+    const g = acreFeet * E.GALLONS_PER_ACRE_FOOT, unit = long ? " gallons" : " gal";
+    return g >= 1e9 ? (g / 1e9).toFixed(g >= 1e10 ? 0 : 1) + " billion" + unit : g >= 1e6 ? U.num(g / 1e6, g < 1e7 ? 1 : 0) + " million" + unit : U.num(g) + unit;
+  }
+  const af = (n) => gal(n.afLow).replace(/ (million|billion) gal$/, (m, w) => (gal(n.afHigh).indexOf(w) > 0 ? "" : " " + w)) + " to " + gal(n.afHigh);   // a range, e.g. "20 to 63 billion gal"
+  const afMid = (n) => gal((n.afLow + n.afHigh) / 2);
   const money = (v) => (v < 0 ? "-" + money(-v) : v >= 1e9 ? "$" + (v / 1e9).toFixed(2) + "B" : v >= 1e6 ? "$" + (v / 1e6).toFixed(v >= 1e8 ? 0 : 1) + "M" : v >= 1e4 ? "$" + Math.round(v / 1e3) + "k" : "$" + U.num(v));
   /* A row of key figures: [[label, value, note], ...]. Plain rules between them, no boxes. */
   const stats = (rows) => '<dl class="stats">' + rows.map((r) => "<div class=\"" + (r[3] || "") + "\"><dt>" + r[0] + "</dt><dd>" + r[1] + "</dd>" + (r[2] ? "<small>" + r[2] + "</small>" : "") + "</div>").join("") + "</dl>";
@@ -76,7 +82,7 @@
     return '<dl class="stats three ' + (cls || "") + '">' +
       '<div class="cost"><dt>Cost</dt><dd>' + (n.usd >= 1e6 ? money(n.usd) : U.usd(n.usd)) + "</dd><small>sealant, " + U.num(n.km, n.km < 10 ? 2 : 1) + " km; labour extra</small></div>" +
       '<div class="time"><dt>Time</dt><dd>' + U.workTime(days) + "</dd><small>" + (oneCrew ? "1 crew" : p.crews + (p.crews === 1 ? " crew" : " crews")) + ", " + p.kmPerCrewDay + " km a day</small></div>" +
-      '<div class="save"><dt>Water kept</dt><dd>' + (n.afHigh > 0 ? af(n) + " af" : "unknown") + "</dd><small>" + (n.afHigh > 0 ? "per 90-day application; " + money(n.worthLow) + " to " + money(n.worthHigh) + " in a shortage" : "no seepage rate for this soil") + "</small></div></dl>";
+      '<div class="save"><dt>Water kept</dt><dd>' + (n.afHigh > 0 ? af(n) : "unknown") + "</dd><small>" + (n.afHigh > 0 ? "per 90-day application; " + money(n.worthLow) + " to " + money(n.worthHigh) + " in a shortage" : "no seepage rate for this soil") + "</small></div></dl>";
   }
   function gauge(p) {
     const tier = U.tierFor(p);
@@ -146,25 +152,34 @@
       .sort((a, b) => b.km - a.km);
   }
 
+  /* Is the state view showing the simulation's district list (where map taps pick districts)? */
+  const picking = () => state.step === "sim" && !district() && state.simStep === 1;
+  /* With everything ticked (the default), a tap picks just that district. After that, taps add or remove. */
+  function tapDistrict(i) {
+    if (GROUPABLE.indexOf(i) < 0) { setScope(i); return; }             // an Elephant Butte district opens on its own
+    simMembers();
+    if (state.simSel.size === GROUPABLE.length) state.simSel = new Set([i]);
+    else if (state.simSel.has(i)) state.simSel.delete(i); else state.simSel.add(i);
+    renderSimResult(); simChrome();
+  }
+
   /* ---------- The map ---------- */
   const map = window.HGMap.create({
     stage: $("stage"), canvas: $("map"), tip: $("tip"), coords: $("coords"), bar: $("bar"),
     hud: { phase: $("phase"), line1: $("hud1"), line2: $("hud2") },
-    onCanal: (c) => { state.canal = c.id; if (state.step === "sim") state.step = "risk"; refresh(false); },
-    onDistrict: (i) => {
-      // In the state view's simulation list, a click on the map ticks or unticks a district.
-      if (state.step === "sim" && !district() && state.simStep === 1 && GROUPABLE.indexOf(i) >= 0) { simMembers(); state.simSel.has(i) ? state.simSel.delete(i) : state.simSel.add(i); renderSimResult(); simChrome(); }
-      else setScope(i);
-    },
-    onCounty: (fips) => { state.county = fips; state.canal = null; state.step = "risk"; refresh(false); },
+    // On the simulation's district list, any tap inside a district picks that district:
+    // a tap on one of its canals counts, and a tap on empty county land does nothing.
+    onCanal: (c) => { if (picking()) { if (c.district >= 0) tapDistrict(c.district); return; } state.canal = c.id; if (state.step === "sim") state.step = "risk"; refresh(false); },
+    onDistrict: (i) => { if (picking()) tapDistrict(i); else setScope(i); },
+    onCounty: (fips) => { if (picking()) return; state.county = fips; state.canal = null; state.step = "risk"; refresh(false); },
     tipHtml(hit) {
       if (hit.canal) {
         const c = hit.canal, n = U.canalNumbers([c], params());
-        return "<b>" + U.esc(c.name) + "</b><dl><dt>Costs</dt><dd class=\"big\">" + U.usd(n.usd) + "</dd><dt>Takes</dt><dd class=\"big\">" + U.workTime(n.crewDays) + "</dd><dt>Saves</dt><dd class=\"big\">" + (n.afHigh > 0 ? af(n) + " acre-feet" : "unknown") + "</dd>" +
+        return "<b>" + U.esc(c.name) + "</b><dl><dt>Costs</dt><dd class=\"big\">" + U.usd(n.usd) + "</dd><dt>Takes</dt><dd class=\"big\">" + U.workTime(n.crewDays) + "</dd><dt>Saves</dt><dd class=\"big\">" + (n.afHigh > 0 ? af(n) : "unknown") + "</dd>" +
           "<dt>Length</dt><dd>" + U.num(c.km, 2) + " km</dd><dt>Soil</dt><dd>" + U.esc(c.soil || "not looked up") + "</dd><dt>Class</dt><dd>" + U.esc(c.level) + "</dd></dl>" +
           "<small>" + U.esc((c.kind || "Canal or ditch") + (c.piped ? ", mapped as piped" : "") + ". Click for the full card.") + "</small>";
       }
-      if (hit.district != null) { const d = HG.districts[hit.district]; return "<b>" + U.esc(d.name) + "</b><dl><dt>Risk</dt><dd>" + d.risk + ", " + U.pct(d.pSeason) + "</dd><dt>Canals</dt><dd>" + U.num(d.canalKm) + " km</dd></dl><small>Click to open this district.</small>"; }
+      if (hit.district != null) { const d = HG.districts[hit.district]; return "<b>" + U.esc(d.name) + "</b><dl><dt>Risk</dt><dd>" + d.risk + ", " + U.pct(d.pSeason) + "</dd><dt>Canals</dt><dd>" + U.num(d.canalKm) + " km</dd></dl><small>" + (picking() ? "Tap to select it for the simulation." : "Click to open this district.") + "</small>"; }
       const c = U.countyByFips[hit.county], river = U.riverByFips[hit.county];
       return "<b>" + U.esc(c.name) + " County</b><dl><dt>Drought now</dt><dd>" + (c.dm == null ? "no data" : U.DM_TEXT[c.dm]) + "</dd>" +
         (river ? "<dt>6-month chance</dt><dd>" + U.pct(river.pSeason) + ", " + river.tier + "</dd>" : "") + "</dl><small>Click for photos and a profile.</small>";
@@ -187,7 +202,7 @@
   function syncMap() {
     const lakes = {};
     if (state.live && state.live.systems && state.live.systems["Elephant Butte"]) lakes["Elephant Butte"] = state.live.systems["Elephant Butte"].pct;
-    map.set({ mode: state.mapMode, scope: state.scope, county: state.county, canal: state.canal,
+    map.set({ pick: picking(), mode: state.mapMode, scope: state.scope, county: state.county, canal: state.canal,
               funded: state.step === "budget" ? currentPlan().fundedIds : null, lakes });
     legend();
   }
@@ -240,7 +255,7 @@
         '<div class="rowBtns"><button class="btn" data-act="go" data-step="budget">Budget plan &rarr;</button><button class="btn ghost" data-act="go" data-step="sim">Simulation &rarr;</button></div>' +
         "<h3>Canal length by leak class</h3>" + mixBar(list, (c) => c.level, (k) => U.LEVEL_COLOR[k]) +
         "<h3>Canal length by soil</h3>" + mixBar(list, (c) => c.soil || "Not looked up", (k) => { const r = HG.seepage[k]; return r == null ? U.LEVEL_COLOR["Unknown soil"] : r >= 7.48 ? U.TIER_COLOR.Warning : r >= 2.9 ? U.TIER_COLOR.Watch : U.TIER_COLOR.Low; }) +
-        (named.length ? "<h3>Named canals (" + named.length + ")</h3><div class=\"scroll\"><table class=\"t\"><tr><th>Canal</th><th class=\"r\">km</th><th class=\"r\">Cost</th><th class=\"r\">Time</th><th class=\"r\">Kept, af</th></tr>" +
+        (named.length ? "<h3>Named canals (" + named.length + ")</h3><div class=\"scroll\"><table class=\"t\"><tr><th>Canal</th><th class=\"r\">km</th><th class=\"r\">Cost</th><th class=\"r\">Time</th><th class=\"r\">Water kept</th></tr>" +
           named.slice(0, 80).map((g) => '<tr class="click" data-act="canal" data-id="' + g.segs[0].id + '"><td>' + U.esc(g.name) + ' <span class="muted">(' + g.segs.length + ")</span></td><td class=\"r\">" + U.num(g.km, 1) + "</td>" +
             (g.n.km > 0 ? '<td class="r">' + U.usd(g.n.usd) + '</td><td class="r">' + U.workTime(g.n.crewDays) + '</td><td class="r">' + af(g.n) + "</td>" : '<td class="r muted" colspan="3">not rankable</td>') + "</tr>").join("") +
           '</table></div><p class="fn">One crew, one application. Segment count in brackets. Select a row to find it on the map.</p>' : "") +
@@ -292,17 +307,17 @@
     const plan = currentPlan(), d = district(), p = scopeP(), act = U.actionFor(p), a = HG.plan.assumptions, P = params();
     const total = U.canalNumbers(plan.funded, P), piped = plan.funded.filter((c) => c.piped).length;
     $("budgetOut").textContent = U.usd(state.budget);
-    const perAf = (x) => (x > 0 ? "$" + U.num(plan.spent / x, 2) : "n/a");
+    const perAf = (x) => (x > 0 ? "$" + U.num(plan.spent / (x * E.GALLONS_PER_ACRE_FOOT / 1e6), 2) : "n/a");   // dollars per million gallons
     let rows;
     if (d) {
-      rows = "<h3>Canals in sealing order</h3><div class=\"scroll\"><table class=\"t\"><tr><th>#</th><th>Canal</th><th class=\"r\">km</th><th class=\"r\">Cost</th><th class=\"r\">Time</th><th class=\"r\">Kept, af</th></tr>" +
+      rows = "<h3>Canals in sealing order</h3><div class=\"scroll\"><table class=\"t\"><tr><th>#</th><th>Canal</th><th class=\"r\">km</th><th class=\"r\">Cost</th><th class=\"r\">Time</th><th class=\"r\">Water kept</th></tr>" +
         plan.ordered.slice(0, 250).map((c, i) => { const n = U.canalNumbers([c], P), on = plan.fundedIds.has(c.id); return '<tr class="click ' + (on ? "" : "off") + '" data-act="canal" data-id="' + c.id + '"><td>' + (i + 1) + "</td><td>" + U.esc(c.name) + (c.piped ? '<span class="flag">piped?</span>' : "") + ' <span class="muted">' + U.esc(c.soil) + '</span></td><td class="r">' + U.num(c.km, 2) + '</td><td class="r">' + U.usd(n.usd) + '</td><td class="r">' + U.workTime(n.crewDays) + '</td><td class="r">' + afMid(n) + "</td></tr>"; }).join("") +
         "</table></div><p class=\"fn\">Greyed rows are not funded. One crew; water kept is the middle of the tested range." + (plan.ordered.length > 250 ? " First 250 of " + plan.ordered.length + " shown; the CSV has every funded canal." : "") + "</p>";
     } else {
       const by = {};
       plan.funded.forEach((c) => { (by[c.district] = by[c.district] || []).push(c); });
       const order = Object.keys(by).map((i) => ({ i, n: U.canalNumbers(by[i], P), count: by[i].length })).sort((x, y) => y.n.usd - x.n.usd);
-      rows = "<h3>Allocation by district</h3><div class=\"scroll\"><table class=\"t\"><tr><th>District</th><th class=\"r\">Segments</th><th class=\"r\">km</th><th class=\"r\">Cost</th><th class=\"r\">Time</th><th class=\"r\">Kept, af</th></tr>" +
+      rows = "<h3>Allocation by district</h3><div class=\"scroll\"><table class=\"t\"><tr><th>District</th><th class=\"r\">Segments</th><th class=\"r\">km</th><th class=\"r\">Cost</th><th class=\"r\">Time</th><th class=\"r\">Water kept</th></tr>" +
         order.map((r) => '<tr class="click" data-act="district" data-i="' + r.i + '"><td>' + U.esc(HG.districts[r.i].name) + '</td><td class="r">' + r.count + '</td><td class="r">' + U.num(r.n.km, 1) + '</td><td class="r">' + U.usd(r.n.usd) + '</td><td class="r">' + U.workTime(r.n.crewDays) + '</td><td class="r">' + afMid(r.n) + "</td></tr>").join("") +
         "</table></div><p class=\"fn\">" + order.length + " of " + HG.districts.length + " districts funded. One crew per district. Select a district for its canal list.</p>";
     }
@@ -310,7 +325,7 @@
       triple(total) +
       stats([
         ["Segments funded", U.num(plan.funded.length), U.num(plan.km, 1) + " km"],
-        ["Sealant per acre-foot kept", perAf(total.afHigh) + " to " + perAf(total.afLow), "an acre-foot is worth about $" + U.num(U.USD_PER_AF) + " in a shortage"],
+        ["Sealant cost per million gallons kept", perAf(total.afHigh) + " to " + perAf(total.afLow), "a million gallons is worth about $" + U.num(U.USD_PER_AF * 1e6 / E.GALLONS_PER_ACRE_FOOT) + " to farms in a shortage"],
       ]) +
       '<p class="rec ' + act.key + '"><b>' + act.title + ".</b> At a " + U.pct(p) + " chance of a drought season" + (state.severity != null ? " (your setting)." : " (the forecast).") + "</p>" +
       (piped ? '<p class="fn warn">' + piped + " funded segments are mapped as piped in OpenStreetMap. Check them first: a pipe does not seep.</p>" : "") + rows +
@@ -335,8 +350,8 @@
   /* ---------- Step 3: Simulation ---------- */
   const POLICIES = [
     { trigger: "never", name: "Do nothing", css: "", blurb: "No canal work. Losses are paid for afterwards." },
-    { trigger: "declared", name: "Wait for the declaration", css: "react", blurb: "Seal only after 8 straight weeks of severe drought, plus paperwork." },
-    { trigger: "forecast", name: "Act on the forecast", css: "act", blurb: "Seal before the season whenever the forecast warns." },
+    { trigger: "declared", name: "Wait for an official drought declaration", css: "react", blurb: "Seal only after 8 straight weeks of severe drought, plus paperwork." },
+    { trigger: "forecast", name: "Seal early, when the forecast warns", css: "act", blurb: "Seal before the season whenever the forecast warns." },
   ];
   const SLIDERS = [   // the assumptions the user can move: [parameter, min, max, step, how to show it]
     ["cut", 0.28, 0.87, 0.01, (v) => Math.round(v * 100) + "%"],
@@ -401,10 +416,10 @@
        2 Scenario   pick a future: best, average or worst of the 300, or the real 2020 to 2025 record
        3 Simulation watch that district twice, side by side */
   const CASES = [
-    { key: "best", short: "Best", name: "Best case", tone: "low", note: "9 in 10 of the 300 futures are harsher than this one" },
-    { key: "likely", short: "Average", name: "Average case", tone: "watch", note: "the middle one of the 300 futures" },
-    { key: "worst", short: "Worst", name: "Worst case", tone: "warning", note: "9 in 10 of the 300 futures are milder than this one" },
-    { key: "check", short: "2020 to 2025", name: "The real record", tone: "accent", note: "2020 to 2025 as it happened: years the forecast model never saw" },
+    { key: "best", short: "Mild", name: "A mild five years", tone: "low", note: "9 in 10 of the 300 futures are harsher than this one" },
+    { key: "likely", short: "Typical", name: "A typical five years", tone: "watch", note: "the middle one of the 300 futures" },
+    { key: "worst", short: "Harsh", name: "A harsh five years", tone: "warning", note: "9 in 10 of the 300 futures are milder than this one" },
+    { key: "check", short: "What really happened, 2020-25", name: "The real record", tone: "accent", note: "2020 to 2025 as it happened: years the forecast model never saw" },
   ];
   const caseOf = (key) => CASES.find((c) => c.key === key);
   function renderSim() {
@@ -416,9 +431,9 @@
     }
     $("view").innerHTML =
       "<h2>Simulation</h2>" +
-      '<div class="sub">' + (d ? U.esc(d.name) : simMembers().length + " of " + GROUPABLE.length + " districts together") + " · do nothing against sealing when the forecast warns</div>" +
+      '<div class="sub">' + (d ? U.esc(d.name) : simMembers().length === 1 ? U.esc(simMembers()[0].name) : simMembers().length + " districts together") + " · five years, with and without sealing the leakiest canals</div>" +
       '<div id="simLead"></div>' +
-      '<div class="controls"><div class="field"><label for="simBudget">Sealing budget, each application <output id="simBudgetOut"></output></label><input id="simBudget" type="range" min="0" max="' + maxBudget() + '" step="' + budgetStep() + '" value="' + state.budget + '"></div><div id="shockRow"></div></div>' +
+      '<div class="controls"><div class="field"><label for="simBudget">Sealant budget, each round <output id="simBudgetOut"></output></label><input id="simBudget" type="range" min="0" max="' + maxBudget() + '" step="' + budgetStep() + '" value="' + state.budget + '"></div><div id="shockRow"></div></div>' +
       '<div id="simResult"></div>' +
       '<details class="more"><summary>Assumptions (' + SLIDERS.length + " sliders)</summary>" +
       SLIDERS.map(([k, min, max, step, show]) => '<div class="field"><label for="a_' + k + '"><span>' + E.DEFAULTS[k].label + ' <span class="tag ' + E.DEFAULTS[k].tag + '">' + E.DEFAULTS[k].tag + '</span></span><output id="o_' + k + '">' + show(p[k]) + '</output></label><input type="range" data-param="' + k + '" id="a_' + k + '" min="' + min + '" max="' + max + '" step="' + step + '" value="' + p[k] + '"></div>').join("") +
@@ -428,26 +443,19 @@
   }
   /* The chips and the prompt drawn over the stage on the Simulation step. */
   function simChrome() {
-    const n = state.simStep, ok = simMembers().length > 0 && (!district() || APPLICABLE[state.scope]);
-    $("simSteps").innerHTML = [[1, district() ? "District" : "Districts"], [2, "Scenario"], [3, "Simulation"]].map(([k, name]) =>
-      '<button data-sim="' + k + '" class="' + (k === n ? "on" : "") + '"' + (k > 1 && !ok ? " disabled" : "") + "><b>" + k + "</b>" + name + "</button>").join("");
-    $("simPrompt").innerHTML = n === 1 ? "<b>Choose districts</b><span>Tick them in the table, or click them on the map.</span>"
-      : n === 2 ? "<b>" + U.esc(district() ? district().name : simMembers().length + " districts together") + "</b><span>Choose a scenario</span>" : "";
-    // On the last step, one row of buttons switches scenario without going back.
-    $("simCases").innerHTML = CASES.map((c) => '<button class="sbtn ' + (c.key === state.simCase ? "on" : "") + '" data-case="' + c.key + '">' + c.short + "</button>").join("");
+    const n = state.simStep;
+    $("simSteps").innerHTML = n === 3 ? '<button data-sim="1">&larr; ' + (district() ? "Other districts" : "Back to the district list") + "</button>" : "";
+    $("simPrompt").innerHTML = n === 1 ? "<b>Tap a district on the map</b><span>or tick several in the list, then run the simulation</span>" : "";
+    // One row of buttons switches scenario.
+    $("simCases").innerHTML = CASES.map((c) => '<button class="sbtn ' + (c.key === state.simCase ? "on" : "") + '" data-case="' + c.key + '" title="' + c.note + '">' + c.short + "</button>").join("");
   }
   $("simCases").addEventListener("click", (e) => { const b = e.target.closest("[data-case]"); if (b) { state.simCase = b.dataset.case; refresh(false); } });
-  $("simSteps").addEventListener("click", (e) => {
-    const b = e.target.closest("button"); if (!b || b.disabled) return;
-    const k = Number(b.dataset.sim);
-    if (k === 1 && district()) { setScope(STATE, true); return; }
-    state.simStep = k; refresh(k === 2);
-  });
-  $("simCards").addEventListener("click", (e) => {
-    const b = e.target.closest("[data-case]");
-    if (b) { state.simCase = b.dataset.case; state.simStep = 3; refresh(false); }
-  });
-
+  /* Back to the list. From a district's own view, the state list opens with only that district ticked. */
+  function backToList() {
+    if (district()) { const i = state.scope; setScope(STATE, true); state.simSel = new Set(GROUPABLE.indexOf(i) >= 0 ? [i] : []); }
+    state.simStep = 1; refresh(true);
+  }
+  $("simSteps").addEventListener("click", (e) => { if (e.target.closest("button")) backToList(); });
   /* A line chart as SVG. series = [{ name, color, values, dash }], labels = x-axis labels. band = optional { low, high }. */
   function lineChart(series, labels, fmt, band) {
     const W = 640, H = 230, L = 62, R = 12, T = 12, B = 26;
@@ -484,8 +492,8 @@
       // One part per district. With several districts, each is drawn in its own cell (not to scale).
       parts: scope.ids.map((id) => ({ rings: HG.districts[id].rings, km: HG.districts[id].canalKm,
         canals: U.canals.filter((c) => c.district === id).map((c) => ({ line: c.line, km: c.km, rate: c.rate, level: c.level, ranked: c.rank != null, funded: funded.has(c.id) })) })),
-      weeks: twinWeeks, caseName: which.name, caseNote: note, tone: which.tone, system: scope.system, fullAt: P.fullAt, cut: P.cut,
-      sealedWord: U.theme() === "dark" ? "white" : "black", leftName: "Do nothing", rightName: "Act on the forecast", leftNote: "no canal work", rightNote: "seals when the forecast warns",
+      weeks: twinWeeks, fullAt: P.fullAt,
+
     });
   }
   const twin = window.HGTwin.create({ canvas: $("twin"), stage: $("stage"), onTick(i, playing) {
@@ -496,22 +504,6 @@
   $("simPlay").onclick = () => (twin.playing() ? twin.pause() : twin.play());
   $("simSkip").onclick = () => { twin.pause(); twin.seek(twinWeeks.length - 1); };
   $("simSeek").oninput = (e) => { const i = Number(e.target.value); twin.pause(); twin.seek(i); };   // read the slider first: pausing redraws it
-
-  /* The three scenario cards (and the real-record card) shown over the map on sub-step 2. */
-  function buildCards(run, check, endYear) {
-    const spark = (weeks) => {                                  // reservoir storage, week by week, as a small line
-      const pts = weeks.map((w, i) => (300 * i / (weeks.length - 1)).toFixed(1) + "," + (33 - Math.max(0, Math.min(100, w.pct || 0)) * 0.3).toFixed(1)).join(" ");
-      return '<svg viewBox="0 0 300 34" preserveAspectRatio="none" aria-hidden="true"><polyline points="0,33 300,33" fill="none" stroke="currentColor" stroke-opacity=".25"/><polyline points="' + pts + '" fill="none" stroke="var(--river)" stroke-width="2"/></svg>';
-    };
-    const flat = (r) => [].concat.apply([], r.years.map((y) => y.weekly));
-    $("simCards").innerHTML = CASES.map((c) => {
-      const pair = c.key === "check" ? [check[0], check[2]] : [run.cases[c.key].sample[0], run.cases[c.key].sample[2]];
-      const gain = pair[0].totals.cost - pair[1].totals.cost;
-      return '<button class="scase ' + c.key + '" data-case="' + c.key + '"><h3>' + c.name + "<small>" + (c.key === "check" ? "2020 to 2025" : "to " + endYear) + "</small></h3>" +
-        '<div class="big">' + money(pair[0].totals.loss) + "</div><p>in crops lost if nothing is done. " + c.note.charAt(0).toUpperCase() + c.note.slice(1) + ".</p>" + spark(flat(pair[0])) +
-        '<p class="tiny">reservoir storage, week by week</p><div class="gain ' + (gain >= 0 ? "" : "bad") + '">Acting ' + (gain >= 0 ? "saves " + money(gain) : "costs " + money(-gain) + " more") + '</div><div class="go">Run this scenario &rarr;</div></button>';
-    }).join("");
-  }
 
   /* State view: every district, with what acting on the forecast saves it in the middle future.
      Each district is run on its own canals with every treatable canal funded. */
@@ -530,14 +522,16 @@
       }).sort((a, b) => b.saved - a.saved);
       tableKey = key;
     }
-    const n = simMembers().length, skipped = HG.districts.length - tableCache.length;
-    return '<div class="rowBtns"><button class="btn" data-act="simRun"' + (n ? "" : " disabled") + ">Run the simulation for " + (n === GROUPABLE.length ? "all " + n : n) + (n === 1 ? " district" : " districts") + ' &rarr;</button>' +
-      '<button class="btn ghost small" data-act="simAll">All</button><button class="btn ghost small" data-act="simNone">None</button></div>' +
-      "<div class=\"scroll\" style=\"max-height:330px\"><table class=\"t\"><tr><th></th><th>District</th><th class=\"r\">Canals</th><th class=\"r\">Do nothing loses</th><th class=\"r\">Acting saves</th></tr>" +
-      tableCache.map((r) => r.alone
-        ? '<tr class="go" data-act="district" data-i="' + r.i + '"><td>&rarr;</td><td>' + U.esc(r.d.name) + ' <span class="muted">runs alone (Elephant Butte)</span></td><td class="r">' + U.num(r.d.canalKm) + ' km</td><td class="r">' + money(r.loss) + '</td><td class="r save">' + money(r.saved) + "</td></tr>"
-        : '<tr class="go" data-act="simPick" data-i="' + r.i + '"><td><input type="checkbox" tabindex="-1"' + (state.simSel.has(r.i) ? " checked" : "") + "></td><td>" + U.esc(r.d.name) + ' <span class="muted">' + r.d.counties.join(", ") + '</span></td><td class="r">' + U.num(r.d.canalKm) + ' km</td><td class="r">' + money(r.loss) + '</td><td class="r save">' + money(r.saved) + "</td></tr>").join("") +
-      '</table></div><p class="fn">Each row: that district alone, middle of 100 futures. Ticked districts are simulated together below.' + (skipped ? " " + skipped + " districts are left out: none of their canals has a seepage rate." : "") + "</p>";
+    const n = simMembers().length, q = (state.simQuery || "").toLowerCase();
+    const rows = tableCache.filter((r) => !q || r.d.name.toLowerCase().indexOf(q) >= 0 || r.d.counties.join(" ").toLowerCase().indexOf(q) >= 0);
+    return '<div class="rowBtns"><button class="btn" data-act="simRun"' + (n ? "" : " disabled") + ">Run the simulation: " + (n === 1 ? U.esc(simMembers()[0].name) : n === GROUPABLE.length ? "all " + n + " districts" : n + " districts") + ' &rarr;</button></div>' +
+      '<div class="pickBar"><input id="simSearch" type="search" placeholder="Search for a district or county" value="' + U.esc(state.simQuery || "") + '"><button class="btn ghost small" data-act="simAll">Tick all</button><button class="btn ghost small" data-act="simNone">Clear</button></div>' +
+      "<div class=\"scroll\" style=\"max-height:330px\"><table class=\"t\"><tr><th></th><th>District</th><th class=\"r\">Crops lost if nothing is done</th><th class=\"r\">Saved by sealing early</th></tr>" +
+      rows.map((r) => r.alone
+        ? '<tr class="go" data-act="district" data-i="' + r.i + '"><td>&rarr;</td><td>' + U.esc(r.d.name) + ' <span class="muted">opens on its own (different reservoir)</span></td><td class="r">' + money(r.loss) + '</td><td class="r save">' + money(r.saved) + "</td></tr>"
+        : '<tr class="go" data-act="simPick" data-i="' + r.i + '"><td><input type="checkbox" tabindex="-1"' + (state.simSel.has(r.i) ? " checked" : "") + "></td><td>" + U.esc(r.d.name) + ' <span class="muted">' + r.d.counties.join(", ") + '</span></td><td class="r">' + money(r.loss) + '</td><td class="r save">' + money(r.saved) + "</td></tr>").join("") +
+      (rows.length ? "" : '<tr><td colspan="4" class="muted">No district matches.</td></tr>') +
+      '</table></div><p class="fn">Five years, typical future, each district on its own. Ticked districts run together.</p>';
   }
 
   function renderSimResult() {
@@ -581,12 +575,12 @@
         return median(r.policies[1].draws.map((t, k) => r.policies[0].draws[k].cost - t.cost));
       });
       const mult = U.PUBLISHED.worstCaseOutput / U.PUBLISHED.worstCaseRevenue;      // total economic output per $1 of crop revenue (Texas A&M)
-      const heroHtml = '<div class="saveHero"><span>Net saving to ' + endYear + ", middle of 300 futures</span><b>" + money(saved) + "</b></div>" +
+      const heroHtml = '<div class="saveHero"><span>Money saved by sealing early, typical future</span><b>' + money(saved) + "</b></div>" +
         stats([
-          ["Crop revenue kept", money(kept), "net farm revenue"],
-          ["Economic output kept", money(kept * mult), "Texas A&amp;M multiplier, " + mult.toFixed(1) + "x"],
+          ["Crops kept", money(kept), "farm income that would have been lost"],
+          ["Value to the wider economy", money(kept * mult), "jobs, suppliers, processing (Texas A&amp;M, " + mult.toFixed(1) + "x)"],
           ["Sealant spent", money(spent), spent > 0 ? "$" + U.num(kept / spent) + " kept per $1" : ""],
-          ["Futures where acting loses", behind + " / 300", "false alarms cost a round of sealing"],
+          ["Futures where sealing does not pay", behind + " of 300", "wet years: the sealant was not needed"],
         ]);
       const curveHtml = "<h3>Net saving by budget</h3><div class=\"chart\">" +
         lineChart([{ name: "Five-year net saving, middle future", color: U.TIER_COLOR.Low, values: curve }], levels.map((b) => money(b)), money) + "</div>" +
@@ -602,7 +596,7 @@
         cases: state.simStep > 1 ? CASES.filter((c) => c.key !== "check").map((c) => c.name + ": " + run.cases[c.key].sourceYears.join(", ")) : [], share: scope.share,
         outsideValley: scope.outsideValley, who, P,
       };
-      html = "<h3>All 300 futures, to " + endYear + "</h3>" + heroHtml +
+      html = "<h3>Across 300 possible futures, to " + endYear + "</h3>" + heroHtml +
         "<table class=\"t\"><tr><th>Policy</th><th class=\"r\">Total cost</th><th class=\"r\">Saves</th><th class=\"r\">Worse in</th></tr>" + policyRows + "</table>" +
         more("Net saving by budget", curveHtml) +
         more("Reservoir storage in the 300 futures", '<div class="chart">' +
@@ -641,7 +635,6 @@
     // What the stage shows, and the few lines that lead the panel, for the current sub-step.
     if (state.simStep === 1) lead = districtTable(over, hit, on);
     else if (state.simStep === 2) {
-      buildCards(run, runs, endYear);
       lead = "";
     } else {
       const pair = showCheck ? [runs[0], runs[2]] : [run.cases[which.key].sample[0], run.cases[which.key].sample[2]];
@@ -651,16 +644,20 @@
       loadTwin(pair[0], pair[1], scope, P, plan, which, note);
       const end = twinWeeks[twinWeeks.length - 1];
       simFacts = Object.assign(simFacts || {}, { watching: which.name + ": " + note });
-      lead = '<p class="watching ' + which.key + '"><b>' + which.name + "</b></p>" +
-        stats([
-          ["Saved by acting", (gain >= 0 ? "" : "-") + money(Math.abs(gain)), "after " + money(pair[1].totals.spend) + " of sealant", gain >= 0 ? "good" : "bad"],
-          ["Water kept in canals", U.num(end.sumR.saved) + " af", U.num(plan.km) + " km sealed", "good"],
-          ["Crops lost, do nothing", money(pair[0].totals.loss), "", "bad"],
-          ["Leaked from canals, do nothing", U.num(end.sumL.leak) + " af", "", "bad"],
-        ]);
+      lead = stats([
+          ["Money saved by sealing early", (gain >= 0 ? "" : "-") + money(Math.abs(gain)), "after paying " + money(pair[1].totals.spend) + " for sealant", gain >= 0 ? "good" : "bad"],
+          ["Water saved from leaking", gal(end.sumR.saved, true), U.num(plan.km) + " km of canal sealed", "good"],
+          ["Crops lost if nothing is done", money(pair[0].totals.loss), "over five years", "bad"],
+          ["Water leaked if nothing is done", gal(end.sumL.leak, true), "soaks into the ground through canal beds", "bad"],
+        ]) +
+        more("How to read the picture", '<dl class="key">' +
+          "<dt>Reservoir</dt><dd>The lakes on the river that feed the canals. The bar at the top shows how full they are. Below " + P.fullAt + "% full, farms get less water than they asked for.</dd>" +
+          "<dt>Green and brown</dt><dd>Each district shape fills with green for the share of water that reached its farms that week. Brown is water that did not arrive.</dd>" +
+          "<dt>Red and white lines</dt><dd>Canals. Red canals are unsealed and leak into the soil. White canals have been sealed.</dd>" +
+          "<dt>Scenario</dt><dd>" + which.name + ": " + which.note + ".</dd></dl>");
     }
     $("simLead").innerHTML = lead;
-    $("shockRow").innerHTML = showCheck ? "" : '<div class="shocks"><span>Stress tests (our assumptions):</span>' + SHOCKS.map((s) => '<button class="sbtn ' + (state.shocks[s.key] ? "on" : "") + '" data-shock="' + s.key + '" title="' + s.note + '">' + s.label + "</button>").join("") + "</div>";
+    $("shockRow").innerHTML = showCheck ? "" : '<div class="shocks"><span>What if things get worse or better? (our assumptions)</span>' + SHOCKS.map((s) => '<button class="sbtn ' + (state.shocks[s.key] ? "on" : "") + '" data-shock="' + s.key + '" title="' + s.note + '">' + s.label + "</button>").join("") + "</div>";
     $("simResult").innerHTML = html;
 
     $("simNotes").innerHTML = '<div class="rowBtns"><button class="btn ghost" data-act="go" data-step="sources">Data and sources &rarr;</button></div>';
@@ -696,6 +693,7 @@
       "<h3>3. Water leaking from canals</h3>" + table([
         ["Leak rate by soil, unlined canals", Object.keys(HG.seepage).filter((k) => !/sand$/i.test(k) || k === "Sand").map((k) => k + " " + HG.seepage[k]).join(" · ") + " gallons per sq ft per day", link("Fipps, Texas A&amp;M, 1998, Tables 6 to 8", "https://gfipps.tamu.edu/files/2019/12/RGV-Potential-Water-Savings.pdf") + " (Table 7 quotes the Texas Board of Water Engineers, 1946)"],
         ["Canal size", a.wetted_width_ft + " ft wetted width for every canal", "Ours" + tag("assumption")],
+        ["Units", "Water agencies count in acre-feet. One acre-foot is 325,851 gallons, about half an Olympic pool. The platform shows gallons.", "Conversion"],
         ["Scale check", "Published potential saving in 28 Valley districts: 54,000 to 223,000 acre-feet a year." + (F.keptYear ? " This simulation keeps " + U.num(F.keptYear) + " in a year it acts, for " + F.who + "." : ""), link("Fipps, 1998", "https://gfipps.tamu.edu/files/2019/12/RGV-Potential-Water-Savings.pdf")],
       ]) +
       '<p class="fn">Leakage counts only weeks when water is released, and never more than was released. It assumes every ranked canal is unlined, because no source records lining. Treat it as an upper estimate.</p>' +
@@ -735,7 +733,6 @@
     const sim = state.step === "sim";
     if (sim && !district() && !simMembers().length) state.simStep = 1;         // nothing ticked yet: stay on the list
     $("stage").classList.toggle("flow", sim);                                   // chips and prompt over the stage
-    $("stage").classList.toggle("cards", sim && state.simStep === 2);           // the scenario cards
     $("stage").classList.toggle("sim", sim && state.simStep === 3);             // the twin picture instead of the map
     if (sim) simChrome();
     $("scopeBtn").innerHTML = "<small>" + (district() ? "District" : "View") + "</small>" + U.esc(scopeName()) + " &#9662;";
@@ -744,11 +741,14 @@
     syncMap();
     $("view").scrollTop = 0;
     if (sim && state.simStep === 3) twin.play(); else twin.pause();
-    if (refit && !map.isScanning()) map.fitScope();
+    // On the district list, open the map on the Lower Valley, where most districts are, close
+    // enough to tap one. The buttons above the map jump to El Paso and Eagle Pass.
+    if (sim && !district() && state.simStep === 1 && !map.isScanning()) map.flyTo("valley");
+    else if (refit && !map.isScanning()) map.fitScope();
   }
   function setScope(scope, noScan) {
     state.scope = scope; state.county = null; state.canal = null; state.severity = null;
-    state.simStep = scope === STATE ? 1 : 3; state.simCase = "likely";       // a district goes straight to the average case
+    state.simStep = scope === STATE ? 1 : 3; state.simCase = "likely"; state.simQuery = "";       // a district goes straight to the average case
     state.budget = defaultBudget();
     $("onboard").classList.remove("open");
     let seen = false;
@@ -787,6 +787,10 @@
   });
   $("view").addEventListener("input", (e) => {
     if (e.target.id === "budget") { state.budget = Number(e.target.value); renderBudgetResult(); }
+    if (e.target.id === "simSearch") {                          // filter the list as you type, keeping the cursor in the box
+      state.simQuery = e.target.value; renderSimResult();
+      const box = $("simSearch"); box.focus(); box.setSelectionRange(box.value.length, box.value.length);
+    }
     if (e.target.id === "simBudget") { state.budget = Number(e.target.value); renderSimResult(); if (state.simStep === 3) twin.play(); }
     if (e.target.dataset.param) {
       const k = e.target.dataset.param, row = SLIDERS.find((s) => s[0] === k);
