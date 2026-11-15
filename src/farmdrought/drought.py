@@ -97,13 +97,19 @@ def d2_streak(classes):
     return streak
 
 
-def build_panel(buffer_km=BUFFER_KM, score_through=None):
+def build_panel(buffer_km=BUFFER_KM, score_through=None, rivers=None, exclude=()):
     """Build the county-week table for the river counties (436 of them at the default 50 km).
 
     score_through : None (the default) uses every week in the file, exactly as before. A date
                     (for example config.SCORE_THROUGH) drops every later week BEFORE the inputs
                     and the truths are built, so no answer window can reach past that date: a
                     row whose window would cross it gets NaN, as if the file ended there.
+
+    rivers        : None (the default) uses the five rivers in config.RIVERS, exactly as before.
+                    A list of other river names builds the same table for those rivers instead
+                    (used only by the holdout test, holdout.py).
+    exclude       : county codes to leave out even if they are near one of the rivers (the
+                    holdout test passes the 436 counties already used). Empty by default.
 
     Columns: date, fips, county, state, river, lat, lon, d2_streak, the inputs (sets H, L
     and E), and the three truths: y (4-week), y_season (6-month) and y_weeks (12-month).
@@ -125,8 +131,9 @@ def build_panel(buffer_km=BUFFER_KM, score_through=None):
     lat = np.array([centers[usdm["fips"][i]][1] for i in keep])
 
     # 2. A river county is one whose center is within 50 km of one of the five rivers.
-    river, distance = nearest_river(lon, lat, load_river_points())
-    chosen = np.where(distance <= buffer_km)[0]
+    river, distance = nearest_river(lon, lat, load_river_points(names=rivers))
+    left_out = set(exclude)
+    chosen = np.array([j for j in np.where(distance <= buffer_km)[0] if usdm["fips"][keep[j]] not in left_out])
 
     # 3. Neighbors of each river county: ALL counties within 150 km, except itself.
     neighbors = []

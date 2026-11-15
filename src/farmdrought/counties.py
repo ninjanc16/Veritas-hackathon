@@ -13,15 +13,19 @@ import numpy as np
 from farmdrought.config import COUNTIES_GEOJSON, RIVERS, RIVERS_GEOJSON
 
 
-def load_river_points(path=RIVERS_GEOJSON):
-    """Return {river name: array of (lon, lat) points along that river}."""
+def load_river_points(path=RIVERS_GEOJSON, names=None):
+    """Return {river name: array of (lon, lat) points along that river}.
+
+    names : which rivers to read. None (the default) means the five rivers in config.RIVERS,
+            exactly as before. The holdout test (holdout.py) passes its own six names.
+    """
     with open(path) as f:
         features = json.load(f)["features"]
-    points = {name: [] for name in RIVERS}
+    points = {name: [] for name in (RIVERS if names is None else names)}
     for feature in features:
         name = feature["properties"].get("name")
         if name not in points:
-            continue  # not one of our five rivers
+            continue  # not one of the rivers asked for
         geometry = feature["geometry"]
         # A river is stored as one line or as several lines. Treat both as a list of lines.
         lines = [geometry["coordinates"]] if geometry["type"] == "LineString" else geometry["coordinates"]
