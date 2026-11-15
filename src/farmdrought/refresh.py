@@ -1,0 +1,174 @@
+"""refresh.py: fetch the newest data, then rebuild every output. This is the "live data" step.
+
+HOW LIVE CAN THIS BE? Each source updates on its own clock:
+  U.S. Drought Monitor  : once a week (Thursdays). THE FORECAST CAN ONLY CHANGE WEEKLY.
+  El Nino index (NOAA)  : once a month
+  County weather (NOAA) : once a month
+  Reservoir storage     : once a day
+  Canals, soil, district boundaries : fixed (not refreshed here)
+So running this every day gives a new reservoir reading daily and a new forecast weekly.
+
+WHAT IT DOES:
+  1. Download the fresh files. A download is checked BEFORE it replaces the saved file.
+     If a source fails, the saved file is kept and the failure is reported.
+  2. If the drought map or the El Nino index changed, rerun version 2 (about 11 minutes).
+  3. Rerun the export (every forecast, the canal levels and the sealant plan).
+  4. Rebuild the demo's data file.
+  5. Write reports/refresh.json: what was fetched, how new it is, and what failed.
+
+HONEST NOTE: each new week also gives a few more weeks their real answer, so the test
+scores in metrics.json can move slightly from one refresh to the next. The models, inputs,
+thresholds and rules never change here. Only the data does.
+
+Run it with:  PYTHONPATH=src python -m farmdrought.refresh
+              PYTHONPATH=src python -m farmdrought.refresh --download-only   (skip the reruns)
+"""
+import json
+import subprocess
+import sys
+from datetime import datetime, timezone
+
+import pandas as pd
+import requests
+
+from farmdrought.config import FOCUS_RIVER, ONI_TXT, REPORTS, RESERVOIR_DIR, RESERVOIR_FILES, ROOT, USDM_JSON
+
+REFRESH_JSON = REPORTS / "refresh.json"
+BROWSER = {"User-Agent": "Mozilla/5.0"}  # some government servers refuse requests with no browser name
+# The three sources, all public with no key (checked Nov 14, 2026)
+USDM_URL = "https://raw.githubusercontent.com/sustainable-fsa/usdm-counties/main/usdm-counties.json"
+ONI_URL = "https://www.cpc.ncep.noaa.gov/data/indices/oni.ascii.txt"
+RESERVOIR_URL = "https://www.waterdatafortexas.org/reservoirs/individual/{file}"
+# NOAA lists the 12 overlapping 3-month seasons by these names. Our file keeps them in this order.
+SEASONS = ["DJF", "JFM", "FMA", "MAM", "AMJ", "MJJ", "JJA", "JAS", "ASO", "SON", "OND", "NDJ"]
+ONI_FIRST_YEAR = 1998  # our file starts here: two years before the drought record
+
+
+def fetch(url):
+    """Download a text file. Raises an error on any failure, so the caller keeps the old file."""
+    reply = requests.get(url, headers=BROWSER, timeout=300)
+    reply.raise_for_status()
+    return reply.text
+
+
+def week_of(usdm):
+    """The date of the newest week in a Drought Monitor file."""
+    return str((pd.Timestamp(usdm["week0"]) + pd.Timedelta(weeks=usdm["weeks"] - 1)).date())
+
+
+def refresh_drought():
+    """Weekly drought class per county. Returns (newest week, did it change?)."""
+    old = json.loads(USDM_JSON.read_text())
+    text = fetch(USDM_URL)
+    new = json.loads(text)
+    # Checks before replacing: same counties in the same order, one value per week, never shorter.
+    assert new["counties"] == old["counties"], "the county list changed"
+    assert all(len(series) == new["weeks"] for series in new["series"]), "a county is missing weeks"
+    assert new["weeks"] >= old["weeks"], "the new file is shorter than the saved one"
+    changed = new["series"] != old["series"]
+    if changed:
+        USDM_JSON.write_text(text)
+    return week_of(new), changed
+
+
+def oni_table(noaa_text):
+    """Turn NOAA's El Nino file into our layout: one line per year, 12 season values.
+
+    NOAA's file has one line per season:  "DJF 1950 25.01 -1.32"  (season, year, total, anomaly).
+    We keep the anomaly. NOAA files NDJ under the year it STARTS in, the same as our file.
+    """
+    years = {}
+    for line in noaa_text.splitlines()[1:]:  # the first line is the header
+        season, year, _, anomaly = line.split()
+        if int(year) >= ONI_FIRST_YEAR:
+            years.setdefault(int(year), {})[season] = anomaly
+    lines = []
+    for year in sorted(years):
+        # a year in progress has only its first seasons, and they must be in order with no gap
+        values = [years[year][s] for s in SEASONS if s in years[year]]
+        assert list(years[year]) == SEASONS[:len(values)], f"El Nino seasons out of order in {year}"
+        lines.append(f"{year} " + " ".join(values))
+    return lines
+
+
+def refresh_enso():
+    """Monthly El Nino index. Returns (newest season, did it change?)."""
+    lines = oni_table(fetch(ONI_URL))
+    old_lines = [line for line in ONI_TXT.read_text().splitlines() if not line.startswith("#")]
+    assert len(lines) >= len(old_lines), "the new El Nino file is shorter than the saved one"
+    changed = lines != old_lines
+    if changed:
+        header = (f"# NOAA CPC ONI anomaly, seasons {' '.join(SEASONS)} "
+                  f"(source: cpc.ncep.noaa.gov/data/indices/oni.ascii.txt, fetched {datetime.now().date()})")
+        ONI_TXT.write_text("\n".join([header] + lines) + "\n")
+    last_year, *values = lines[-1].split()
+    return f"{SEASONS[len(values) - 1]} {last_year}", changed
+
+
+def refresh_reservoirs():
+    """Daily reservoir storage, one file per lake. Returns (oldest of the newest readings, changed?)."""
+    newest, changed = [], False
+    for files in RESERVOIR_FILES.values():
+        for name in files:
+            text = fetch(RESERVOIR_URL.format(file=name))
+            rows = [line for line in text.splitlines() if line and not line.startswith("#")]
+            assert rows[0].startswith("date,") and len(rows) > 1000, f"{name} does not look like a reservoir file"
+            newest.append(rows[-1].split(",")[0])  # the date of the last row
+            path = RESERVOIR_DIR / name
+            if text != path.read_text():
+                path.write_text(text)
+                changed = True
+    return min(newest), changed
+
+
+def refresh_weather():
+    """Monthly county rain and temperature (version 2 only). Two 40 MB files, so they are only
+    downloaded when the month the forecast needs is missing from the saved file."""
+    from farmdrought.drought import build_panel
+    from farmdrought.weather import PUBLISH_LAG_MONTHS, WEATHER_CSV, download_weather
+
+    newest = lambda: pd.read_csv(WEATHER_CSV).assign(p=lambda t: t["year"] * 100 + t["month"])["p"].max()
+    needed = pd.Timestamp.today().to_period("M") - PUBLISH_LAG_MONTHS
+    before = newest()
+    if before < needed.year * 100 + needed.month:
+        panel = build_panel()
+        download_weather(sorted(panel.loc[panel["river"] == FOCUS_RIVER, "fips"].unique()))
+    after = newest()
+    return f"{after // 100}-{after % 100:02d}", bool(after != before)
+
+
+def run(*command):
+    """Run one pipeline step as its own program, and stop if it fails."""
+    print(">>>", " ".join(command), flush=True)
+    subprocess.run([sys.executable, *command], check=True, cwd=ROOT)
+
+
+def main():
+    sources = {"drought_monitor": ("weekly", refresh_drought), "el_nino_index": ("monthly", refresh_enso),
+               "reservoirs": ("daily", refresh_reservoirs), "county_weather": ("monthly", refresh_weather)}
+    report = {"refreshed_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "sources": {}}
+    for name, (updates, download) in sources.items():
+        try:
+            newest, changed = download()
+            report["sources"][name] = {"updates": updates, "newest": newest, "changed": changed, "ok": True}
+        except Exception as error:  # the saved file is kept, and the failure is written down
+            report["sources"][name] = {"updates": updates, "ok": False, "changed": False, "error": str(error)[:200]}
+        print(name, report["sources"][name], flush=True)
+
+    changed = lambda name: report["sources"][name]["changed"]
+    # Only the drought map, El Nino and weather feed the models. Reservoirs feed the second
+    # 6-month forecast and the reservoir tiles, which the export alone rebuilds.
+    report["models_rerun"] = changed("drought_monitor") or changed("el_nino_index") or changed("county_weather")
+    report["outputs_rebuilt"] = "--download-only" not in sys.argv and any(changed(name) for name in sources)
+    if report["outputs_rebuilt"]:
+        if report["models_rerun"]:
+            run("-m", "farmdrought.v2")      # version 2 first: the export reads its report
+        run("-m", "farmdrought.export")
+        if (ROOT / "demo" / "build_data.py").exists():
+            run("demo/build_data.py")
+    REFRESH_JSON.write_text(json.dumps(report, indent=2) + "\n")
+    print("wrote", REFRESH_JSON.name, "| outputs rebuilt:", report["outputs_rebuilt"])
+
+
+if __name__ == "__main__":
+    main()
