@@ -1,0 +1,803 @@
+{
+  "added": true,
+  "declared_in": "reports/decision.md, section \"Evaluation round 3 (written Nov 15, 2026, before any item below was scored)\"",
+  "score_through": "2026-11-10",
+  "computed_against_manifest_sha256": "f353768186ac5af41c19a0be285fa209498745e3ae8369e8f434e90042689221",
+  "computed_at": "2026-11-15T06:10:48-08:00",
+  "git_commit": "0d409585cab146ffae9250fc7a5f8542fcb208b5",
+  "git_dirty_source": false,
+  "git_dirty_source_paths": [],
+  "git_dirty_source_means": "a file under src/ or a Python file in app/ differed from git_commit",
+  "draws": 10000,
+  "seed": 0,
+  "what": "The 6-month probability, raw (the system) and calibrated. The calibrated value is ADDED and is not the system: for each year an isotonic curve is fitted on forecasts whose answers were already known before that New Year, and that year's forecasts are passed through it.",
+  "calibration_history": "Rio Grande issue rows with the version 1 forest chained from 2005 (same inputs, settings and seed), as v2.py does, so the first test year has past forecasts to learn from",
+  "rows_scored": 6665,
+  "rows_with_all_four_probabilities": 6665,
+  "largest_gap_between_chained_and_system_forecast": 6.661338147750939e-16,
+  "coverage": {
+    "min_years": 3,
+    "years": [
+      {
+        "year": 2003,
+        "calibrated": false,
+        "past_years": 0,
+        "past_rows": 0
+      },
+      {
+        "year": 2004,
+        "calibrated": false,
+        "past_years": 0,
+        "past_rows": 0
+      },
+      {
+        "year": 2005,
+        "calibrated": false,
+        "past_years": 0,
+        "past_rows": 0
+      },
+      {
+        "year": 2006,
+        "calibrated": false,
+        "past_years": 1,
+        "past_rows": 186
+      },
+      {
+        "year": 2007,
+        "calibrated": false,
+        "past_years": 2,
+        "past_rows": 558
+      },
+      {
+        "year": 2008,
+        "calibrated": true,
+        "past_years": 3,
+        "past_rows": 930
+      },
+      {
+        "year": 2009,
+        "calibrated": true,
+        "past_years": 4,
+        "past_rows": 1333
+      },
+      {
+        "year": 2010,
+        "calibrated": true,
+        "past_years": 5,
+        "past_rows": 1674
+      },
+      {
+        "year": 2011,
+        "calibrated": true,
+        "past_years": 6,
+        "past_rows": 2046
+      },
+      {
+        "year": 2012,
+        "calibrated": true,
+        "past_years": 7,
+        "past_rows": 2418
+      },
+      {
+        "year": 2013,
+        "calibrated": true,
+        "past_years": 8,
+        "past_rows": 2790
+      },
+      {
+        "year": 2014,
+        "calibrated": true,
+        "past_years": 9,
+        "past_rows": 3193
+      },
+      {
+        "year": 2015,
+        "calibrated": true,
+        "past_years": 10,
+        "past_rows": 3565
+      },
+      {
+        "year": 2016,
+        "calibrated": true,
+        "past_years": 11,
+        "past_rows": 3906
+      },
+      {
+        "year": 2017,
+        "calibrated": true,
+        "past_years": 12,
+        "past_rows": 4278
+      },
+      {
+        "year": 2018,
+        "calibrated": true,
+        "past_years": 13,
+        "past_rows": 4650
+      },
+      {
+        "year": 2019,
+        "calibrated": true,
+        "past_years": 14,
+        "past_rows": 5022
+      },
+      {
+        "year": 2020,
+        "calibrated": true,
+        "past_years": 15,
+        "past_rows": 5425
+      },
+      {
+        "year": 2021,
+        "calibrated": true,
+        "past_years": 16,
+        "past_rows": 5766
+      },
+      {
+        "year": 2022,
+        "calibrated": true,
+        "past_years": 17,
+        "past_rows": 6138
+      },
+      {
+        "year": 2023,
+        "calibrated": true,
+        "past_years": 18,
+        "past_rows": 6510
+      },
+      {
+        "year": 2024,
+        "calibrated": true,
+        "past_years": 19,
+        "past_rows": 6882
+      },
+      {
+        "year": 2025,
+        "calibrated": true,
+        "past_years": 20,
+        "past_rows": 7285
+      },
+      {
+        "year": 2026,
+        "calibrated": true,
+        "past_years": 21,
+        "past_rows": 7657
+      }
+    ],
+    "years_left_raw": [
+      2003,
+      2004,
+      2005,
+      2006,
+      2007
+    ]
+  },
+  "brier": {
+    "raw": 0.1475347166948846,
+    "calibrated": 0.15133942881222173,
+    "usual": 0.269013478164346,
+    "class_frequency": 0.15105009348484238
+  },
+  "skill": {
+    "raw_against_usual": 0.45157128296466786,
+    "raw_against_class_frequency": 0.023272920319711954,
+    "calibrated_against_usual": 0.4374280803887258,
+    "calibrated_against_class_frequency": -0.0019154925409454737
+  },
+  "skill_means": "1 - Brier / reference Brier. Above zero means better than the reference.",
+  "brier_differences": [
+    {
+      "name": "Brier of the raw forecast minus Brier of 'usual'",
+      "a": "raw",
+      "b": "usual",
+      "rows_used": "scored Rio Grande outlook rows that have all four probabilities",
+      "year_unit": "the calendar year of the issue date (the date the forecast was made), all counties together",
+      "statistic": "mean over rows (yearly means weighted by rows)",
+      "lower_is_better": true,
+      "per_year": {
+        "years": [
+          2008,
+          2009,
+          2010,
+          2011,
+          2012,
+          2013,
+          2014,
+          2015,
+          2016,
+          2017,
+          2018,
+          2019,
+          2020,
+          2021,
+          2022,
+          2023,
+          2024,
+          2025
+        ],
+        "raw": [
+          0.14384645514721783,
+          0.09766033060337997,
+          0.1101306646261211,
+          0.1498857748268151,
+          0.1459387861814459,
+          0.11446466621600626,
+          0.13987455455516087,
+          0.06666026837330968,
+          0.020337311377971814,
+          0.1347348783023468,
+          0.10593611510631565,
+          0.25184117254110006,
+          0.2306741666378229,
+          0.18535274672659713,
+          0.13147482105594194,
+          0.3051416783767905,
+          0.16348690888313896,
+          0.159151681359127
+        ],
+        "usual": [
+          0.2562502765609098,
+          0.20796714549544046,
+          0.1729443702148417,
+          0.41664675428116277,
+          0.40864865870446854,
+          0.28848826934342087,
+          0.22016710700088069,
+          0.24588349742577714,
+          0.2065820788530466,
+          0.2170683560236195,
+          0.3146908655423864,
+          0.2381078923910652,
+          0.3437925701344025,
+          0.3074932338526809,
+          0.2347938609926404,
+          0.2645601954948522,
+          0.23212576146217795,
+          0.26576064364082796
+        ],
+        "rows": [
+          372,
+          372,
+          372,
+          372,
+          372,
+          372,
+          372,
+          372,
+          372,
+          372,
+          372,
+          372,
+          372,
+          372,
+          372,
+          372,
+          372,
+          341
+        ]
+      },
+      "block1": {
+        "diff": -0.1214787614694614,
+        "lo": -0.15796151900886335,
+        "hi": -0.08485936258200404,
+        "share_draws_a_better": 1.0,
+        "years_a_better": 16,
+        "lower_is_better": true,
+        "n_years": 18,
+        "draws": 10000,
+        "block": 1,
+        "seed": 0,
+        "caveat": "Percentile interval from 18 resampled years (block 1). With this few years it is too narrow: in simulation a nominal 95% interval covered the truth about 88% of the time with 8 years and 92% with 18 (80% and 90% with two-year blocks), and is expected to be less if years are dependent. These coverage figures come from a simulation with independent years and a true difference of zero, not from this project's data.",
+        "direction": "raw better"
+      },
+      "block2": {
+        "diff": -0.1214787614694614,
+        "lo": -0.15455631878624282,
+        "hi": -0.09002485508486294,
+        "share_draws_a_better": 1.0,
+        "years_a_better": 16,
+        "lower_is_better": true,
+        "n_years": 18,
+        "draws": 10000,
+        "block": 2,
+        "seed": 0,
+        "caveat": "Percentile interval from 18 resampled years (block 2). With this few years it is too narrow: in simulation a nominal 95% interval covered the truth about 88% of the time with 8 years and 92% with 18 (80% and 90% with two-year blocks), and is expected to be less if years are dependent. These coverage figures come from a simulation with independent years and a true difference of zero, not from this project's data.",
+        "direction": "raw better"
+      },
+      "raw_mean": 0.1475347166948846,
+      "usual_mean": 0.269013478164346,
+      "difference": -0.1214787614694614
+    },
+    {
+      "name": "Brier of the raw forecast minus Brier of class frequency",
+      "a": "raw",
+      "b": "class frequency",
+      "rows_used": "scored Rio Grande outlook rows that have all four probabilities",
+      "year_unit": "the calendar year of the issue date (the date the forecast was made), all counties together",
+      "statistic": "mean over rows (yearly means weighted by rows)",
+      "lower_is_better": true,
+      "per_year": {
+        "years": [
+          2008,
+          2009,
+          2010,
+          2011,
+          2012,
+          2013,
+          2014,
+          2015,
+          2016,
+          2017,
+          2018,
+          2019,
+          2020,
+          2021,
+          2022,
+          2023,
+          2024,
+          2025
+        ],
+        "raw": [
+          0.14384645514721783,
+          0.09766033060337997,
+          0.1101306646261211,
+          0.1498857748268151,
+          0.1459387861814459,
+          0.11446466621600626,
+          0.13987455455516087,
+          0.06666026837330968,
+          0.020337311377971814,
+          0.1347348783023468,
+          0.10593611510631565,
+          0.25184117254110006,
+          0.2306741666378229,
+          0.18535274672659713,
+          0.13147482105594194,
+          0.3051416783767905,
+          0.16348690888313896,
+          0.159151681359127
+        ],
+        "class frequency": [
+          0.1401975961052911,
+          0.10253206458587215,
+          0.13267347734598034,
+          0.11320624202459599,
+          0.12707892900524484,
+          0.11876214772149943,
+          0.1702360630364387,
+          0.10220820107354216,
+          0.023138001823703912,
+          0.15801739799048894,
+          0.12118908591570607,
+          0.24521844196123788,
+          0.2357574146511843,
+          0.2000240086746301,
+          0.13501229490821048,
+          0.2598518232035318,
+          0.16418076537999252,
+          0.17130569403230048
+        ],
+        "rows": [
+          372,
+          372,
+          372,
+          372,
+          372,
+          372,
+          372,
+          372,
+          372,
+          372,
+          372,
+          372,
+          372,
+          372,
+          372,
+          372,
+          372,
+          341
+        ]
+      },
+      "block1": {
+        "diff": -0.003515376789957798,
+        "lo": -0.012535683084701871,
+        "hi": 0.006203160595875399,
+        "share_draws_a_better": 0.7792,
+        "years_a_better": 13,
+        "lower_is_better": true,
+        "n_years": 18,
+        "draws": 10000,
+        "block": 1,
+        "seed": 0,
+        "caveat": "Percentile interval from 18 resampled years (block 1). With this few years it is too narrow: in simulation a nominal 95% interval covered the truth about 88% of the time with 8 years and 92% with 18 (80% and 90% with two-year blocks), and is expected to be less if years are dependent. These coverage figures come from a simulation with independent years and a true difference of zero, not from this project's data.",
+        "direction": "not separated"
+      },
+      "block2": {
+        "diff": -0.003515376789957798,
+        "lo": -0.01313537109075745,
+        "hi": 0.005366952999520551,
+        "share_draws_a_better": 0.7747,
+        "years_a_better": 13,
+        "lower_is_better": true,
+        "n_years": 18,
+        "draws": 10000,
+        "block": 2,
+        "seed": 0,
+        "caveat": "Percentile interval from 18 resampled years (block 2). With this few years it is too narrow: in simulation a nominal 95% interval covered the truth about 88% of the time with 8 years and 92% with 18 (80% and 90% with two-year blocks), and is expected to be less if years are dependent. These coverage figures come from a simulation with independent years and a true difference of zero, not from this project's data.",
+        "direction": "not separated"
+      },
+      "raw_mean": 0.1475347166948846,
+      "class frequency_mean": 0.15105009348484238,
+      "difference": -0.003515376789957798
+    },
+    {
+      "name": "Brier of the calibrated forecast minus Brier of the raw forecast",
+      "a": "calibrated",
+      "b": "raw",
+      "rows_used": "scored Rio Grande outlook rows that have all four probabilities",
+      "year_unit": "the calendar year of the issue date (the date the forecast was made), all counties together",
+      "statistic": "mean over rows (yearly means weighted by rows)",
+      "lower_is_better": true,
+      "per_year": {
+        "years": [
+          2008,
+          2009,
+          2010,
+          2011,
+          2012,
+          2013,
+          2014,
+          2015,
+          2016,
+          2017,
+          2018,
+          2019,
+          2020,
+          2021,
+          2022,
+          2023,
+          2024,
+          2025
+        ],
+        "calibrated": [
+          0.15387958131052973,
+          0.10135343029042085,
+          0.11344447955524022,
+          0.16731538087215986,
+          0.12153433048230049,
+          0.12101376396536634,
+          0.15911205767214798,
+          0.07622733841762933,
+          0.02142215556644778,
+          0.14728660103383415,
+          0.1068173447418496,
+          0.256210116919684,
+          0.23024325487437128,
+          0.18897678351444003,
+          0.1450462008180058,
+          0.29897408571104933,
+          0.16502923813765613,
+          0.15012213345727987
+        ],
+        "raw": [
+          0.14384645514721783,
+          0.09766033060337997,
+          0.1101306646261211,
+          0.1498857748268151,
+          0.1459387861814459,
+          0.11446466621600626,
+          0.13987455455516087,
+          0.06666026837330968,
+          0.020337311377971814,
+          0.1347348783023468,
+          0.10593611510631565,
+          0.25184117254110006,
+          0.2306741666378229,
+          0.18535274672659713,
+          0.13147482105594194,
+          0.3051416783767905,
+          0.16348690888313896,
+          0.159151681359127
+        ],
+        "rows": [
+          372,
+          372,
+          372,
+          372,
+          372,
+          372,
+          372,
+          372,
+          372,
+          372,
+          372,
+          372,
+          372,
+          372,
+          372,
+          372,
+          372,
+          341
+        ]
+      },
+      "block1": {
+        "diff": 0.0038047121173371643,
+        "lo": -0.0010773120567160162,
+        "hi": 0.008011505665594032,
+        "share_draws_a_better": 0.0595,
+        "years_a_better": 4,
+        "lower_is_better": true,
+        "n_years": 18,
+        "draws": 10000,
+        "block": 1,
+        "seed": 0,
+        "caveat": "Percentile interval from 18 resampled years (block 1). With this few years it is too narrow: in simulation a nominal 95% interval covered the truth about 88% of the time with 8 years and 92% with 18 (80% and 90% with two-year blocks), and is expected to be less if years are dependent. These coverage figures come from a simulation with independent years and a true difference of zero, not from this project's data.",
+        "direction": "not separated"
+      },
+      "block2": {
+        "diff": 0.0038047121173371643,
+        "lo": -0.0006898281324197952,
+        "hi": 0.008002601226820097,
+        "share_draws_a_better": 0.0468,
+        "years_a_better": 4,
+        "lower_is_better": true,
+        "n_years": 18,
+        "draws": 10000,
+        "block": 2,
+        "seed": 0,
+        "caveat": "Percentile interval from 18 resampled years (block 2). With this few years it is too narrow: in simulation a nominal 95% interval covered the truth about 88% of the time with 8 years and 92% with 18 (80% and 90% with two-year blocks), and is expected to be less if years are dependent. These coverage figures come from a simulation with independent years and a true difference of zero, not from this project's data.",
+        "direction": "not separated"
+      },
+      "calibrated_mean": 0.15133942881222176,
+      "raw_mean": 0.1475347166948846,
+      "difference": 0.0038047121173371643
+    }
+  ],
+  "reliability": {
+    "raw": [
+      {
+        "bin_low": 0.0,
+        "bin_high": 0.1,
+        "n": 1422,
+        "mean_p": 0.05186776018561909,
+        "observed": 0.11251758087201125
+      },
+      {
+        "bin_low": 0.1,
+        "bin_high": 0.2,
+        "n": 1016,
+        "mean_p": 0.1471770889923333,
+        "observed": 0.18405511811023623
+      },
+      {
+        "bin_low": 0.2,
+        "bin_high": 0.3,
+        "n": 657,
+        "mean_p": 0.24635359816274227,
+        "observed": 0.2694063926940639
+      },
+      {
+        "bin_low": 0.3,
+        "bin_high": 0.4,
+        "n": 456,
+        "mean_p": 0.34656553252742617,
+        "observed": 0.38596491228070173
+      },
+      {
+        "bin_low": 0.4,
+        "bin_high": 0.5,
+        "n": 362,
+        "mean_p": 0.44605543370505907,
+        "observed": 0.6022099447513812
+      },
+      {
+        "bin_low": 0.5,
+        "bin_high": 0.6,
+        "n": 254,
+        "mean_p": 0.5511981580725651,
+        "observed": 0.7086614173228346
+      },
+      {
+        "bin_low": 0.6,
+        "bin_high": 0.7,
+        "n": 412,
+        "mean_p": 0.6530037598770881,
+        "observed": 0.8106796116504854
+      },
+      {
+        "bin_low": 0.7,
+        "bin_high": 0.8,
+        "n": 676,
+        "mean_p": 0.7524606989646664,
+        "observed": 0.8062130177514792
+      },
+      {
+        "bin_low": 0.8,
+        "bin_high": 0.9,
+        "n": 769,
+        "mean_p": 0.8492120418292674,
+        "observed": 0.8699609882964889
+      },
+      {
+        "bin_low": 0.9,
+        "bin_high": 1.0,
+        "n": 641,
+        "mean_p": 0.9409631720902653,
+        "observed": 0.9609984399375975
+      }
+    ],
+    "calibrated": [
+      {
+        "bin_low": 0.0,
+        "bin_high": 0.1,
+        "n": 921,
+        "mean_p": 0.0776155222167833,
+        "observed": 0.15092290988056462
+      },
+      {
+        "bin_low": 0.1,
+        "bin_high": 0.2,
+        "n": 1913,
+        "mean_p": 0.13083395414009144,
+        "observed": 0.15629900679560899
+      },
+      {
+        "bin_low": 0.2,
+        "bin_high": 0.3,
+        "n": 226,
+        "mean_p": 0.24885017806790163,
+        "observed": 0.415929203539823
+      },
+      {
+        "bin_low": 0.3,
+        "bin_high": 0.4,
+        "n": 376,
+        "mean_p": 0.3318670276754273,
+        "observed": 0.4228723404255319
+      },
+      {
+        "bin_low": 0.4,
+        "bin_high": 0.5,
+        "n": 264,
+        "mean_p": 0.440878417342656,
+        "observed": 0.5
+      },
+      {
+        "bin_low": 0.5,
+        "bin_high": 0.6,
+        "n": 407,
+        "mean_p": 0.5435885176527822,
+        "observed": 0.5798525798525799
+      },
+      {
+        "bin_low": 0.6,
+        "bin_high": 0.7,
+        "n": 136,
+        "mean_p": 0.6668188155744313,
+        "observed": 0.8382352941176471
+      },
+      {
+        "bin_low": 0.7,
+        "bin_high": 0.8,
+        "n": 385,
+        "mean_p": 0.7577716474330632,
+        "observed": 0.8935064935064935
+      },
+      {
+        "bin_low": 0.8,
+        "bin_high": 0.9,
+        "n": 1450,
+        "mean_p": 0.8520547292957232,
+        "observed": 0.8372413793103448
+      },
+      {
+        "bin_low": 0.9,
+        "bin_high": 1.0,
+        "n": 587,
+        "mean_p": 0.9200886540728509,
+        "observed": 0.9045996592844975
+      }
+    ]
+  },
+  "cost_at_threshold": {
+    "name": "6-month cost at threshold 0.25: calibrated minus raw",
+    "a": "calibrated",
+    "b": "raw",
+    "rows_used": "scored Rio Grande outlook rows that have all four probabilities",
+    "year_unit": "the calendar year of the issue date (the date the forecast was made), all counties together",
+    "statistic": "sum of the yearly totals",
+    "lower_is_better": true,
+    "per_year": {
+      "years": [
+        2008,
+        2009,
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025
+      ],
+      "calibrated": [
+        140.0,
+        76.0,
+        133.0,
+        110.0,
+        54.0,
+        73.0,
+        134.0,
+        62.0,
+        32.0,
+        188.0,
+        87.0,
+        271.0,
+        217.0,
+        126.0,
+        129.0,
+        344.0,
+        142.0,
+        112.0
+      ],
+      "raw": [
+        133.0,
+        68.0,
+        110.0,
+        57.0,
+        48.0,
+        75.0,
+        149.0,
+        67.0,
+        35.0,
+        190.0,
+        83.0,
+        271.0,
+        185.0,
+        124.0,
+        132.0,
+        342.0,
+        146.0,
+        109.0
+      ]
+    },
+    "block1": {
+      "diff": 106.0,
+      "lo": -7.0,
+      "hi": 240.0,
+      "share_draws_a_better": 0.0341,
+      "years_a_better": 7,
+      "lower_is_better": true,
+      "n_years": 18,
+      "draws": 10000,
+      "block": 1,
+      "seed": 0,
+      "caveat": "Percentile interval from 18 resampled years (block 1). With this few years it is too narrow: in simulation a nominal 95% interval covered the truth about 88% of the time with 8 years and 92% with 18 (80% and 90% with two-year blocks), and is expected to be less if years are dependent. These coverage figures come from a simulation with independent years and a true difference of zero, not from this project's data.",
+      "direction": "not separated"
+    },
+    "block2": {
+      "diff": 106.0,
+      "lo": -27.0,
+      "hi": 275.0,
+      "share_draws_a_better": 0.0753,
+      "years_a_better": 7,
+      "lower_is_better": true,
+      "n_years": 18,
+      "draws": 10000,
+      "block": 2,
+      "seed": 0,
+      "caveat": "Percentile interval from 18 resampled years (block 2). With this few years it is too narrow: in simulation a nominal 95% interval covered the truth about 88% of the time with 8 years and 92% with 18 (80% and 90% with two-year blocks), and is expected to be less if years are dependent. These coverage figures come from a simulation with independent years and a true difference of zero, not from this project's data.",
+      "direction": "not separated"
+    },
+    "calibrated_total": 2430.0,
+    "raw_total": 2324.0,
+    "difference": 106.0
+  }
+}
