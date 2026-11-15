@@ -618,7 +618,7 @@
           ["Act, crops lost", money(pair[1].totals.loss), money(pair[1].totals.spend) + " sealing, " + pair[1].totals.yearsActed + " of " + pair[1].years.length + " years"],
           ["Net saving, this future", (gain >= 0 ? "" : "-") + money(Math.abs(gain)), U.num(plan.funded.length) + " segments sealed, " + U.num(plan.km, 1) + " km"],
         ]) +
-        '<p class="fn">Canal colour is soil leak class; ' + (U.theme() === "dark" ? "white" : "black") + " means sealed. The dry share of fields is the model's number; which squares are dry is illustration.</p>";
+        '<p class="fn">Green fields have water, brown fields do not; bright green on the right are fields that sealing kept watered. The dry share is the model\'s number; which squares are dry is illustration.</p>';
     }
     $("simLead").innerHTML = lead;
     $("shockRow").innerHTML = showCheck ? "" : '<div class="shocks"><span>Stress tests (our assumptions):</span>' + SHOCKS.map((s) => '<button class="sbtn ' + (state.shocks[s.key] ? "on" : "") + '" data-shock="' + s.key + '" title="' + s.note + '">' + s.label + "</button>").join("") + "</div>";

@@ -16,8 +16,7 @@
     A picture only:
       - WHICH squares go dry. The district is tiled with squares and the right share of them
         is coloured dry; the model does not know which farm loses water.
-      - the orange dots drifting off the canals. They show that an unsealed canal seeps;
-        the amount is in the numbers, not in the dots.
+      - canals are drawn as thin lines for orientation only; the fields carry the story.
 
   window.HGTwin.create({ canvas, stage, onTick }) returns { load, play, pause, seek, playing, readTheme }.
 */
@@ -171,58 +170,46 @@
       const t = (zoom - 1) / (ZOOM - 1), fx = p.sx(shape.focus[0]), fy = p.sy(shape.focus[1]), z = zoom;
       ctx.translate(fx + (p.w / 2 - fx) * t, fy + (p.head + p.mh / 2 - fy) * t); ctx.scale(z, z); ctx.translate(-fx, -fy);
 
-      // 1. Fields. Dry ones are tan, and darken the longer they have been dry (looking back 26 weeks).
-      const size = Math.max(2.5, shape.step * p.k * 0.84), side = k ? "right" : "left", recent = [];
+      // 1. Fields: the main thing to look at. Watered fields are green; dry ones are brown and
+      //    darken the longer they have been dry (looking back 26 weeks). On the right, a field
+      //    that is dry on the left but watered here is drawn brighter: sealing kept it going.
+      const size = Math.max(2.5, shape.step * p.k * 0.93), side = k ? "right" : "left", recent = [];
+      const other = arrives(w, w.left);                               // what the do-nothing side gets this week
       for (let j = Math.max(0, i - 25); j <= i; j++) { const v = arrives(data.weeks[j], data.weeks[j][side]); if (v != null) recent.push(v); }
       for (const f of shape.fields) {
         let age = 0; for (const v of recent) if (v < f.u) age++;
         age = recent.length ? age / recent.length : 0;
-        if (share == null) { ctx.globalAlpha = 0.22; ctx.fillStyle = mix(C.wet, C.dry, age * 0.6); }          // off season: fields rest
-        else if (share < f.u) { ctx.globalAlpha = 0.8; ctx.fillStyle = mix(C.dry, C.dead, Math.min(1, age * 1.15)); }
-        else { ctx.globalAlpha = 0.5 - 0.2 * age; ctx.fillStyle = mix(C.wet, C.dry, age * 0.5); }
+        const kept = right && share != null && share >= f.u && other < f.u;
+        if (share == null) { ctx.globalAlpha = 0.3; ctx.fillStyle = mix(C.wet, C.dry, age * 0.6); }           // off season: fields rest
+        else if (share < f.u) { ctx.globalAlpha = 0.95; ctx.fillStyle = mix(C.dry, C.dead, Math.min(1, age * 1.15)); }
+        else { ctx.globalAlpha = kept ? 1 : 0.8; ctx.fillStyle = kept ? C.low : mix(C.wet, C.dry, age * 0.4); }
         ctx.fillRect(p.sx(f.x) - size / 2, p.sy(f.y) - size / 2, size, size);
       }
-      ctx.globalAlpha = 0.9; ctx.strokeStyle = C.text; ctx.lineWidth = 1.3 / z; ctx.stroke(p.outline);
+      ctx.globalAlpha = 0.95; ctx.strokeStyle = C.text; ctx.lineWidth = 1.6; ctx.stroke(p.outline);
 
-      // 2. Canals, drawn large. A dark casing first so every line reads against the fields.
+      // 2. Canals, kept quiet: thin lines under the story the fields tell. Sealed ones are picked out.
       ctx.lineJoin = ctx.lineCap = "round";
-      ctx.globalAlpha = 0.5; ctx.strokeStyle = C.unknown; ctx.lineWidth = 1 / z; ctx.stroke(p.other);
-      ctx.globalAlpha = 0.9; ctx.strokeStyle = C.map; ctx.lineWidth = 4.6 / z; ctx.stroke(p.all);
-      for (const lv of p.byLevel) { ctx.globalAlpha = 1; ctx.strokeStyle = lv.color; ctx.lineWidth = 2.3 / z; ctx.stroke(lv.path); }
-      // Water moving in the canals: a dashed line that slides along. Fainter when less water is released.
-      if (share != null && !reduced) {
-        ctx.setLineDash([5 / z, 11 / z]); ctx.lineDashOffset = -clock * 26 / z;
-        ctx.globalAlpha = 0.25 + 0.6 * (1 - s.missing / w.demand); ctx.strokeStyle = C.river; ctx.lineWidth = 1.5 / z; ctx.stroke(p.all);
-        ctx.setLineDash([]);
-      }
-      // Sealed canals: white, with a glow that is strongest in the weeks just after the work.
-      if (s.sealed) {
-        let since = 0; while (since < 14 && i - since >= 0 && data.weeks[i - since][side].sealed && !(data.weeks[i - since][side].spend > 0)) since++;
-        const fresh = Math.max(0, 1 - since / 6);
-        ctx.globalAlpha = 0.22 + 0.3 * fresh; ctx.strokeStyle = C.hl; ctx.lineWidth = (7 + 9 * fresh) / z; ctx.stroke(p.funded);
-        ctx.globalAlpha = 1; ctx.strokeStyle = C.hl; ctx.lineWidth = 2.8 / z; ctx.stroke(p.funded);
-      }
-      // 3. Leak dots.
-      ctx.fillStyle = C.inspect;
-      for (const d of dots[k]) {
-        const far = (1 - d.life) * 9 / z;
-        ctx.globalAlpha = Math.min(1, d.life * 1.4) * 0.9;
-        ctx.beginPath(); ctx.arc(p.sx(d.x) + d.dx * far, p.sy(d.y) + d.dy * far, 1.6 / z, 0, 7); ctx.fill();
-      }
+      ctx.globalAlpha = 0.28; ctx.strokeStyle = C.map; ctx.lineWidth = 1; ctx.stroke(p.other); ctx.stroke(p.all);
+      if (s.sealed) { ctx.globalAlpha = 0.4; ctx.strokeStyle = C.hl; ctx.lineWidth = 1; ctx.stroke(p.funded); }
       ctx.restore();                                               // end of the zoomed, clipped map
 
-      // 4. The words and numbers.
-      const a = Math.min(1, e * 1.5), bad = share != null && share < 0.999;
+      // 3. The words and numbers. Left: what is lost. Right: what acting has saved so far.
+      const a = Math.min(1, e * 1.5), bad = share != null && share < 0.999, base = p.h - p.foot, big = p.narrow ? 26 : 36;
+      const savedSoFar = Math.max(0, w.sumL.loss - w.sumR.loss);     // crops the right side kept that the left side lost
       text(right ? data.rightName : data.leftName, 12, 18, p.narrow ? 16 : 18, right ? C.accent : C.head, { weight: 700, alpha: a });
-      text(s.sealed ? "canals sealed now (" + data.sealedWord + ")" : right ? data.rightNote : data.leftNote, p.w - 12, 18, 13.5, s.sealed ? C.hl : C.muted, { italic: !s.sealed, weight: s.sealed ? 700 : 400, align: "right", alpha: a });
-      const base = p.h - p.foot;
-      text(money(sum.loss), 12, base + 24, p.narrow ? 26 : 34, sum.loss > 1e4 ? C.head : C.muted, { weight: 700 });
-      text("in crops lost so far", 12, base + (p.narrow ? 46 : 52), 13.5, C.muted, { italic: true });
-      text(share == null ? "off season" : Math.round(share * 100) + "%", p.w - 12, base + 22, p.narrow ? 19 : 22, bad ? C.warning : C.head, { weight: 700, align: "right" });
-      text(share == null ? "canals are not running" : "of the water farms asked for arrives", p.w - 12, base + (p.narrow ? 42 : 46), 13, C.muted, { italic: true, align: "right" });
+      text(s.sealed ? "canals sealed now" : right ? data.rightNote : data.leftNote, p.w - 12, 18, 13.5, s.sealed ? C.low : C.muted, { italic: !s.sealed, weight: s.sealed ? 700 : 400, align: "right", alpha: a });
+      if (right) {
+        text(money(savedSoFar), 12, base + 24, big, savedSoFar > 1e4 ? C.low : C.muted, { weight: 700 });
+        text("in crops saved so far", 12, base + (p.narrow ? 46 : 54), 13.5, C.muted, { italic: true });
+      } else {
+        text(money(sum.loss), 12, base + 24, big, sum.loss > 1e4 ? C.warning : C.muted, { weight: 700 });
+        text("in crops lost so far", 12, base + (p.narrow ? 46 : 54), 13.5, C.muted, { italic: true });
+      }
+      text(share == null ? "off season" : Math.round((1 - share) * 100) + "% dry", p.w - 12, base + 22, p.narrow ? 19 : 24, bad ? (right && share > other + 0.005 ? C.watch : C.warning) : C.head, { weight: 700, align: "right" });
+      text(share == null ? "fields are resting" : "of fields without water this week", p.w - 12, base + (p.narrow ? 42 : 48), 13, C.muted, { italic: true, align: "right" });
       if (!p.narrow) {
-        text(right ? "Sealing " + money(sum.spend) + " · kept " + num(sum.saved) + " af · " + num(sum.recovered) + " af filled a shortage"
-                   : "Sealing $0 · every canal keeps seeping", 12, p.h - 18, 13, C.muted);
+        text(right ? num(sum.recovered) + " acre-feet put back on fields · sealing cost " + money(sum.spend)
+                   : "No sealing · no water recovered", 12, p.h - 18, 13, C.muted);
       }
       ctx.restore();
     }
@@ -259,9 +246,8 @@
           if (at >= data.weeks.length - 1) playing = false;
           opt.onTick(index(), playing);
         }
-        const want = data.weeks[index()].right.sealed ? ZOOM : 1;                  // ease the zoom in and out
+        const want = 1;                                                              // no zoom: the whole district stays in view
         zoom = reduced ? want : zoom + (want - zoom) * Math.min(1, dt * 2.5);
-        if (!reduced) stepDots(dt);
         draw();
       }
       requestAnimationFrame(frame);
@@ -272,7 +258,7 @@
       /* next: { rings, canals: [{ line, km, rate, level, ranked, funded }], weeks: [{ date, pct, demand, left, right, sumL, sumR }],
                  caseName, caseNote, tone, system, fullAt, cut, leftName, rightName, leftNote, rightNote } */
       load(next) { data = next; shape = build(next); at = 0; split = 0; zoom = 1; dots[0] = []; dots[1] = []; playing = false; layout(); opt.onTick(0, false); },
-      play() { if (!data) return; if (at >= data.weeks.length - 1) at = 0; playing = true; },
+      play() { if (!data) return; if (at >= data.weeks.length - 1) at = 0; playing = true; opt.onTick(index(), true); },   // tell the page at once, so the button reads Pause
       pause() { playing = false; if (data) opt.onTick(index(), false); },
       seek(i) { at = i; split = 1; if (data) opt.onTick(index(), playing); },
       playing: () => playing,
