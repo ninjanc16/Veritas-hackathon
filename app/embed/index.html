@@ -1,14 +1,19 @@
 <!doctype html>
 <!--
-  index.html - puts the hosted Streamlit app inside a page on our own domain.
+  index.html - ONE page that holds both parts of the project, with a switch at the top:
+    "Demo"     = the demo page (demo/index.html, copied next to this file when the site is deployed)
+    "Full app" = the Streamlit app, hosted at APP_URL
 
-  Why: Streamlit Community Cloud gives the app an address like https://NAME.streamlit.app and
-  does not let us use our own domain. This one-file page is hosted for free (for example on
-  Vercel) under our domain, and simply fills the whole window with the app.
+  Why a wrapper: Streamlit Community Cloud does not allow our own domain, and the demo page
+  belongs to the pipeline side, so we do not edit it. This page simply shows each in a frame.
 
-  To set it up: replace APP_URL below with the real address after the app is deployed.
-  Links like  https://our-domain/?fips=48215&view=Canal%20action  work too: everything after
-  the "?" is passed on to the app, so the county and tab open just as they do in the app itself.
+  Links:  /                    opens the Demo
+          /?tab=app            opens the Full app
+          /?fips=48215&view=Canal%20action   opens the Full app on that county and tab
+  Anything in the address that the app understands (river, fips, view) is passed on to it.
+
+  To deploy: copy demo/index.html and demo/data.js into a folder "demo" next to this file,
+  then upload the folder (see README). APP_URL below is the hosted app's address.
 -->
 <html lang="en">
 <head>
@@ -16,34 +21,61 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Rio Grande Farm Drought Outlook</title>
   <style>
-    /* The app fills the whole window, with no margins or page scrollbar of our own. */
-    html, body { margin: 0; height: 100%; background: #f3f1ea; }
-    [hidden] { display: none !important; }   /* make the hidden flag win over the rules below */
-    iframe { display: block; border: 0; width: 100%; height: 100%; }
-    /* Shown only if the app link has not been filled in yet. */
-    #missing { font: 16px/1.5 Georgia, serif; padding: 2rem; color: #1f3a2d; }
+    html, body { margin: 0; height: 100%; background: #f3f1ea; font-family: Georgia, serif; }
+    [hidden] { display: none !important; }       /* make the hidden flag win over the rules below */
+    body { display: flex; flex-direction: column; }
+    /* The bar at the top with the two buttons. */
+    nav { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; padding: 8px 16px;
+          background: #1f3a2d; color: #f3f1ea; }
+    nav .name { font-size: 16px; margin-right: auto; }
+    nav button { font: 14px Georgia, serif; padding: 6px 14px; border-radius: 999px; cursor: pointer;
+                 border: 1px solid #7a9e7e; background: transparent; color: #f3f1ea; }
+    nav button[aria-pressed="true"] { background: #f3f1ea; color: #1f3a2d; }
+    /* The frame fills the rest of the window. */
+    iframe { flex: 1 1 auto; border: 0; width: 100%; background: #f3f1ea; }
   </style>
 </head>
 <body>
-  <iframe id="app" title="Rio Grande Farm Drought Outlook" allow="clipboard-write"></iframe>
-  <p id="missing" hidden>The app link is not set yet. Edit <code>APP_URL</code> in this file.</p>
+  <nav>
+    <span class="name">Rio Grande Farm Drought Outlook</span>
+    <button id="b-demo" aria-pressed="true">Demo</button>
+    <button id="b-app" aria-pressed="false">Full app</button>
+  </nav>
+  <iframe id="demo" title="Demo" hidden></iframe>
+  <iframe id="app" title="Full app" allow="clipboard-write" hidden></iframe>
 
   <script>
-    // 1) The address of the hosted app (no "?" part). CHANGE THIS after deploying.
+    // The hosted app's address (no "?" part).
     var APP_URL = "https://hackathon-drought.streamlit.app";
 
-    // 2) Keep whatever came after "?" in our address (county, river, tab) and add embed=true,
-    //    which tells Streamlit to hide its own page chrome because it is shown inside a page.
     var params = new URLSearchParams(window.location.search);
-    params.set("embed", "true");
+    // Open the app when the link names a tab or county for it; otherwise open the demo.
+    var wantApp = params.get("tab") === "app" ||
+                  params.has("fips") || params.has("river") || params.has("view");
+    if (params.get("tab") === "demo") wantApp = false;
 
-    if (APP_URL.indexOf("REPLACE-ME") !== -1) {
-      document.getElementById("app").hidden = true;
-      document.getElementById("missing").hidden = false;
-    } else {
-      // URLSearchParams writes spaces as "+"; use %20 so the link matches the ones the app itself makes.
-      document.getElementById("app").src = APP_URL + "/?" + params.toString().replace(/\+/g, "%20");
+    // The app gets everything after the "?" except our own "tab" word, plus embed=true,
+    // which tells Streamlit to hide its own page chrome because it is shown in a frame.
+    var appParams = new URLSearchParams(params);
+    appParams.delete("tab");
+    appParams.set("embed", "true");
+
+    function show(which) {
+      var demo = document.getElementById("demo"), app = document.getElementById("app");
+      // Load each frame only the first time it is shown (so the app is not woken up for nothing).
+      if (which === "demo" && !demo.src) demo.src = "demo/index.html";
+      if (which === "app" && !app.src) {
+        // URLSearchParams writes spaces as "+"; use %20 so the link matches the app's own links.
+        app.src = APP_URL + "/?" + appParams.toString().replace(/\+/g, "%20");
+      }
+      demo.hidden = which !== "demo";
+      app.hidden = which !== "app";
+      document.getElementById("b-demo").setAttribute("aria-pressed", which === "demo");
+      document.getElementById("b-app").setAttribute("aria-pressed", which === "app");
     }
+    document.getElementById("b-demo").onclick = function () { show("demo"); };
+    document.getElementById("b-app").onclick = function () { show("app"); };
+    show(wantApp ? "app" : "demo");
   </script>
 </body>
 </html>
