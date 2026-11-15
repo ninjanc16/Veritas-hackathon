@@ -567,7 +567,7 @@
   function bandsBlock(result, withScoredTest) {
     const lines = window.HGLogic.replayBandsLines(result), shared = window.HGLogic.sharedForecastSentence(result);
     return window.HGLogic.replayBandsTable(result) +
-      '<p class="fn">Each figure is the middle of ' + U.esc(result.draws) + " draws of what is not known about the canals; under it, the range 8 in 10 draws fall in. Sealant spent, water kept (in thousands of acre-feet), crop loss and saving against doing nothing are all modelled.</p>" +
+      '<p class="fn">Each figure is the middle of ' + U.esc(result.draws) + " draws of what is not known about the canals; under it, the range 8 in 10 draws fall in. Sealant spent, water kept (in billions of gallons), crop loss and saving against doing nothing are all modelled.</p>" +
       '<p class="rec">' + U.esc(window.HGLogic.replayBandsSentence(result).text) + "</p>" +
       (withScoredTest ? '<p class="rec">' + U.esc(window.HGLogic.SCORED_TEST_SENTENCE) + "</p>" : "") +
       (shared ? '<p class="fn">' + U.esc(shared) + "</p>" : "") +

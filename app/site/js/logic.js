@@ -161,6 +161,9 @@
   }
   /* Acre-feet in thousands, for narrow table cells: 3,350 / 48.8 / 4.37. */
   const thousandAf = (af) => num(af / 1000, Math.abs(af) >= 1e5 ? 0 : Math.abs(af) >= 1e4 ? 1 : 2);
+  /* Acre-feet as billions of gallons, for the same narrow cells: 1,091 / 15.9 / 1.42. The page
+     shows water in gallons; a billion gallons is about 1,500 Olympic pools. */
+  const billionGal = (af) => { const b = af * ENGINE.GALLONS_PER_ACRE_FOOT / 1e9; return num(b, Math.abs(b) >= 100 ? 0 : Math.abs(b) >= 10 ? 1 : 2); };
 
   /*
     The replay again, across many draws of what is not known about the canals (the engine's
@@ -298,8 +301,8 @@
     const rows = result.rows.map((r) => (r.trigger === "never"
       ? "<tr><td>" + esc(r.name) + '</td><td class="r">0</td><td class="r">none</td><td class="r">none</td>' + cell(r.loss, money) + '<td class="r"></td></tr>'
       : "<tr><td>" + esc(r.name) + '</td><td class="r">' + esc(r.yearsSealed) + " of " + esc(result.years.length) + "</td>" +
-        cell(r.spend, money) + cell(r.keptAf, thousandAf) + cell(r.loss, money) + cell(r.saving, money) + "</tr>")).join("");
-    return '<div class="tableWrap"><table class="t replay"><tr><th>Policy</th><th class="r">Years sealed</th><th class="r">Sealant</th><th class="r">Water kept (1,000 af)</th><th class="r">Crop loss</th><th class="r">Saving vs nothing</th></tr>' +
+        cell(r.spend, money) + cell(r.keptAf, billionGal) + cell(r.loss, money) + cell(r.saving, money) + "</tr>")).join("");
+    return '<div class="tableWrap"><table class="t replay"><tr><th>Policy</th><th class="r">Years sealed</th><th class="r">Sealant</th><th class="r">Water kept (billion gallons)</th><th class="r">Crop loss</th><th class="r">Saving vs nothing</th></tr>' +
       rows + "</table></div>";
   }
 
@@ -537,7 +540,7 @@
 
   return { usd, num, pct, niceDate, esc, safeUrl, safeDecode, cssClass, TIER_CLASSES, SEVERITY_CLASSES, finiteOrNull, percentOrNull, csvText, csvNumber,
            workTime, gal, money, usesElephantButte, REPLAY_POLICIES, replay,
-           band, rangeText, rangeCell, thousandAf, replayBands, replayBandsSentence, replayBandsLines, replayBandsTable,
+           band, rangeText, rangeCell, thousandAf, billionGal, replayBands, replayBandsSentence, replayBandsLines, replayBandsTable,
            sharedForecastSentence, SCORED_TEST_SENTENCE, HELD_OUT_SENTENCE, LOSSES_1998_SENTENCE, TWIN_CAPTION,
            sig, signed, verdictFor, forecastEffectSentence, LEVEL_LABELS, levelLabel, LEVEL_NOTE, STRESS_TEST_SENTENCE,
            perMillionGal, BENCHMARK_CAVEAT, makeLogic };

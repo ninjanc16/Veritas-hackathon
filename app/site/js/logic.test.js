@@ -704,6 +704,12 @@ test("rangeCell puts the middle and the range in separate elements and escapes w
   assert.ok(L.rangeCell({ low: 1, mid: 2, high: 3 }, (v) => "<b>" + v + "</b>").indexOf("<b>") < 0);
 });
 
+test("billionGal writes acre-feet as billions of gallons with fewer decimals as the figure grows", () => {
+  assert.strictEqual(L.billionGal(1000000), "326");      // 1,000,000 x 325,851 gallons = 325.851 billion
+  assert.strictEqual(L.billionGal(48769), "15.9");
+  assert.strictEqual(L.billionGal(4370), "1.42");
+});
+
 test("thousandAf writes acre-feet in thousands with fewer decimals as the figure grows", () => {
   assert.strictEqual(L.thousandAf(3349696), "3,350");
   assert.strictEqual(L.thousandAf(48769), "48.8");
