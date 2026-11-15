@@ -402,6 +402,8 @@
     }
     async function runScan() {
       if (scanning) return;
+      // The whole scan runs at about a third of its original length (roughly 20 seconds).
+      const Q = 0.32, tw = (o, to, ms, e, cb) => tween(o, to, ms * Q, e, cb), fl = (box, ms, x) => fly(box, ms * Q, x), wt = (ms) => wait(ms * Q);
       scanning = true; skip = false; hover = null; tip.classList.remove("on");
       document.body.classList.add("scanning");
       const nTexas = G.counties.length, mine = G.canals.filter((s) => want.scope < 0 || s.c.district === want.scope);
@@ -409,49 +411,49 @@
       const bar = (i) => { opt.bar.style.width = (i / 6) * 100 + "%"; };
 
       say("Domain", "the mainland United States"); bar(0);
-      await Promise.all([tween(S, { rivers: 0, canals: 0, lakes: 0, tx: 0, risk: 0, lev: 0, soil: 0, fill: 0 }, 600), fly(VIEW.us, 1600, 0.9), tween(S, { us: 0.5, dots: 1 }, 1600)]);
-      await wait(400); S.sweep = 0;
-      await tween(S, { sweep: 1.02 }, 3200, ease.lin, (e) => live(fmt(Math.round(HG.base.nCounties * Math.min(1, e))) + " of " + fmt(HG.base.nCounties) + " counties indexed"));
+      await Promise.all([tw(S, { rivers: 0, canals: 0, lakes: 0, tx: 0, risk: 0, lev: 0, soil: 0, fill: 0 }, 600), fl(VIEW.us, 1600, 0.9), tw(S, { us: 0.5, dots: 1 }, 1600)]);
+      await wt(400); S.sweep = 0;
+      await tw(S, { sweep: 1.02 }, 3200, ease.lin, (e) => live(fmt(Math.round(HG.base.nCounties * Math.min(1, e))) + " of " + fmt(HG.base.nCounties) + " counties indexed"));
       S.sweep = -1; live("locking on the Rio Grande reach in Texas");
-      await tween(S, { reticle: 1 }, 1100, ease.out); await wait(400);
-      await Promise.all([fly(TXBOX, 2600), tween(S, { us: 0.2, dots: 0, tx: 1 }, 2600), tween(S, { reticle: 0 }, 2200)]);
+      await tw(S, { reticle: 1 }, 1100, ease.out); await wt(400);
+      await Promise.all([fl(TXBOX, 2600), tw(S, { us: 0.2, dots: 0, tx: 1 }, 2600), tw(S, { reticle: 0 }, 2200)]);
 
       say("Drought right now", "U.S. Drought Monitor, week of " + U.niceDate(HG.week)); bar(1);
       S.scanX = TXBOX[0] - 10;
-      await tween(S, { scanX: TXBOX[2] + 70 }, 5200, ease.lin, () => { const done = G.counties.filter((c) => c.xy[0] < S.scanX); live(done.length + " of " + nTexas + " counties read, " + done.filter((c) => c.cls >= 3).length + " in severe drought or worse"); });
-      S.scanX = -1; S.fill = 1; await wait(900);
+      await tw(S, { scanX: TXBOX[2] + 70 }, 5200, ease.lin, () => { const done = G.counties.filter((c) => c.xy[0] < S.scanX); live(done.length + " of " + nTexas + " counties read, " + done.filter((c) => c.cls >= 3).length + " in severe drought or worse"); });
+      S.scanX = -1; S.fill = 1; await wt(900);
 
       say("River and reservoirs", "river lines, and how full the reservoirs are"); bar(2);
-      await Promise.all([fly(VIEW.corridor, 2600), tween(S, { rivers: 1 }, 3200, ease.io, (e) => live(Math.round(G.rivers.length * e) + " of " + G.rivers.length + " river reaches traced"))]);
-      await tween(S, { lakes: 1 }, 1800, ease.out, (e) => live(G.lakes.map((l) => l.name + " " + fmt(l.pct * e, 1) + "%").join("   ")));
-      await wait(900);
+      await Promise.all([fl(VIEW.corridor, 2600), tw(S, { rivers: 1 }, 3200, ease.io, (e) => live(Math.round(G.rivers.length * e) + " of " + G.rivers.length + " river reaches traced"))]);
+      await tw(S, { lakes: 1 }, 1800, ease.out, (e) => live(G.lakes.map((l) => l.name + " " + fmt(l.pct * e, 1) + "%").join("   ")));
+      await wt(900);
 
       say("Canals", "every mapped canal, ditch and drain"); bar(3);
-      await fly(canalBox, 2800);
-      await tween(S, { canals: 1 }, 3600, ease.lin, (e) => live(fmt(Math.round(mine.length * e)) + " canal segments, " + fmt(km * e) + " km"));
-      await wait(900);
+      await fl(canalBox, 2800);
+      await tw(S, { canals: 1 }, 3600, ease.lin, (e) => live(fmt(Math.round(mine.length * e)) + " canal segments, " + fmt(km * e) + " km"));
+      await wt(900);
 
       say("Soil under each canal", "sandy soil leaks fastest; clay holds water"); bar(4);
-      await tween(S, { soil: 1 }, 2400, ease.io, (e) => live("seepage rate set for " + fmt(Math.round(mine.filter((s) => s.soilClass !== 2).length * e)) + " segments"));
-      await wait(1500);
+      await tw(S, { soil: 1 }, 2400, ease.io, (e) => live("seepage rate set for " + fmt(Math.round(mine.filter((s) => s.soilClass !== 2).length * e)) + " segments"));
+      await wt(1500);
 
       // The flight downstream: the camera follows the river while each county's forecast appears.
       say("6-month forecast", "chance of a drought season, county by county"); bar(5);
       const pts = FOCUS.map((c) => c.xy), last = pts.length - 1, m = { u: 0 }, r = 190;
-      await fly([pts[0][0] - r, pts[0][1] - r * 0.6, pts[0][0] + r, pts[0][1] + r * 0.6], 2400, 1);
+      await fl([pts[0][0] - r, pts[0][1] - r * 0.6, pts[0][0] + r, pts[0][1] + r * 0.6], 2400, 1);
       flying++;
-      await tween(m, { u: 1 }, 9000, ease.io, (e) => {
+      await tw(m, { u: 1 }, 9000, ease.io, (e) => {
         const t = e * last, c = FOCUS[Math.round(t)]; const p = along(pts, t); cam.x = p[0]; cam.y = p[1]; S.risk = (t + 1.2) / FOCUS.length;
         live(c.name + " County: " + U.pct(c.river.pSeason) + ", " + c.river.tier);
       });
-      flying--; S.risk = 1; await wait(600);
+      flying--; S.risk = 1; await wt(600);
 
       say("Which canals first", "forecast and soil combined, canal by canal"); bar(6);
-      await fly(canalBox, 2600);
-      await tween(S, { lev: 1 }, 2200, ease.io, (e) => live(fmt(Math.round(mine.length * e)) + " segments ranked"));
-      for (let i = 0; i < 2; i++) { await tween(S, { pulse: 1 }, 500, ease.out); await tween(S, { pulse: 0 }, 700, ease.io); }
-      await wait(600);
-      await fly(scopeBox(), 2200);
+      await fl(canalBox, 2600);
+      await tw(S, { lev: 1 }, 2200, ease.io, (e) => live(fmt(Math.round(mine.length * e)) + " segments ranked"));
+      for (let i = 0; i < 2; i++) { await tw(S, { pulse: 1 }, 500, ease.out); await tw(S, { pulse: 0 }, 700, ease.io); }
+      await wt(600);
+      await fl(scopeBox(), 2200);
       endScan();
     }
     function endScan() {

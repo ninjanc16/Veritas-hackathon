@@ -116,7 +116,7 @@ test("from today: a missed delivery (a storage shock) never makes losses smaller
 });
 
 test("a second application costs a second round and never recovers less water", () => {
-  const one = E.simulate(dry, { trigger: "always" }).totals, two = E.simulate(dry, { trigger: "always" }, { applications: 2 }).totals;
+  const one = E.simulate(dry, { trigger: "always" }, { applications: 1 }).totals, two = E.simulate(dry, { trigger: "always" }, { applications: 2 }).totals;
   close(two.spend, 2 * one.spend);
   assert.ok(two.recoveredAf > one.recoveredAf);
 });
