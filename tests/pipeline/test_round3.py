@@ -24,6 +24,7 @@ from farmdrought.manifest import build_manifest, check_manifest, guard_scored_wr
 from farmdrought.prob_calibration import (brier, calibrate_by_past, calibration_coverage, class_frequency_by_past,
                                           reliability)
 from farmdrought.trigger import run_trigger, run_trigger_annual
+from farmdrought import seepage_calibration as seepage
 from farmdrought.uncertainty import direction, excludes_zero, resample_years, year_block_bootstrap
 
 YEARS = list(range(2008, 2020))
@@ -1582,3 +1583,214 @@ def test_widths_and_the_lined_share_are_the_declared_assumptions():
                                      "unknown": (8, 20, 40)}
     assert config.LINED_SHARE == (0.0, 0.3, 0.7) and config.SEEPAGE_SEASON_DAYS == 273
     assert config.CANAL_WIDTH_FT["unknown"][1] == config.WETTED_WIDTH_FT        # the old single width
+
+
+# ---------------------------------------------------------------------------------------------
+# seepage_calibration.py (package I). Made-up districts and segments only.
+# ---------------------------------------------------------------------------------------------
+def made_up_segments():
+    """Twelve segments in three matched districts (A, B, C) and one unmatched (Z). Some must be
+    dropped: a drain, a segment with no permeability, one with no texture rate."""
+    rows = [  # district, class, km, ksat, wt_cm, texture rate, fundable
+        ("Map A", "unknown", 2.0, 9.0, None, 2.99, True), ("Map A", "main", 1.0, 28.0, 150.0, 9.35, True),
+        ("Map A", "unknown", 5.0, 9.0, None, 2.99, False),                       # a drain: dropped
+        ("Map B", "lateral", 3.0, 0.21, None, 1.5, True), ("Map B", "ditch", 4.0, 91.0, 50.0, 9.34, True),
+        ("Map B", "unknown", 2.0, np.nan, None, np.nan, True),                    # no permeability: dropped
+        ("Map C", "unknown", 6.0, 9.0, 250.0, 4.49, True), ("Map C", "unknown", 1.0, 1.0, None, np.nan, True),  # no texture rate: dropped
+        ("Map C", "main", 2.0, 300.0, None, 9.34, True),
+        ("Map Z", "unknown", 9.0, 28.0, None, 9.34, True),                        # district not in the crosswalk
+        ("", "unknown", 9.0, 28.0, None, 9.34, True),                             # in no district
+    ]
+    table = pd.DataFrame(rows, columns=["district", "class", "length_km", "ksat_typ", "wt_cm", "texture_rate", "fundable"])
+    return table.assign(fcode=33600)
+
+
+MADE_UP_CROSSWALK = pd.DataFrame({"district": ["A", "B", "C", "D"], "map_district": ["Map A", "Map B", "Map C", ""],
+                                  "match": ["exact", "normalised", "normalised", "none"]})
+
+
+def test_district_loss_is_authorised_water_times_the_share_not_delivered():
+    # Arrange: 100,000 acre-feet at 60% efficiency loses 40,000; a row with no authorised water is left out
+    table = pd.DataFrame({"district": ["A", "B", "C"], "efficiency_pct": [60, 90, 95],
+                          "authorized_af": [100000, 2000, np.nan]})
+
+    # Act
+    losses = seepage.district_losses(table)
+
+    # Assert
+    assert losses["district"].tolist() == ["A", "B"]
+    assert losses["loss_af"].tolist() == pytest.approx([40000.0, 200.0])
+
+
+def test_crosswalk_matches_only_by_stated_rules_and_never_guesses():
+    # Arrange: names shaped like the 1998 table and like the district map
+    map_names = ["Cameron County Irrigation District 2", "Cameron County Irrigation District 6",
+                 "Hidalgo County Irrigation District 1", "Hidalgo County Irrigation District 16",
+                 "Hidalgo & Cameron Counties Irrigation District 9", "Delta Lake Irrigation District",
+                 "Donna Irrigation District Hidalgo County 1", "Harlingen Irrigation District-Cameron County-1",
+                 "Adams Gardens Irrigation District 19", "Brownsville Irrigation District", "United Irrigation District"]
+    reference = ["CCID#2 (San Benito)", "HCID#1 (Edinburg)", "HCCID#9 (Mercedes)", "Delta Lake", "Donna", "Harlingen",
+                 "Brownsville Irrigation District", "Adams Garden", "Santa Maria", "HCMUD", "HCWID#3 (McAllen)"]
+
+    # Act
+    crosswalk = seepage.build_crosswalk(reference, map_names).set_index("district")
+
+    # Assert: abbreviations spelled out, and a plain name that starts the map name
+    assert crosswalk.loc["CCID#2 (San Benito)"].tolist() == ["Cameron County Irrigation District 2", "normalised"]
+    assert crosswalk.loc["HCID#1 (Edinburg)"].tolist() == ["Hidalgo County Irrigation District 1", "normalised"]   # not District 16
+    assert crosswalk.loc["HCCID#9 (Mercedes)", "map_district"] == "Hidalgo & Cameron Counties Irrigation District 9"
+    assert crosswalk.loc["Delta Lake", "map_district"] == "Delta Lake Irrigation District"
+    assert crosswalk.loc["Donna", "map_district"] == "Donna Irrigation District Hidalgo County 1"
+    assert crosswalk.loc["Harlingen", "map_district"] == "Harlingen Irrigation District-Cameron County-1"
+    assert crosswalk.loc["Brownsville Irrigation District"].tolist() == ["Brownsville Irrigation District", "exact"]
+    # "Adams Garden" is one letter away from "Adams Gardens": close, but that would be a guess
+    for name in ("Adams Garden", "Santa Maria", "HCMUD", "HCWID#3 (McAllen)"):
+        assert crosswalk.loc[name].tolist() == ["", "none"], name
+
+
+def test_the_same_segments_feed_all_four_models():
+    # Arrange
+    segments = made_up_segments()
+
+    # Act
+    kept, summary = seepage.model_set(segments, MADE_UP_CROSSWALK)
+    raw = seepage.raw_seepage(kept)
+
+    # Assert: 6 of the 11 segments are kept, and each drop has its reason
+    assert len(kept) == 6 and sorted(kept["reference_district"].unique()) == ["A", "B", "C"]
+    assert summary.loc["A", ["kept_segments", "dropped_not_fundable"]].tolist() == [2, 1]
+    assert summary.loc["B", ["kept_segments", "dropped_no_permeability"]].tolist() == [2, 1]
+    assert summary.loc["C", ["kept_segments", "dropped_no_texture_rate"]].tolist() == [2, 1]
+    assert summary.loc["A", "kept_km"] == 3.0 and summary.loc["A", "dropped_km"] == 5.0
+    assert list(raw.columns) == ["M1", "M2", "texture", "length"] and list(raw.index) == ["A", "B", "C"]
+    # District A by hand: constants = 3280.84 ft per km x (1 - 0.3) x 273 days / 325,851 gallons per acre-foot
+    k = 3280.84 * 0.7 * 273 / 325851
+    seg1, seg2 = 2.0 * 20, 1.0 * 30                               # km x width: unknown is 20 ft, main is 30 ft
+    assert raw.loc["A", "length"] == pytest.approx(k * (seg1 + seg2))
+    assert raw.loc["A", "texture"] == pytest.approx(k * (2.99 * seg1 + 9.35 * seg2))
+    assert raw.loc["A", "M2"] == pytest.approx(k * 2.1205 * (9.0 * seg1 + 28.0 * seg2))
+    # M1: the second segment has a water table at 150 cm, factor 0.1 + 0.9 x 50 / 200 = 0.325
+    assert raw.loc["A", "M1"] == pytest.approx(k * 2.1205 * (9.0 * seg1 + 28.0 * 0.325 * seg2))
+    # a water table can only lower the rate
+    assert (raw["M1"] <= raw["M2"]).all() and raw.loc["B", "M1"] < raw.loc["B", "M2"]
+
+
+def test_fit_factor_recovers_a_known_factor_and_lists_what_it_cannot_use():
+    # Arrange: losses are exactly 4 x the raw values; then two districts that cannot enter a logarithm
+    raw = pd.Series({"A": 10.0, "B": 250.0, "C": 3000.0})
+    noisy_raw = pd.Series({"A": 10.0, "B": 20.0, "C": 0.0, "D": np.nan})
+    noisy_loss = pd.Series({"A": 20.0, "B": 160.0, "C": 50.0, "D": 50.0})
+
+    # Act
+    exact = seepage.fit_factor(raw, 4 * raw)
+    partial = seepage.fit_factor(noisy_raw, noisy_loss)
+
+    # Assert
+    assert exact["c"] == pytest.approx(4.0) and exact["sd"] == pytest.approx(0.0, abs=1e-12) and exact["n"] == 3
+    # ratios 2 and 8: the log-mean is ln 4, so c = 4; sd of (ln 2, ln 8) with n - 1 is ln(4) / sqrt(2) = 0.980
+    assert partial["c"] == pytest.approx(4.0) and partial["n"] == 2 and partial["excluded"] == ["C", "D"]
+    assert partial["sd"] == pytest.approx(np.std([np.log(2), np.log(8)], ddof=1))
+
+
+def test_the_fitted_factor_matches_the_losses_in_log_mean_not_in_total():
+    # Arrange
+    raw = pd.Series({"A": 10.0, "B": 200.0, "C": 3000.0, "D": 40.0})
+    loss = pd.Series({"A": 90.0, "B": 300.0, "C": 2000.0, "D": 500.0})
+
+    # Act
+    c = seepage.fit_factor(raw, loss)["c"]
+
+    # Assert: the identity the formula satisfies is that the log ratios average zero ...
+    assert np.log(c * raw / loss).mean() == pytest.approx(0.0, abs=1e-12)
+    # ... which is NOT the same as the totals being equal
+    assert (c * raw).sum() != pytest.approx(loss.sum(), rel=0.05)
+
+
+def held_out_table():
+    """Six made-up districts. M1 is close to the losses; the length rival is far off."""
+    loss = pd.Series({"A": 100.0, "B": 220.0, "C": 480.0, "D": 900.0, "E": 2100.0, "F": 4000.0})
+    return pd.DataFrame({"loss_af": loss, "M1": loss * [0.9, 1.1, 1.0, 0.95, 1.05, 1.0] / 5,
+                         "M2": loss * [0.7, 1.3, 1.0, 0.8, 1.2, 1.0] / 5,
+                         "texture": loss * [0.5, 2.0, 1.0, 0.6, 1.7, 1.0] / 3,
+                         "length": [50.0, 40.0, 60.0, 45.0, 55.0, 50.0]})
+
+
+def test_leave_one_out_never_uses_the_district_it_predicts():
+    # Arrange: the same table, with district C's loss multiplied by ten
+    table = held_out_table()
+    changed = table.copy()
+    changed.loc["C", "loss_af"] *= 10
+
+    # Act
+    original = seepage.leave_one_out(table, draws=500)
+    after = seepage.leave_one_out(changed, draws=500)
+
+    # Assert: C's own prediction does not move; every other district's does
+    for model in ("M1", "length"):
+        before, now = original["models"][model]["predicted_af"], after["models"][model]["predicted_af"]
+        assert now["C"] == before["C"]
+        assert all(now[d] != before[d] for d in "ABDEF")
+    # and C's error is its prediction against its own loss
+    c_error = original["models"]["M1"]["abs_pct_error"]["C"]
+    assert c_error == pytest.approx(abs(original["models"]["M1"]["predicted_af"]["C"] - 480.0) / 480.0)
+
+
+def test_leave_one_out_prediction_matches_a_hand_fit_on_the_other_districts():
+    # Arrange
+    table = held_out_table()
+    others = table.drop("A")
+
+    # Act
+    result = seepage.leave_one_out(table, draws=500)
+
+    # Assert: c fitted by hand on B to F, then applied to A
+    c = np.exp(np.log(others["loss_af"] / others["length"]).mean())
+    assert result["models"]["length"]["predicted_af"]["A"] == pytest.approx(c * 50.0)
+    assert result["n_districts"] == 6 and result["pass_test"] == "length_minus_M1"
+    # predictions that follow the losses rank them perfectly; canal length alone does not
+    assert result["models"]["M1"]["rank_correlation"] == pytest.approx(1.0)
+    assert result["models"]["length"]["rank_correlation"] < 0.5
+
+
+def test_the_pass_test_is_seeded_and_needs_the_whole_interval_above_zero():
+    # Arrange
+    table = held_out_table()
+
+    # Act
+    first = seepage.leave_one_out(table, draws=1000, seed=0)["gaps"]
+    again = seepage.leave_one_out(table, draws=1000, seed=0)["gaps"]
+    other = seepage.leave_one_out(table, draws=1000, seed=1)["gaps"]
+
+    # Assert: seeded; M1 is far better than canal length here, so it passes
+    assert first == again and first["length_minus_M1"] != other["length_minus_M1"]
+    assert set(first) == {"length_minus_M1", "texture_minus_M1", "length_minus_M2", "texture_minus_M2"}
+    assert first["length_minus_M1"]["passes"] is True and first["length_minus_M1"]["lo"] > 0
+    # a model compared with itself has a gap of exactly zero and does not pass
+    same = seepage.median_error_gap([0.2, 0.5, 0.1, 0.9], [0.2, 0.5, 0.1, 0.9], draws=500)
+    assert (same["gap"], same["lo"], same["hi"], same["passes"]) == (0.0, 0.0, 0.0, False)
+    # and a rival that is better gives an interval below zero: not a pass
+    worse = seepage.median_error_gap([0.1, 0.1, 0.1, 0.1], [0.5, 0.6, 0.7, 0.8], draws=500)
+    assert worse["hi"] < 0 and worse["passes"] is False
+
+
+def test_calibration_item_lists_a_district_above_its_own_loss_and_states_the_sentence():
+    # Arrange: made-up segments and losses for A, B, C (D is unmatched, E has no authorised water)
+    losses = seepage.district_losses(pd.DataFrame({
+        "district": ["A", "B", "C", "D", "E"], "efficiency_pct": [60, 75, 80, 85, 95],
+        "authorized_af": [100000, 50000, 80000, 30000, np.nan]}))
+    crosswalk = pd.concat([MADE_UP_CROSSWALK, pd.DataFrame({"district": ["E"], "map_district": [""], "match": ["none"]})])
+
+    # Act
+    item = seepage.calibration_item(losses, crosswalk, made_up_segments())
+
+    # Assert
+    assert item["segments_kept"] == 6 and item["districts_unmatched"] == ["D", "E"]
+    assert item["districts_without_a_loss"] == ["E"]
+    assert set(item["fit_all_districts"]) == {"M1", "M2", "texture", "length"}
+    description = item["description_only"]
+    calibrated, loss = description["calibrated_af"], losses.set_index("district")["loss_af"]
+    assert description["districts_above_their_own_loss"] == [d for d in "ABC" if calibrated[d] > loss[d]]
+    assert 0 < len(description["districts_above_their_own_loss"]) < 3      # log-mean fit: some above, some below
+    assert item["sentence"] in (seepage.FAIL_SENTENCE,) or item["sentence"].startswith("Held-out districts: median error")
+    assert item["passes"] == item["held_out"]["gaps"]["length_minus_M1"]["passes"]
+    assert json.loads(json.dumps(item, default=lambda value: value.item()))["segments_kept"] == 6
