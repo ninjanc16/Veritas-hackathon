@@ -1,7 +1,8 @@
 <!doctype html>
 <!--
-  index.html: the intro page. It tells the story in order: the problem, the solution, then a
-  button into the platform (app.html) where the detailed data lives.
+  index.html: the intro page. It tells the story in order: the river from source to sea
+  (the opening, built by js/opening.js), the problem, the solution, then a button into the
+  platform (app.html) where the detailed data lives.
 
   All numbers on this page are filled in by js/landing.js from data/core.js and data/sim.js,
   so the page always matches the pipeline's latest run. Nothing here is typed in by hand
@@ -11,23 +12,26 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Headgate: Rio Grande Drought and Canal Portal</title>
+  <title>RioIQ: Rio Grande Drought and Canal Portal</title>
   <meta name="description" content="A six-month drought forecast for the Texas reach of the Rio Grande, joined to a map of every irrigation canal, so districts know which canals to seal first.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..600;1,9..144,300&family=IBM+Plex+Mono:wght@400&family=Public+Sans:wght@400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/site.css">
+  <link rel="stylesheet" href="css/opening.css">
+  <link rel="preload" as="image" href="photos/opening-santa-elena.jpg">
 </head>
-<body>
+<body class="intro">
   <div class="progress" id="progress"></div>
 
   <header class="nav" id="nav">
     <div class="wrap">
       <a class="brand" href="#top">
         <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 5v22M26 5v22M6 9h20M11 9v9M16 9v13M21 9v6"/><path d="M3 27c3-2 5 2 8 0s5 2 8 0 5 2 10 0" stroke="#8fd0ff"/></svg>
-        <span>Headgate<small>RIO GRANDE DROUGHT AND CANAL PORTAL</small></span>
+        <span>RioIQ<small>RIO GRANDE DROUGHT AND CANAL PORTAL</small></span>
       </a>
       <nav>
+        <a href="#top">The river</a>
         <a href="#problem">The problem</a>
         <a href="#cost">The cost</a>
         <a href="#solution">The solution</a>
@@ -37,13 +41,16 @@
     </div>
   </header>
 
-  <!-- ============ 1. Opening ============ -->
-  <section class="hero" id="top">
+  <!-- ============ 0. The opening: the river from source to sea (filled in by js/opening.js) ============ -->
+  <section class="opening" id="top" aria-label="The Rio Grande, from source to sea"></section>
+
+  <!-- ============ 1. This week on the Texas reach ============ -->
+  <section class="hero" id="now">
     <div class="mosaic" id="mosaic" aria-hidden="true"></div>
     <div class="wrap">
       <div class="eyebrow reveal">Texas reach of the Rio Grande</div>
       <h1 class="reveal" style="--d:.1s">The river is running short. <em>The canals leak what is left.</em></h1>
-      <p class="lead reveal" style="--d:.2s">Headgate joins a six-month drought forecast to a map of every irrigation canal in the Texas districts on the Rio Grande, so a district manager or a state agency can see which canals to seal first, what it costs, and what happens if nobody acts.</p>
+      <p class="lead reveal" style="--d:.2s">RioIQ joins a six-month drought forecast to a map of every irrigation canal in the Texas districts on the Rio Grande, so a district manager or a state agency can see which canals to seal first, what it costs, and what happens if nobody acts.</p>
       <div class="cta reveal" style="--d:.3s">
         <a class="btn" href="app.html">Get started <span aria-hidden="true">&rarr;</span></a>
         <a class="btn ghost" href="#problem">See the problem</a>
@@ -134,27 +141,42 @@
   <section class="band white" id="solution">
     <div class="wrap">
       <div class="kicker reveal">The solution</div>
-      <h2 class="reveal">Forecast the season. Rank the canals. Fund the worst first.</h2>
-      <p class="intro reveal">Three steps, each one built on public data and each one open to inspection inside the platform.</p>
-      <div class="grid3">
-        <div class="feature reveal">
-          <span class="stepNo">1</span>
-          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-6 4 3 5-8 4 5"/><path d="M3 21h18"/></svg></div>
-          <h3>Forecast</h3>
-          <p>A random forest model gives each river county a chance of a drought season in the next six months. It learns from the past drought record and makes new predictions from new data: the Drought Monitor each week, reservoirs each day.</p>
-        </div>
-        <div class="feature reveal" style="--d:.12s">
-          <span class="stepNo">2</span>
-          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h11M4 18h6"/><circle cx="19" cy="15" r="2.5"/></svg></div>
-          <h3>Rank</h3>
-          <p>Nearly ten thousand canal segments are mapped. Each one with a known soil is scored by how fast that soil leaks times how likely a drought is. Open your district and you see each canal on the map, its soil, its rank and its cost.</p>
-        </div>
-        <div class="feature reveal" style="--d:.24s">
-          <span class="stepNo">3</span>
-          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M7 12h.01M17 12h.01"/></svg></div>
-          <h3>Fund and test</h3>
-          <p>Enter a budget and a drought severity. The planner lists exactly which canals to seal, what each costs, how long it takes and how much water it saves. The simulation then starts from today's live readings and runs five years forward: doing nothing against acting early.</p>
-        </div>
+      <h2 class="reveal">How RioIQ works</h2>
+      <p class="intro reveal">Three steps. All of the data is public, and you can check every step inside the platform.</p>
+      <div class="how">
+        <article class="howRow reveal">
+          <figure>
+            <img src="photos/intro-dry-riverbed.jpg" alt="A wide, dry, sandy riverbed under a cloudy sky" width="1100" height="825" loading="lazy">
+            <figcaption>A dry riverbed on the Rio Grande floodplain, Doña Ana County, New Mexico, March 2023. Photo: <a href="https://commons.wikimedia.org/wiki/File:Dry_sandy_riverbed_with_a_brush_island,_Do%C3%B1a_Ana_County,_New_Mexico.jpg" target="_blank" rel="noopener">Z3lvs, CC0</a>.</figcaption>
+          </figure>
+          <div>
+            <span class="howNo">First</span>
+            <h3>We forecast the drought</h3>
+            <p>A random forest model gives each river county a chance of a drought season in the next six months. It learned from the past drought record, and it gets new data all the time: the Drought Monitor every week, the reservoirs every day.</p>
+          </div>
+        </article>
+        <article class="howRow reveal">
+          <figure>
+            <img src="photos/intro-river-mcallen.jpg" alt="The Rio Grande from the air, with a rectangular basin of water beside it" width="1100" height="825" loading="lazy">
+            <figcaption>The Rio Grande near McAllen, Texas, December 2025. Photo: <a href="https://commons.wikimedia.org/wiki/File:Aerial_photographs_of_the_Rio_Grande_Valley_on_December_17_and_18,_2025_-_7.jpg" target="_blank" rel="noopener">USDA, public domain</a>.</figcaption>
+          </figure>
+          <div>
+            <span class="howNo">Then</span>
+            <h3>We rank the canals</h3>
+            <p>We mapped nearly ten thousand canal segments. Each one with a known soil gets a score: how fast that soil leaks, times how likely a drought is. Open your district and you can see every canal, its soil, its rank and its cost.</p>
+          </div>
+        </article>
+        <article class="howRow reveal">
+          <figure>
+            <img src="photos/intro-citrus-grove.jpg" alt="Rows of citrus trees seen from above" width="1100" height="825" loading="lazy">
+            <figcaption>A citrus grove in the Rio Grande Valley, Texas, December 2025. Photo: <a href="https://commons.wikimedia.org/wiki/File:Aerial_photographs_of_the_Rio_Grande_Valley_on_December_17_and_18,_2025_-_1.jpg" target="_blank" rel="noopener">USDA, public domain</a>.</figcaption>
+          </figure>
+          <div>
+            <span class="howNo">Last</span>
+            <h3>You set the budget</h3>
+            <p>Type in a budget and how bad a drought to plan for. The planner lists which canals to seal, what each one costs, how long it takes and how much water it saves. A simulation then starts from today's readings and runs five years forward, once doing nothing and once acting early.</p>
+          </div>
+        </article>
       </div>
     </div>
   </section>
@@ -173,14 +195,22 @@
   <!-- ============ 6. What this cannot tell you ============ -->
   <section class="band white" id="limits">
     <div class="wrap">
-      <div class="kicker reveal">Honest limits</div>
-      <h2 class="reveal">What this does not claim</h2>
-      <p class="intro reveal">A planning tool is only useful if you know where it stops. These are stated on every screen where they matter.</p>
-      <div class="honest">
-        <div class="reveal"><b>The forecast is a close call, not a crystal ball.</b><span id="limitTie"></span></div>
-        <div class="reveal" style="--d:.08s"><b>Canals are assumed unlined.</b>No public data says which canals are already lined. Walk a canal before you spend on it.</div>
-        <div class="reveal" style="--d:.16s"><b>The price is materials only.</b>Labour, equipment and water quality checks are not in the sealant cost. The sealant has not been field-tested on the Rio Grande.</div>
-        <div class="reveal" style="--d:.24s"><b>Nothing here was measured in the field.</b>Water saved is a range worked out from published seepage rates. Texas districts only.</div>
+      <div class="limitsGrid">
+        <figure class="reveal">
+          <img src="photos/48215-drought.jpg" alt="Farm fields in Hidalgo County seen from above" width="640" height="448" loading="lazy">
+          <figcaption>Hidalgo County, Texas, from the air. We worked from public data and images like this one. Image: USGS The National Map, public domain.</figcaption>
+        </figure>
+        <div>
+          <div class="kicker reveal">Limits</div>
+          <h2 class="reveal">What we don't know</h2>
+          <p class="intro reveal">Please read this before you trust a number on this site. The platform repeats each point next to the numbers it affects.</p>
+          <div class="honest">
+            <div class="reveal"><b>Our forecast is only a little better than a simple rule.</b><span id="limitTie"></span></div>
+            <div class="reveal" style="--d:.08s"><b>We assumed every canal is unlined.</b>No public data says which canals are already lined. Walk a canal before you spend money on it.</div>
+            <div class="reveal" style="--d:.16s"><b>Our price covers materials only.</b>It leaves out labour, equipment and water quality checks. The sealant has not been field-tested on the Rio Grande.</div>
+            <div class="reveal" style="--d:.24s"><b>We measured nothing in the field.</b>The water saved is a range worked out from published seepage rates. We cover Texas districts only.</div>
+          </div>
+        </div>
       </div>
     </div>
   </section>
@@ -201,6 +231,7 @@
     <div class="wrap">
       <p>A student hackathon project (Veritas AI, AI + Climate track). Not a government website. No sign-in and no personal data collected.</p>
       <p>Data: U.S. Drought Monitor &middot; Water Data for Texas &middot; USGS National Hydrography Dataset &middot; USDA soil survey and Risk Management Agency &middot; Texas Commission on Environmental Quality &middot; Texas A&amp;M AgriLife &middot; county profiles from Wikipedia, ground photos from Wikimedia Commons (credited beside each photo in the platform).</p>
+      <p>Photos: Santa Elena Canyon by Carol M. Highsmith, Library of Congress (public domain); Rio Grande Valley by USDA (public domain); dry riverbed by Z3lvs (CC0); Rio Grande below Creede by Tim Engleman (<a href="https://commons.wikimedia.org/wiki/File:Rio_grande_below_Creede_CO.jpg">CC BY-SA 2.0</a>); Albuquerque and Elephant Butte from space by NASA (public domain); Texas aerials from USGS The National Map (public domain).</p>
     </div>
   </footer>
 
@@ -209,5 +240,7 @@
   <script src="sim/engine.js"></script>
   <script src="js/common.js"></script>
   <script src="js/landing.js"></script>
+  <script src="data/river.js"></script>
+  <script src="js/opening.js"></script>
 </body>
 </html>
