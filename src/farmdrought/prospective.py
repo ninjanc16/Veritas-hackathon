@@ -11,6 +11,9 @@ Rules:
   - One file per issue week: reports/prospective/<issue date>.json.
   - Append-only. A week that is already logged is never rewritten, even if the forecast for it
     is recomputed later (for example after a data correction). The first record stands.
+  - Each file's sha256 is added to reports/prospective.sha256 when it is written. CI fails if a
+    listed file changes, or if a line of that list changes or disappears (manifest.py and
+    tools/hash_list_gate.py).
 
 Run it with:  PYTHONPATH=src python -m farmdrought.prospective
 (The daily refresh runs it after rebuilding this week's forecast. On a day when the week is
@@ -24,7 +27,7 @@ import pandas as pd
 
 from farmdrought.config import (ALERT_WEEKS, FROZEN, LATEST, REPORTS, ROOT, SEASON_THRESHOLD, SEASON_WEEKS, USDM_JSON,
                                 YEAR_WEEKS, live_data, raw_path)
-from farmdrought.manifest import sha256_of
+from farmdrought.manifest import add_new_prospective_files, sha256_of
 
 PROSPECTIVE = REPORTS / "prospective"
 HEADER = ("A forecast log, written before the truth was known. NOTHING HERE IS SCORED YET: each forecast can be scored "
@@ -92,6 +95,10 @@ def main():
         print("logged", log_week(record).relative_to(ROOT), "- not scored yet")
     except FileExistsError as already:
         print(already)
+    # Record the new file's hash. Only files not yet listed get a line; a line is never changed.
+    listed = add_new_prospective_files()
+    if listed:
+        print("listed in reports/prospective.sha256:", ", ".join(listed))
 
 
 if __name__ == "__main__":

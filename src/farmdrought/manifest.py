@@ -11,12 +11,19 @@ manifest. A few files under data/raw are not scored inputs and are left out (NOT
 The same idea guards the RESULTS: reports/frozen.sha256 lists the sha256 of every file under
 reports/frozen. A scored file is never rewritten, so a listed file whose bytes changed, a listed
 file that is gone, or a file that is there but not listed is a problem. A new result is added
-with "frozen-add", which only ever appends lines for files not yet listed.
+with "frozen-add", which only ever appends lines for files not yet listed. The forecast log
+under reports/prospective has the same rule and its own list, reports/prospective.sha256.
+
+These local checks compare the working tree with itself, so they guard against ACCIDENTS only:
+editing a file and its line together passes them. The barrier against that is the CI step that
+compares each list with the base branch (tools/hash_list_gate.py).
 
 Run it with:  PYTHONPATH=src python -m farmdrought.manifest              (check the raw inputs)
               PYTHONPATH=src python -m farmdrought.manifest build        (write a new manifest)
               PYTHONPATH=src python -m farmdrought.manifest frozen       (check the frozen results)
               PYTHONPATH=src python -m farmdrought.manifest frozen-add   (list new result files)
+              PYTHONPATH=src python -m farmdrought.manifest prospective       (check the forecast log)
+              PYTHONPATH=src python -m farmdrought.manifest prospective-add   (list new forecast files)
 """
 import hashlib
 import json
@@ -108,28 +115,33 @@ def guard_scored_writer(output, force=False, frozen_metrics=None):
                            "To replace it on purpose, run the same command again with --force")
 
 
-FROZEN_LIST = Path("reports") / "frozen.sha256"   # relative to the repo root
+# Two folders hold files that are written once and never rewritten. Each has a list of hashes
+# beside it: (the folder, its list), both relative to the repo root.
+FROZEN_LIST = Path("reports") / "frozen.sha256"
+PROSPECTIVE_LIST = Path("reports") / "prospective.sha256"
+APPEND_ONLY = {"frozen": (Path("reports") / "frozen", FROZEN_LIST),
+               "prospective": (Path("reports") / "prospective", PROSPECTIVE_LIST)}
 
 
-def frozen_files(root=ROOT):
-    """{path relative to root: sha256} for every file under reports/frozen as it is now."""
+def listed_files(root, folder):
+    """{path relative to root: sha256} for every file under `folder` as it is now."""
     root = Path(root)
-    files = [p for p in (root / "reports" / "frozen").rglob("*") if p.is_file() and not p.name.startswith(".")]
+    files = [p for p in (root / folder).rglob("*") if p.is_file() and not p.name.startswith(".")]
     return {p.relative_to(root).as_posix(): sha256_of(p) for p in sorted(files)}
 
 
-def read_frozen_list(root=ROOT):
+def read_list(root, list_path):
     """The recorded {path: sha256}, from lines of "<sha256>  <path>". Empty if there is no list."""
-    path = Path(root) / FROZEN_LIST
+    path = Path(root) / list_path
     if not path.exists():
         return {}
     return {name: digest for digest, name in (line.split(maxsplit=1) for line in path.read_text().splitlines() if line)}
 
 
-def check_frozen(root=ROOT):
-    """Compare reports/frozen with reports/frozen.sha256. Returns [] when all agree, else one
-    line per problem: "(changed)", "(missing)" or "(not listed)"."""
-    recorded, now = read_frozen_list(root), frozen_files(root)
+def check_listed(root, folder, list_path):
+    """Compare a write-once folder with its list. Returns [] when all agree, else one line per
+    problem: "(changed)", "(missing)" or "(not listed)"."""
+    recorded, now = read_list(root, list_path), listed_files(root, folder)
     problems = []
     for name in sorted(set(recorded) | set(now)):
         if name not in now:
@@ -141,25 +153,43 @@ def check_frozen(root=ROOT):
     return problems
 
 
-def add_new_frozen_files(root=ROOT):
-    """Append to reports/frozen.sha256 the files that are not listed yet. A line that is already
-    there is NEVER changed: a frozen file whose bytes changed stays a problem. Returns the names added."""
-    recorded, now = read_frozen_list(root), frozen_files(root)
+def add_new_listed(root, folder, list_path):
+    """Append to the list the files that are not listed yet. A line that is already there is
+    NEVER changed: a file whose bytes changed stays a problem. Returns the names added."""
+    recorded, now = read_list(root, list_path), listed_files(root, folder)
     new = [name for name in now if name not in recorded]
     if new:
-        path = Path(root) / FROZEN_LIST
-        with open(path, "a") as f:
+        with open(Path(root) / list_path, "a") as f:
             f.writelines(f"{now[name]}  {name}\n" for name in new)
     return new
 
 
+def check_frozen(root=ROOT):
+    """The scored results under reports/frozen against reports/frozen.sha256."""
+    return check_listed(root, *APPEND_ONLY["frozen"])
+
+
+def add_new_frozen_files(root=ROOT):
+    return add_new_listed(root, *APPEND_ONLY["frozen"])
+
+
+def check_prospective(root=ROOT):
+    """The forecast log under reports/prospective against reports/prospective.sha256."""
+    return check_listed(root, *APPEND_ONLY["prospective"])
+
+
+def add_new_prospective_files(root=ROOT):
+    return add_new_listed(root, *APPEND_ONLY["prospective"])
+
+
 if __name__ == "__main__":
-    if sys.argv[1:] == ["frozen"]:
-        problems = check_frozen()
-        print("\n".join(problems) if problems else "every frozen result matches reports/frozen.sha256")
+    if sys.argv[1:] in (["frozen"], ["prospective"]):
+        folder, list_path = APPEND_ONLY[sys.argv[1]]
+        problems = check_listed(ROOT, folder, list_path)
+        print("\n".join(problems) if problems else f"every file under {folder} matches {list_path}")
         sys.exit(1 if problems else 0)
-    if sys.argv[1:] == ["frozen-add"]:
-        print("added:", ", ".join(add_new_frozen_files()) or "nothing new")
+    if sys.argv[1:] in (["frozen-add"], ["prospective-add"]):
+        print("added:", ", ".join(add_new_listed(ROOT, *APPEND_ONLY[sys.argv[1][:-4]])) or "nothing new")
         sys.exit(0)
     if sys.argv[1:] == ["build"]:
         print(f"wrote {MANIFEST_PATH} with {len(build_manifest()['files'])} files")

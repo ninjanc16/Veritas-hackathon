@@ -51,7 +51,7 @@ jobs:
           git config user.email "Sam@users.noreply.github.com"
           if [ -d data/live ]; then git add data/live; fi
           if [ -d reports/live ]; then git add reports/live; fi
-          if [ -d reports/prospective ]; then git add reports/prospective; fi
+          if [ -d reports/prospective ]; then git add reports/prospective reports/prospective.sha256; fi
           git add data/processed/latest.parquet data/processed/canals.geojson data/processed/districts.geojson
           git add reports/metrics.json reports/refresh.json reports/issues.json app/site/data
           # commit only if a data file changed (refresh.json and issues.json change on every run)

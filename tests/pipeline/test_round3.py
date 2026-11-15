@@ -20,8 +20,8 @@ from farmdrought.config import (ALERT_WEEKS, COUNTY_RESERVOIR, FROZEN, METRICS, 
                                 SEASON_WEEKS, YEAR_WEEKS)
 from farmdrought.drought import build_panel, load_usdm
 from farmdrought.leaks import bed_layer, seepage_rate, water_table_factor
-from farmdrought.manifest import (add_new_frozen_files, build_manifest, check_frozen, check_manifest, guard_scored_writer,
-                                  sha256_of)
+from farmdrought.manifest import (add_new_frozen_files, add_new_prospective_files, build_manifest, check_frozen,
+                                  check_manifest, check_prospective, guard_scored_writer, sha256_of)
 from farmdrought.prob_calibration import (brier, calibrate_by_past, calibration_coverage, class_frequency_by_past,
                                           reliability)
 from farmdrought.trigger import run_trigger, run_trigger_annual
@@ -2040,3 +2040,32 @@ def test_boosting_item_scores_all_three_on_the_same_rows():
     # a scored row with no boosting forecast is an error, not a silent drop
     with pytest.raises(ValueError, match="no boosting forecast"):
         boosting.boosting_item(scored, perfect.where(scored["date"].dt.year > 2008))
+
+
+def test_every_logged_forecast_is_listed_and_unchanged():
+    assert check_prospective() == []
+
+
+def test_the_forecast_log_is_append_only_like_the_frozen_results(tmp_path):
+    # Arrange: one week logged and listed
+    folder = tmp_path / "reports" / "prospective"
+    first = prospective.entry(made_up_latest("2027-01-05"), MADE_UP_FROZEN, "d0d0")
+    path = prospective.log_week(first, folder=folder)
+    added = add_new_prospective_files(tmp_path)
+    listed_before = (tmp_path / "reports" / "prospective.sha256").read_text()
+
+    # Act: the next week is logged, and someone edits the first week's file by hand
+    prospective.log_week(prospective.entry(made_up_latest("2027-01-12"), MADE_UP_FROZEN, "d1d1"), folder=folder)
+    unlisted = check_prospective(tmp_path)
+    added_later = add_new_prospective_files(tmp_path)
+    path.write_text(path.read_text().replace("0.31", "0.99"))
+
+    # Assert
+    assert added == ["reports/prospective/2027-01-05.json"]
+    assert unlisted == ["reports/prospective/2027-01-12.json (not listed)"]
+    assert added_later == ["reports/prospective/2027-01-12.json"]
+    assert (tmp_path / "reports" / "prospective.sha256").read_text().startswith(listed_before)   # only appended
+    assert check_prospective(tmp_path) == ["reports/prospective/2027-01-05.json (changed)"]
+    # listing again does not bless the edit
+    assert add_new_prospective_files(tmp_path) == []
+    assert check_prospective(tmp_path) == ["reports/prospective/2027-01-05.json (changed)"]
