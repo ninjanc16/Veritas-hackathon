@@ -120,3 +120,21 @@ test("a second application costs a second round and never recovers less water", 
   close(two.spend, 2 * one.spend);
   assert.ok(two.recoveredAf > one.recoveredAf);
 });
+
+test("from today: the three futures to watch run from mild to harsh and use only library years", () => {
+  const run = E.fromToday(history(), [{ trigger: "never" }, { trigger: "forecast" }], {}, today);
+  const cost = (k) => run.cases[k].sample[0].totals.cost;
+  assert.ok(cost("best") <= cost("likely") && cost("likely") <= cost("worst"));
+  assert.strictEqual(run.cases.likely.sample[0].totals.cost, run.sample[0].totals.cost);
+  for (const k of ["best", "likely", "worst"]) assert.ok(run.cases[k].sourceYears.every((y) => y < 2020));
+});
+
+test("sealing cannot save water that was never released", () => {
+  // Reservoirs far below the "farms get none" line all year: nothing flows, so nothing is saved.
+  const weeks = [];
+  for (let i = 0; i < 52; i++) weeks.push({ date: "2030-01-01", year: 2030, month: 1 + Math.floor(i / 4.34), cls: 4, forecast: 1, pct: 5 });
+  const scope = { weeks, canals: [{ km: 10, rate: 2 }], canalsUnranked: [{ km: 10, rate: 2 }], demandAf: 1000, revenueAtStake: 367000 };
+  const run = E.simulate(scope, { trigger: "always" }, { budget: 1e6 });
+  assert.strictEqual(run.totals.recoveredAf, 0);
+  assert.strictEqual(run.totals.savedAf, 0);
+});
