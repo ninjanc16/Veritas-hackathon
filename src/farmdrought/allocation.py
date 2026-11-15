@@ -44,7 +44,8 @@ def model_minus_rule(model, rule, draws=10000, seed=0):
     year_block_bootstrap with lower_is_better=False. "diff", "lo" and "hi" below are model minus
     rule in plain shares, so ABOVE zero means the model funded more counties that went on to a
     drought season. The two "better" counts are renamed so nobody has to remember which way
-    they point. "caveat" must be printed wherever the interval is.
+    they point. "caveat" must be printed wherever the interval is. uncertainty.direction() works
+    on the result: "a better" means the model is better.
 
     Every year counts the same (weighted-mean mode with weight 1 per year), so "diff" is the
     difference of the two means over years.
@@ -56,7 +57,8 @@ def model_minus_rule(model, rule, draws=10000, seed=0):
         "share_draws_model_better": raw["share_draws_a_better"],
         "years_model_better": raw["years_a_better"],
         "n_years": raw["n_years"], "draws": raw["draws"], "block": raw["block"], "seed": raw["seed"],
-        "higher_is_better": True, "caveat": raw["caveat"],
+        # both spellings, so uncertainty.direction() can read this result ("a" is the model)
+        "higher_is_better": True, "lower_is_better": raw["lower_is_better"], "caveat": raw["caveat"],
     }
 
 

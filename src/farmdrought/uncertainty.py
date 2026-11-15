@@ -27,7 +27,10 @@ import pandas as pd
 
 CAVEAT = ("Percentile interval from {n_years} resampled years (block {block}). With this few years it is "
           "too narrow: in simulation a nominal 95% interval covered the truth about 88% of the time with "
-          "8 years and 92% with 18 (80% and 90% with two-year blocks), and less if years are dependent.")
+          "8 years and 92% with 18 (80% and 90% with two-year blocks), and is expected to be less if years "
+          "are dependent. These coverage figures come from a simulation with independent years and a true "
+          "difference of zero, not from this project's data.")
+MIN_DRAWS = 200   # with fewer resamples the 2.5 and 97.5 percentiles rest on a handful of draws
 
 
 def _by_year(values, name):
@@ -120,8 +123,8 @@ def year_block_bootstrap(per_year_a, per_year_b, weights=None, draws=10000, seed
       caveat                why the interval is too narrow with this few years (print it)
 
     Raises ValueError for: years that do not match, a missing or infinite value, a weight at
-    or below zero, fewer than two units to resample, or block=2 with an odd number of years
-    (see resample_years).
+    or below zero, fewer than 200 draws, fewer than two units to resample, or block=2 with an
+    odd number of years (see resample_years).
     """
     if not isinstance(lower_is_better, (bool, np.bool_)):
         raise ValueError(f"lower_is_better must be True or False, got {lower_is_better!r}")
@@ -134,8 +137,8 @@ def year_block_bootstrap(per_year_a, per_year_b, weights=None, draws=10000, seed
             raise ValueError("weights must all be above zero")
     if len(a) == 0:
         raise ValueError("there are no years to resample")
-    if draws < 1:
-        raise ValueError(f"draws must be at least 1, got {draws}")
+    if draws < MIN_DRAWS:
+        raise ValueError(f"draws must be at least {MIN_DRAWS}, got {draws}")
 
     a_values, b_values = a.to_numpy(), b.to_numpy()
     picked = resample_years(len(a), draws, np.random.default_rng(seed), block)

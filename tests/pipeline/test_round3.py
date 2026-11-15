@@ -160,7 +160,7 @@ def test_a_single_year_or_a_single_pair_is_refused_not_reported_as_certain():
         year_block_bootstrap(one_a, one_b, lower_is_better=True)
     with pytest.raises(ValueError, match="at least two"):
         year_block_bootstrap(two_a, two_b, block=2, lower_is_better=True)
-    assert year_block_bootstrap(two_a, two_b, draws=50, lower_is_better=True)["n_years"] == 2
+    assert year_block_bootstrap(two_a, two_b, draws=200, lower_is_better=True)["n_years"] == 2
 
 
 def test_missing_or_infinite_values_are_refused():
@@ -254,13 +254,24 @@ def test_interval_ends_are_the_2_5_and_97_5_percentiles():
 
 def test_every_result_carries_the_caveat_with_its_own_numbers():
     # Arrange / Act
-    eight = year_block_bootstrap(COST_A[:8], COST_B[:8], draws=100, block=2, lower_is_better=True)
-    twelve = year_block_bootstrap(COST_A, COST_B, draws=100, lower_is_better=True)
+    eight = year_block_bootstrap(COST_A[:8], COST_B[:8], draws=200, block=2, lower_is_better=True)
+    twelve = year_block_bootstrap(COST_A, COST_B, draws=200, lower_is_better=True)
 
     # Assert
     assert eight["caveat"].startswith("Percentile interval from 8 resampled years (block 2). With this few")
     assert twelve["caveat"].startswith("Percentile interval from 12 resampled years (block 1).")
     assert "88% of the time with 8 years and 92% with 18 (80% and 90% with two-year blocks)" in twelve["caveat"]
+    assert "is expected to be less if years are dependent" in twelve["caveat"]
+    # the reader is told where the coverage figures come from
+    assert twelve["caveat"].endswith("a simulation with independent years and a true difference of zero, "
+                                     "not from this project's data.")
+
+
+def test_too_few_draws_are_refused():
+    # Arrange / Act / Assert: 199 resamples are refused, 200 are accepted
+    with pytest.raises(ValueError, match="at least 200"):
+        year_block_bootstrap(COST_A, COST_B, draws=199, lower_is_better=True)
+    assert year_block_bootstrap(COST_A, COST_B, draws=200, lower_is_better=True)["draws"] == 200
 
 
 def test_mismatched_years_raise_an_error_that_names_them():
@@ -638,6 +649,7 @@ def test_allocation_reports_a_model_that_funds_better_as_above_zero():
     assert gap["interval"]["lo"] == gap["interval"]["hi"] == 1.0
     assert gap["interval"]["share_draws_model_better"] == 1.0 and gap["interval"]["years_model_better"] == 6
     assert gap["interval"]["higher_is_better"] is True and excludes_zero(gap["interval"]) is True
+    assert gap["interval"]["lower_is_better"] is False and direction(gap["interval"]) == "a better"
 
 
 def test_model_minus_rule_interval_is_in_plain_shares_with_low_below_high():
@@ -658,3 +670,4 @@ def test_model_minus_rule_interval_is_in_plain_shares_with_low_below_high():
 def test_allocation_refuses_a_budget_larger_than_the_number_of_counties():
     with pytest.raises(ValueError, match="cannot fund"):
         run_allocation(march_table(FIVE_COUNTIES), ks=(6,), draws=10)
+
