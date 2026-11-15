@@ -1013,10 +1013,15 @@ test("the simulation's own scope is unchanged by the replay: it still reads the 
 
 /* ---------- Fixed sentences ---------- */
 test("the held-out test sentence is fixed wording and carries exactly the reported numbers", () => {
-  assert.strictEqual(L.HELD_OUT_SENTENCE, "We tested the leak model by hiding one district at a time and predicting its published water loss. " +
+  assert.strictEqual(L.HELD_OUT_SENTENCE, "We tested the leak model by hiding one district at a time and predicting its published 1998 water loss. " +
     "Across 14 districts its typical error was 32.7%, against 36.5% for canal length alone, and the two could not be told apart. " +
-    "So the volumes and dollar figures here are not reliable; treat the order of canals as the result, and the amounts as an illustration.");
-  assert.deepStrictEqual(L.HELD_OUT_SENTENCE.match(/\d+(?:\.\d+)?/g), ["14", "32.7", "36.5"]);
+    "So the volumes and dollar figures here are not reliable and are not measurements. " +
+    "The canal order on the map is an illustration of the method, not a tested ranking: we have not shown that it ranks canals better than canal length does.");
+  // Its numbers: the year of the published losses, then the three reported figures.
+  assert.deepStrictEqual(L.HELD_OUT_SENTENCE.match(/\d+(?:\.\d+)?/g), ["1998", "14", "32.7", "36.5"]);
+  // It must not tell the reader to trust the order of canals.
+  assert.ok(!/treat the order|as the result/.test(L.HELD_OUT_SENTENCE));
+  assert.strictEqual(L.LOSSES_1998_SENTENCE, "The 1998 losses are estimates based on water rights, not measured, and include evaporation and spills.");
   assert.strictEqual(L.esc(L.HELD_OUT_SENTENCE), L.HELD_OUT_SENTENCE);     // nothing in it needs escaping
 });
 
@@ -1028,6 +1033,9 @@ test("the held-out sentence is placed on the Simulation step above the replay ta
   before(body("bandsBlock"), "replayBandsTable(result)", "replayBandsSentence(result)", "the table is the first thing in the block");
   before(body("renderBudgetResult"), "heldOutNote() + rows", "Simulate this plan", "Budget plan");
   assert.ok(body("renderSources").indexOf("heldOutNote()") >= 0, "Sources step");
+  before(body("renderSources"), "heldOutNote()", "LOSSES_1998_SENTENCE", "Sources step: the note on the 1998 losses follows the sentence");
+  // No copy calls the canals at the top of the list "the leakiest": the order is not a tested ranking.
+  assert.ok(!/leakiest canals/.test(page));
   assert.ok(/const heldOutNote = \(\) => '<p class="note">' \+ U\.esc\(window\.HGLogic\.HELD_OUT_SENTENCE\) \+ "<\/p>";/.test(page));
   // The site does not load the pipeline's result file or a calibration: the engine stays uncalibrated.
   assert.ok(page.indexOf("seepage_calibration") < 0 && page.indexOf("HG.calibration") < 0);

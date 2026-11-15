@@ -218,9 +218,12 @@
   const REPLAY_ONE_YEAR_SHARE = 0.5;
   /* The held-out test of the leak model, as the team reported it (reports/frozen/round3/seepage_calibration.json
      in the pipeline). Fixed wording: nothing here is computed, and the site does not read that file. */
-  const HELD_OUT_SENTENCE = "We tested the leak model by hiding one district at a time and predicting its published water loss. " +
+  const HELD_OUT_SENTENCE = "We tested the leak model by hiding one district at a time and predicting its published 1998 water loss. " +
     "Across 14 districts its typical error was 32.7%, against 36.5% for canal length alone, and the two could not be told apart. " +
-    "So the volumes and dollar figures here are not reliable; treat the order of canals as the result, and the amounts as an illustration.";
+    "So the volumes and dollar figures here are not reliable and are not measurements. " +
+    "The canal order on the map is an illustration of the method, not a tested ranking: we have not shown that it ranks canals better than canal length does.";
+  /* What the published losses used in that test are. Shown on the Sources step. Fixed wording. */
+  const LOSSES_1998_SENTENCE = "The 1998 losses are estimates based on water rights, not measured, and include evaporation and spills.";
   /* The caption on the simulation's picture. The picture shows single figures for one run; they
      are allowed only because this caption is shown with them. */
   const TWIN_CAPTION = "One illustrative run, with each unknown at the middle of its range. Not a prediction.";
@@ -467,5 +470,5 @@
   return { usd, num, pct, niceDate, esc, safeUrl, safeDecode, cssClass, TIER_CLASSES, SEVERITY_CLASSES, finiteOrNull, percentOrNull, csvText, csvNumber,
            workTime, gal, money, usesElephantButte, REPLAY_POLICIES, replay,
            band, rangeText, rangeCell, thousandAf, replayBands, replayBandsSentence, replayBandsLines, replayBandsTable,
-           sharedForecastSentence, SCORED_TEST_SENTENCE, HELD_OUT_SENTENCE, TWIN_CAPTION, makeLogic };
+           sharedForecastSentence, SCORED_TEST_SENTENCE, HELD_OUT_SENTENCE, LOSSES_1998_SENTENCE, TWIN_CAPTION, makeLogic };
 });

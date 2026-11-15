@@ -403,7 +403,7 @@
     }
     $("view").innerHTML =
       "<h2>Simulation</h2>" +
-      '<div class="sub">' + (d ? U.esc(d.name) : simMembers().length === 1 ? U.esc(simMembers()[0].name) : simMembers().length + " districts together") + " · five years, with and without sealing the leakiest canals</div>" +
+      '<div class="sub">' + (d ? U.esc(d.name) : simMembers().length === 1 ? U.esc(simMembers()[0].name) : simMembers().length + " districts together") + " · five years, with and without sealing the canals the model puts first</div>" +
       '<div id="simLead"></div>' +
       '<div class="controls"><div class="field"><label for="simBudget">Sealant budget, each round <output id="simBudgetOut"></output></label><input id="simBudget" type="range" min="0" max="' + maxBudget() + '" step="' + budgetStep() + '" value="' + state.budget + '"></div><div id="shockRow"></div></div>' +
       '<div id="simResult"></div>' +
@@ -699,7 +699,7 @@
     const tag = (k) => ' <span class="tag ' + k + '">' + k + "</span>";
     $("view").innerHTML =
       "<h2>Data and sources</h2><div class=\"sub\">Every dataset, what it is used for and where it comes from. Data as of " + U.niceDate(HG.week) + ".</div>" +
-      heldOutNote() +
+      heldOutNote() + '<p class="fn">' + U.esc(window.HGLogic.LOSSES_1998_SENTENCE) + "</p>" +
       "<h3>1. Drought forecast model</h3>" + table([
         ["Drought class each week, each county (the model's main input and its answer)", "U.S. Drought Monitor, weekly, 2000 on", link("droughtmonitor.unl.edu", "https://droughtmonitor.unl.edu/")],
         ["El Ni&ntilde;o signal", "Oceanic Ni&ntilde;o Index, monthly", link("NOAA Climate Prediction Center", "https://www.cpc.ncep.noaa.gov/data/indices/oni.ascii.txt")],
