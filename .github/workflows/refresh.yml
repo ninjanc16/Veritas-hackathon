@@ -1,0 +1,46 @@
+# Live data: fetch the newest data every day, rebuild every output, and save the result.
+#
+# What changes how often:
+#   reservoir storage     daily   -> a new reservoir reading every day
+#   U.S. Drought Monitor  weekly  -> a new forecast, canal levels and sealant plan (Thursdays)
+#   El Nino, weather      monthly
+# The steps are in src/farmdrought/refresh.py. If a source is down, its saved file is kept.
+# If the tests fail, nothing is saved, so a bad download can never reach the repo.
+name: Refresh live data
+
+on:
+  schedule:
+    - cron: "0 15 * * *"   # every day at 15:00 UTC (9 AM in Texas), after the daily reservoir update
+  workflow_dispatch:        # also adds a "Run workflow" button on the Actions tab
+
+permissions:
+  contents: write           # the job saves the refreshed files back to the repo
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150   # version 2 retrains every candidate with 5 seeds, which is slow on a small runner
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements-pipeline.txt
+      - run: pip install -r requirements-pipeline.txt
+      - name: Fetch new data and rebuild the outputs
+        run: PYTHONPATH=src python -m farmdrought.refresh
+      - name: Check the outputs before saving them
+        run: PYTHONPATH=src python -m pytest tests/pipeline -q
+      - name: Save the refreshed files
+        run: |
+          git config user.name "Sam"
+          git config user.email "samr.ramos1316@gmail.com"
+          git add data/raw data/processed reports notebooks/oni.txt demo/data.js
+          # commit only if a data file changed (refresh.json alone changes on every run)
+          if git diff --cached --quiet -- data notebooks demo; then
+            echo "No new data today."
+          else
+            git commit -m "data: refresh $(date -u +%Y-%m-%d)"
+            git push
+          fi

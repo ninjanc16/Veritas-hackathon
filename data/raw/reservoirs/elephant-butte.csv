@@ -20,7 +20,7 @@
 #     for more detailed explanations see http://waterdatafortexas.org/reservoirs/glossary
 # 
 # Estimated daily average data for Elephant Butte Lake
-#     generated: 2026-11-14T19:44:05.564815 UTC
+#     generated: 2026-11-15T01:20:32.769332 UTC
 #     url: http://www.waterdatafortexas.org/reservoirs/individual/elephant-butte.csv
 # 
 # Footnote:
@@ -40731,4 +40731,4 @@ date,water_level,surface_area,reservoir_storage,conservation_storage,percent_ful
 2026-11-11,4313.60,7765.16,204728,204728,10.3,1985900,0
 2026-11-12,4314.39,7914.49,210921,210921,10.6,1985900,0
 2026-11-13,4315.12,8051.77,216749,216749,10.9,1985900,0
-2026-11-14,4315.61,8143.91,220717,220717,11.1,1985900,0
+2026-11-14,4315.67,8155.20,221206,221206,11.1,1985900,0

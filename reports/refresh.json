@@ -1,0 +1,31 @@
+{
+  "refreshed_at": "2026-11-15T01:20:40+00:00",
+  "sources": {
+    "drought_monitor": {
+      "updates": "weekly",
+      "newest": "2026-11-10",
+      "changed": false,
+      "ok": true
+    },
+    "el_nino_index": {
+      "updates": "monthly",
+      "newest": "ASO 2026",
+      "changed": false,
+      "ok": true
+    },
+    "reservoirs": {
+      "updates": "daily",
+      "newest": "2026-11-14",
+      "changed": true,
+      "ok": true
+    },
+    "county_weather": {
+      "updates": "monthly",
+      "newest": "2026-10",
+      "changed": false,
+      "ok": true
+    }
+  },
+  "models_rerun": false,
+  "outputs_rebuilt": true
+}

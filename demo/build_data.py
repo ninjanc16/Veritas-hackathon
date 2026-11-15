@@ -128,10 +128,9 @@ def main():
     out = {"week": metrics["latest_week"], "levels": LEVELS}
 
     # --- 1. Base map: state lines, Texas outline, Texas county lines, one dot per US county
-    state, texas_edge, texas_inner = borders(counties)
+    state, texas_edge, _ = borders(counties)
     out["states"] = [pack(simplify(l, 0.03), 1000) for l in chain(state)]
     out["texas"] = [pack(simplify(l, 0.004)) for l in chain(texas_edge)]
-    out["txCounties"] = [pack(simplify(l, 0.01), 1000) for l in chain(texas_inner)]
     dots = []
     for feature in counties:
         if feature["id"][:2] in NOT_CONUS:
@@ -161,20 +160,39 @@ def main():
     latest = pd.read_parquet(PROCESSED / "latest.parquet")
     latest["fips"] = latest["fips"].astype(str).str.zfill(5)
     focus = latest[(latest["river"] == metrics["focus_river"]) & latest["fips"].str.startswith(TEXAS)]
-    shapes = {f["id"]: f["geometry"] for f in counties}
     rows = []
     for row in focus.sort_values("lon").itertuples():
         rows.append({
             "fips": row.fips, "name": row.county, "lon": round(row.lon, 3), "lat": round(row.lat, 3),
             "risk": row.risk_level, "cls": int(row.cls), "p4": round(float(row.p_model), 3),
-            "pSeason": round(float(row.p_season), 3), "weeksLow": round(float(row.weeks_low), 1),
+            "pSeason": round(float(row.p_season), 4), "weeksLow": round(float(row.weeks_low), 1),
             "weeksHigh": round(float(row.weeks_high), 1), "weeksModel": round(float(row.weeks_model), 1),
             "typical": float(row.typical_drought_weeks), "longest": float(row.longest_drought_weeks),
             "feedUsd": round(float(row.damage_usd_per_100_head)), "reservoir": row.res_name,
             "resPct": float(row.res_pct_full),
-            "rings": [pack(simplify([(x, y) for x, y in ring], 0.004)) for ring in rings_of(shapes[row.fips])],
         })
     out["counties"] = rows
+
+    # --- 3b. Every Texas county: shape, name, and its Drought Monitor class now and 4 weeks ago
+    usdm = json.loads((RAW / "usdm-counties.json").read_text())
+    series = dict(zip(usdm["counties"], usdm["series"]))
+    digit = lambda ch: int(ch) if ch.isdigit() else -1  # "." means no data that week
+    everyone = []
+    for feature in counties:
+        fips = feature["id"]
+        if fips[:2] != TEXAS:
+            continue
+        rings = rings_of(feature["geometry"])
+        big = max(rings, key=len)
+        weeks = series.get(fips, "..")
+        everyone.append({
+            "fips": fips, "name": feature["properties"]["NAME"],
+            "lon": round(sum(p[0] for p in big) / len(big), 3), "lat": round(sum(p[1] for p in big) / len(big), 3),
+            "cls": digit(weeks[-1]), "cls4": digit(weeks[-5]) if len(weeks) > 4 else -1,
+            "sqmi": round(feature["properties"]["CENSUSAREA"]),
+            "rings": [pack(simplify([(x, y) for x, y in ring], 0.003)) for ring in rings],
+        })
+    out["txAll"] = everyone
     names = {r["fips"]: r["name"] for r in rows}
 
     # --- 4. Texas canal and ditch segments with their leak priority
@@ -225,6 +243,12 @@ def main():
         "check": {k: block[k] for k in ("sealed_km", "spent_usd", "saved_af_low", "saved_af_high")},
     }
 
+    # --- 4c. When the data was last refreshed (written by src/farmdrought/refresh.py)
+    refresh_file = REPORTS / "refresh.json"
+    refresh = json.loads(refresh_file.read_text()) if refresh_file.exists() else {"refreshed_at": "", "sources": {}}
+    out["refresh"] = {"at": refresh["refreshed_at"],
+                      "newest": {name: source.get("newest", "") for name, source in refresh["sources"].items()}}
+
     # --- 5. Reservoir storage, latest reading in each Texas Water Development Board file
     lakes = []
     for name, filename, lon, lat in RESERVOIRS:
@@ -252,9 +276,12 @@ def main():
         "alertBestRule": metrics["headline"]["cheapest_baseline_cost"],
         "season": metrics["season"]["focus"], "year": metrics["year"]["focus"],
         "events": metrics["events"], "trigger": metrics["trigger"]["rules"][0],
+        "reservoirHelped": metrics["reservoir"]["helped"],
         # version 2 of the 4-week alert (chosen on validation years only, see reports/decision.md)
         "alertV2": {k: metrics["v2"]["alert"][k] for k in ("v2", "v1", "simple_rule")},
     }
+    out["leakyRate"] = metrics["canal_priority"]["leaky_soil_rate"]
+    out["threshold"] = metrics["season"]["threshold"]
     out["seepage"] = metrics["canal_priority"]["seepage_gal_sqft_day"]
     out["feedCost"] = metrics["map_fields"]["feed_cost_per_head_month"]
     out["limits"] = metrics["limits"]
@@ -264,7 +291,6 @@ def main():
     print(f"wrote demo/data.js  {len(text) / 1e6:.2f} MB")
     print(f"  {out['nCounties']} county dots, {len(out['states'])} state lines, {len(rivers)} river reaches")
     print(f"  {len(rows)} Texas river counties, {len(segments)} canal segments, km by level {out['canalKm']}")
-    print(f"  {len(districts)} irrigation districts, {sum(1 for s in segments if s[9])} canal segments in the sealant plan")
     print(f"  Texas insured drought losses {sum(v for _, v in out['losses']['byYear']):,} "
           f"(metrics by county: {sum(v for _, v in out['losses']['byCounty']):,})")
 
