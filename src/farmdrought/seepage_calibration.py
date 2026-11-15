@@ -73,7 +73,7 @@ DECLARED_IN = ('reports/decision.md, sections "Evaluation round 3" (physical mod
                'held-out test was run", and its paragraph "Canal classes, fixed on Nov 15, 2026 before any fit"')
 PASS_SENTENCE = "Held-out districts: median error {error:.0%} (interval {lo:.0%} to {hi:.0%}), better than canal length alone."
 FAIL_SENTENCE = ("The model did not predict held-out district losses better than canal length. Volumes are not "
-                 "reliable; only the ranking order is shown.")
+                 "reliable, and the test does not support the ranking either; the order is an illustration.")
 # How a 1998 abbreviation is spelled in the district map. Only these four are expanded.
 ABBREVIATIONS = {"ccid": "cameron county irrigation district", "hcid": "hidalgo county irrigation district",
                  "hccid": "hidalgo & cameron counties irrigation district", "hcwcid": "hidalgo county wcid"}

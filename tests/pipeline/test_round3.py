@@ -1793,6 +1793,12 @@ def test_calibration_item_lists_a_district_above_its_own_loss_and_states_the_sen
     assert description["districts_above_their_own_loss"] == [d for d in "ABC" if calibrated[d] > loss[d]]
     assert 0 < len(description["districts_above_their_own_loss"]) < 3      # log-mean fit: some above, some below
     assert item["sentence"] in (seepage.FAIL_SENTENCE,) or item["sentence"].startswith("Held-out districts: median error")
+    # the sentence for a failed test must not vouch for the ranking
+    assert seepage.FAIL_SENTENCE == ("The model did not predict held-out district losses better than canal length. "
+                                     "Volumes are not reliable, and the test does not support the ranking either; "
+                                     "the order is an illustration.")
+    failed = dict(item, passes=False)
+    assert "only the ranking order is shown" not in seepage.FAIL_SENTENCE and failed["passes"] is False
     assert item["passes"] == item["held_out"]["gaps"]["length_minus_M1"]["passes"]
     assert json.loads(json.dumps(item, default=lambda value: value.item()))["segments_kept"] == 6
 
