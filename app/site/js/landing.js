@@ -196,7 +196,7 @@
   // What the map shows at each story card.
   const STEPS = [
     { zoom: "texas", show: ["counties"], fill: "dm", label: "Drought this week", legend: DM_LEGEND },
-    { zoom: "reach", show: ["counties", "river"], fill: "dm", label: "The Rio Grande in Texas", legend: DM_LEGEND + key("#3aa0e6", "Rio Grande", true) },
+    { zoom: "reach", show: ["counties", "river"], fill: "dm", label: "The Rio Grande in Texas", legend: DM_LEGEND + key("#38c8f5", "Rio Grande", true) },
     { zoom: "reach", show: ["counties", "river", "labels"], fill: "forecast", label: "Six-month drought forecast", legend: TIER_LEGEND },
     { zoom: "valley", show: ["counties", "river", "districts", "canals"], fill: "dark", canals: "plain", label: "Lower Rio Grande Valley: districts and canals", legend: key("#9fc4e6", "Canal", true) + key("#bfe4ff", "District boundary", true) },
     { zoom: "valley", show: ["counties", "river", "canals"], fill: "dark", canals: "levels", label: "Canals by priority", legend: LEVEL_LEGEND },
@@ -207,8 +207,8 @@
     ["counties", "river", "districts", "canals", "funded", "labels"].forEach((name) =>
       svg.classList.toggle("show-" + name, step.show.indexOf(name) >= 0));
     countyNodes.forEach(({ c, node }) => {
-      let fill = "#16345e";
-      if (step.fill === "dm") fill = c.dm == null ? "#16345e" : U.DM_COLOR[c.dm];
+      let fill = "#15272d";
+      if (step.fill === "dm") fill = c.dm == null ? "#15272d" : U.DM_COLOR[c.dm];
       if (step.fill === "forecast" && U.riverByFips[c.fips]) fill = U.TIER_COLOR[U.riverByFips[c.fips].tier];
       node.style.fill = fill;
     });

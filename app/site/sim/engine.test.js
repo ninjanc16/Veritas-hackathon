@@ -75,3 +75,42 @@ test("the budget stops at the first canal it cannot cover", () => {
   const plan = E.fundCanals(dry.canals, cost(10) + cost(5) - 1, p);   // enough for canal 1, not for canal 2
   assert.strictEqual(plan.funded.length, 1);
 });
+
+/* ---- From today, forward ---- */
+const today = { startDate: "2026-11-14", pctNow: 38.7, pNow: 0.3, draws: 40, seed: 5 };
+// A record with wet years (even) and dry years (odd) before 2020, and absurd years after it.
+function history() {
+  const s = scope(26, (y, w) => (2000 + y >= 2020 ? { pct: 999, cls: 5 } : y % 2 ? { pct: 30 - w * 0.2, cls: 3 } : { pct: 60 + w * 0.1, cls: 0 }));
+  return s;
+}
+
+test("from today: the same seed gives the same futures", () => {
+  const a = E.fromToday(history(), [{ trigger: "never" }, { trigger: "forecast" }], {}, today);
+  const b = E.fromToday(history(), [{ trigger: "never" }, { trigger: "forecast" }], {}, today);
+  assert.deepStrictEqual(a.policies[1].summary, b.policies[1].summary);
+});
+
+test("from today: storage starts at today's reading and the calendar starts today", () => {
+  const run = E.fromToday(history(), [{ trigger: "never" }], {}, today);
+  assert.strictEqual(run.fan[0].date, "2026-11-14");
+  assert.strictEqual(run.fan[0].low, 38.7);
+  assert.strictEqual(run.fan[0].high, 38.7);
+});
+
+test("from today: nothing from 2020 or later is learned from", () => {
+  const run = E.fromToday(history(), [{ trigger: "never" }], {}, today);
+  assert.ok(run.libraryYears.every((y) => y < 2020));
+  assert.ok(run.fan.every((w) => w.high <= 100));            // the absurd 999% years never appear
+});
+
+test("from today: with no canal budget every policy gives the same futures", () => {
+  const run = E.fromToday(history(), [{ trigger: "never" }, { trigger: "forecast" }, { trigger: "always" }], { budget: 0 }, today);
+  assert.deepStrictEqual(run.policies[1].draws, run.policies[0].draws);
+  assert.deepStrictEqual(run.policies[2].draws, run.policies[0].draws);
+});
+
+test("from today: a missed delivery (a storage shock) never makes losses smaller", () => {
+  const base = E.fromToday(history(), [{ trigger: "never" }], {}, today);
+  const hit = E.fromToday(history(), [{ trigger: "never" }], {}, Object.assign({}, today, { shocks: [{ year: 1, month: 2, points: -10 }] }));
+  assert.ok(hit.policies[0].summary.loss.mid >= base.policies[0].summary.loss.mid);
+});

@@ -51,6 +51,8 @@
     paperworkWeeks:{ value: 8,      tag: "assumption", label: "Weeks from a drought declaration to canal work starting" },
     reliefShare:   { value: 0.3,    tag: "assumption", label: "Share of farm losses later repaid as public relief" },
     jobsPerMillion:{ value: 16.95,  tag: "published",  label: "Jobs at risk per $1 million of crop revenue lost" },
+    kmPerCrewDay:  { value: 6,      tag: "assumption", label: "Kilometres of canal one crew seals in a working day" },
+    crews:         { value: 2,      tag: "assumption", label: "Crews working at the same time" },
   };
 
   /* Plain values out of DEFAULTS, with any overrides on top. */
@@ -170,7 +172,9 @@
         out.unmetAf += missing - recovered;
         out.savedAf += saved;
         out.loss += (missing - recovered) * valuePerAf;
-        out.weekly.push({ pct: week.pct, cls: week.cls, forecast: week.forecast, missing, recovered, sealed: i <= sealedUntil });
+        out.weekly.push({ date: week.date, month: week.month, pct: week.pct, cls: week.cls, forecast: week.forecast,
+                          demand, missing, recovered, saved, sealed: i <= sealedUntil,
+                          spend: act ? plan.spent : 0, loss: (missing - recovered) * valuePerAf });
       });
 
       out.relief = out.loss * p.reliefShare;                       // public money paid AFTER the loss
@@ -252,6 +256,119 @@
     });
   }
 
-  return { DEFAULTS, makeParams, shortage, fundCanals, savedAcreFeet, simulate, forward, makeRng,
+  /*
+    FROM TODAY, FORWARD. This is the simulation the platform shows first.
+
+    What it LEARNS FROM: the "library", whole years of the real record that ended before the
+    cut-off (2020). Each library year holds two things per week: the drought class, and how
+    much the reservoirs rose or fell that week.
+
+    Where it STARTS: today. The reservoirs start at today's live reading, and the first season
+    leans dry or wet according to the forecast the frozen model makes from this week's data.
+
+    How one future is built:
+      1. For each coming year, pick a library year at random. For the first season, pick from
+         the dry library years with chance pNow, otherwise from the wet ones.
+      2. Storage starts at today's level and moves by that library year's weekly rises and falls.
+      3. The forecast is not perfect. Before a season that turns out dry it warns with chance
+         `recall`; before a season that turns out wet it still warns with chance `falseAlarm`.
+         Both come from the frozen model's test on 2020 to 2025.
+      4. Shocks (optional) push storage down or up at a chosen moment, in every policy alike.
+    Every policy is run through the same futures.
+
+    options: { startDate "YYYY-MM-DD", pctNow, pNow, years, draws, seed, cutoffYear,
+               recall, falseAlarm, shocks: [{ year: 1.., month, points }], secondDryYear }
+    Returns { policies: [{ policy, draws, summary }], sample: [simulate() result per policy for
+              the middle future], fan: weekly low / mid / high storage, libraryYears, dryYears }.
+  */
+  function fromToday(scope, policies, overrides, options) {
+    const opt = Object.assign({ years: 5, draws: 300, seed: 11, pNow: 0.3, pctNow: 50, cutoffYear: 2020,
+                                recall: 0.9, falseAlarm: 0.3, shocks: [], secondDryYear: false }, options || {});
+    const rng = makeRng(opt.seed);
+    const WEEK = 7 * 864e5;
+
+    // The library: full years before the cut-off.
+    const record = {};
+    for (const w of scope.weeks) if (w.year < opt.cutoffYear) (record[w.year] = record[w.year] || []).push(w);
+    const libraryYears = Object.keys(record).map(Number).filter((y) => record[y].length >= 50);
+    const library = {};
+    for (const y of libraryYears) {
+      const weeks = record[y];
+      let run = 0, dry = false;
+      const rows = weeks.map((w, i) => {
+        run = w.cls != null && w.cls >= D2 ? run + 1 : 0;
+        if (run >= 8) dry = true;
+        const before = i > 0 ? weeks[i - 1].pct : null;
+        return { cls: w.cls, change: w.pct != null && before != null ? w.pct - before : 0 };
+      });
+      library[y] = { rows, dry };
+    }
+    const dryYears = libraryYears.filter((y) => library[y].dry), wetYears = libraryYears.filter((y) => !library[y].dry);
+    const pick = (list) => list[Math.floor(rng() * list.length)];
+
+    // The calendar: one entry a week from the start date to the end of the last simulated year.
+    const start = new Date(opt.startDate + "T12:00:00Z").getTime(), startYear = new Date(start).getUTCFullYear();
+    const calendar = [];
+    for (let t = start; new Date(t).getUTCFullYear() <= startYear + opt.years; t += WEEK) {
+      const d = new Date(t), jan1 = Date.UTC(d.getUTCFullYear(), 0, 1);
+      calendar.push({ date: d.toISOString().slice(0, 10), year: d.getUTCFullYear(), month: d.getUTCMonth() + 1,
+                      weekOfYear: Math.min(51, Math.floor((t - jan1) / WEEK)) });
+    }
+
+    const results = policies.map(() => []), futures = [];
+    for (let n = 0; n < opt.draws; n++) {
+      const source = {}, warned = {};
+      for (let y = startYear; y <= startYear + opt.years; y++) {
+        const season = y - startYear;                       // 0 = the rest of this year, 1 = the first full season
+        let from = pick(libraryYears);
+        if (dryYears.length && wetYears.length) {
+          if (season === 1) from = rng() < opt.pNow ? pick(dryYears) : pick(wetYears);
+          if (season === 2 && opt.secondDryYear) from = pick(dryYears);
+        }
+        source[y] = from;
+        warned[y] = library[from].dry ? rng() < opt.recall : rng() < opt.falseAlarm;
+      }
+      let pct = opt.pctNow;
+      const hit = new Set();
+      const weeks = calendar.map((c, i) => {
+        const row = library[source[c.year]].rows[Math.min(c.weekOfYear, library[source[c.year]].rows.length - 1)];
+        if (i > 0) pct += row.change;
+        for (const shock of opt.shocks) {                    // each shock hits once, in its month
+          if (!hit.has(shock) && c.year === startYear + shock.year && c.month === shock.month) { hit.add(shock); pct += shock.points; }
+        }
+        pct = Math.max(0, Math.min(100, pct));
+        return { date: c.date, year: c.year, month: c.month, cls: row.cls, forecast: warned[c.year] ? 1 : 0, pct };
+      });
+      const future = Object.assign({}, scope, { weeks });
+      futures.push(future);
+      policies.forEach((policy, i) => results[i].push(simulate(future, policy, overrides).totals));
+    }
+
+    const quantile = (values, q) => {
+      const sorted = values.slice().sort((a, b) => a - b);
+      return sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))];
+    };
+    // The middle future: the one whose do-nothing cost is the median. It is the one the page animates.
+    const order = results[0].map((t, i) => [t.cost, i]).sort((a, b) => a[0] - b[0]);
+    const middle = order[Math.floor(order.length / 2)][1];
+    return {
+      policies: policies.map((policy, i) => {
+        const summary = {};
+        for (const key of ["cost", "loss", "spend", "publicMoney", "recoveredAf"]) {
+          const values = results[i].map((t) => t[key]);
+          summary[key] = { low: quantile(values, 0.1), mid: quantile(values, 0.5), high: quantile(values, 0.9) };
+        }
+        return { policy, draws: results[i], summary };
+      }),
+      sample: policies.map((policy) => simulate(futures[middle], policy, overrides)),
+      fan: calendar.map((c, i) => {
+        const values = futures.map((f) => f.weeks[i].pct);
+        return { date: c.date, low: quantile(values, 0.1), mid: quantile(values, 0.5), high: quantile(values, 0.9) };
+      }),
+      libraryYears, dryYears,
+    };
+  }
+
+  return { DEFAULTS, makeParams, shortage, fundCanals, savedAcreFeet, simulate, forward, fromToday, makeRng,
            GALLONS_PER_ACRE_FOOT, FEET_PER_KM };
 });

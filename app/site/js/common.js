@@ -9,13 +9,31 @@
   "use strict";
   const HG = window.HG;
 
-  /* ---------- Colours (one place, so the maps, legends and charts always agree) ---------- */
-  const DM_COLOR = ["#e6ebf1", "#f6e58a", "#f5c26b", "#ef8f2f", "#d9352b", "#7a0f12"];   // None, D0 .. D4
+  /* ---------- Theme: dark is the default; the choice is remembered in this browser ---------- */
+  let theme = "dark";
+  try { theme = localStorage.getItem("hg-theme") || "dark"; } catch (e) { /* storage can be blocked */ }
+  document.documentElement.dataset.theme = theme;
+
+  /* ---------- Colours (one place, so the maps, legends and charts always agree) ----------
+     They are read from the stylesheet (css/site.css), so the dark and light themes each
+     have their own set. readTheme() fills the lists below again after the theme changes. */
+  const DM_COLOR = [];                                       // None, D0 .. D4
   const DM_TEXT = ["No drought", "D0 Abnormally dry", "D1 Moderate drought", "D2 Severe drought",
                    "D3 Extreme drought", "D4 Exceptional drought"];
-  const TIER_COLOR = { Low: "#3f8f5f", Watch: "#e0a100", Warning: "#c9372c" };
-  const LEVEL_COLOR = { "Inspect first": "#c9372c", Watch: "#e0a100", Low: "#3f8f5f",
-                        "Unknown soil": "#8a94a3", Drain: "#a9bdd1" };
+  const TIER_COLOR = {}, LEVEL_COLOR = {};
+  function readTheme() {
+    const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    DM_COLOR.splice(0, 9, css("--dm0"), css("--dm1"), css("--dm2"), css("--dm3"), css("--dm4"), css("--dm5"));
+    Object.assign(TIER_COLOR, { Low: css("--low"), Watch: css("--watch"), Warning: css("--warning") });
+    Object.assign(LEVEL_COLOR, { "Inspect first": css("--inspect"), Watch: css("--watch"), Low: css("--low"),
+                                 "Unknown soil": css("--unknown"), Drain: css("--drain") });
+  }
+  readTheme();
+  function setTheme(next) {
+    theme = next; document.documentElement.dataset.theme = next;
+    try { localStorage.setItem("hg-theme", next); } catch (e) { /* storage can be blocked */ }
+    readTheme();
+  }
 
   /*
     Figures from named reports. Each was opened and checked against the report itself on
@@ -66,9 +84,13 @@
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
   /* ---------- Canals as objects (the data file stores them as short lists to stay small) ---------- */
+  const KINDS = ["Irrigation canal", "Ditch", "Drain"];        // what OpenStreetMap calls the line (null = it does not say)
   const canals = HG.canals.map((c, i) => ({
-    id: i, name: HG.canalNames[c[0]] || "Unnamed canal", soil: HG.soils[c[1]], level: c[2], fips: c[3],
+    id: i, name: HG.canalNames[c[0]] || "Unnamed canal", soil: c[1] == null ? null : HG.soils[c[1]], level: c[2], fips: c[3],
     km: c[4], rate: c[5], p: c[6], district: c[7], rank: c[8], usd: c[9], line: c[10],
+    kind: c[11] == null ? null : KINDS[c[11]],                 // irrigation canal, ditch or drain
+    piped: c[12] === 1,                                        // OpenStreetMap maps most of it underground
+    source: c[13] === 1 ? "OpenStreetMap" : "USGS",
   }));
   const countyByFips = {};
   HG.texas.forEach((c) => { countyByFips[c.fips] = c; });
@@ -111,6 +133,35 @@
     };
   }
 
+  /*
+    The three numbers that matter for one canal segment (or any list of them):
+      usd      what the sealant costs (materials only; the pipeline's price per square foot)
+      days     how long the job takes: km / (km one crew seals a day x crews). An assumption.
+      afLow, afHigh  acre-feet of water kept in one application, across the range sealant tests found
+      worthLow, worthHigh  what that water is worth to farms IF there is a shortage to fill
+                           (net crop revenue per acre-foot; in a full year saved water earns nothing)
+    params: { kmPerCrewDay, crews } from the simulation's assumptions.
+  */
+  const USD_PER_AF = PUBLISHED.worstCaseRevenue / PUBLISHED.valleyIrrigationAf;   // about $367, our own division
+  function canalNumbers(list, params) {
+    const a = HG.plan.assumptions, E = window.HGEngine;
+    let km = 0, usd = 0, gallonsPerDay = 0;
+    list.forEach((c) => {
+      const sqft = c.km * E.FEET_PER_KM * a.wetted_width_ft;
+      km += c.km; usd += sqft * a.sealant_usd_per_sqft; gallonsPerDay += sqft * (c.rate || 0);
+    });
+    const afLow = E.savedAcreFeet(gallonsPerDay, a.days_one_application_lasts, a.sealant_cut_low);
+    const afHigh = E.savedAcreFeet(gallonsPerDay, a.days_one_application_lasts, a.sealant_cut_high);
+    return { km, usd, days: km / (params.kmPerCrewDay * params.crews), crewDays: km / params.kmPerCrewDay,
+             afLow, afHigh, worthLow: afLow * USD_PER_AF, worthHigh: afHigh * USD_PER_AF };
+  }
+  /* "3 hours", "2 days", "6 weeks": a length of working time (8-hour days, 5-day weeks) in plain words. */
+  function workTime(days) {
+    if (days < 1) return Math.max(1, Math.round(days * 8)) + (Math.round(days * 8) <= 1 ? " hour" : " hours");
+    if (days < 15) return (days < 3 ? days.toFixed(1) : Math.round(days)) + " days";
+    return Math.round(days / 5) + " weeks";
+  }
+
   /* Path to one of a county's photos. kind = "county" (aerial), "drought" (close-up) or "ground". */
   const photo = (fips, kind) => "photos/" + fips + "-" + kind + ".jpg";
 
@@ -122,6 +173,7 @@
     return node;
   }
 
-  window.HGU = { DM_COLOR, DM_TEXT, TIER_COLOR, LEVEL_COLOR, PUBLISHED, usd, num, pct, niceDate, esc,
-                 canals, countyByFips, riverByFips, actionFor, tierFor, planFor, photo, el };
+  window.HGU = { DM_COLOR, DM_TEXT, TIER_COLOR, LEVEL_COLOR, PUBLISHED, USD_PER_AF, usd, num, pct, niceDate, esc,
+                 canals, countyByFips, riverByFips, actionFor, tierFor, planFor, canalNumbers, workTime, photo, el,
+                 readTheme, setTheme, theme: () => theme };
 })();

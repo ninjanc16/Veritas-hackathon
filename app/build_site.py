@@ -4,16 +4,22 @@ The website (app/site/) is plain HTML and JavaScript. It cannot read parquet fil
 script reads the pipeline's saved outputs and writes them out as JavaScript data:
 
     app/site/data/core.js   maps, this week's forecasts, canals, districts, test results
-    app/site/data/sim.js    the weekly history (2008 on) that the simulation replays
+    app/site/data/sim.js    the weekly history (2000 on) that the simulation learns from and replays
 
-Nothing is calculated here that the pipeline did not already calculate. This script only
-selects, rounds and renames. The one exception is the list of Texas counties, which gets
-this week's U.S. Drought Monitor class straight from the raw Drought Monitor file.
+Almost nothing is calculated here that the pipeline did not already calculate. This script
+selects, rounds and renames. The exceptions, all simple:
+  - Texas counties get this week's U.S. Drought Monitor class from the raw Drought Monitor file.
+  - Canals get extra detail from OpenStreetMap (kind, piped or open, names) and the canals
+    only OpenStreetMap has are added. See app/osm_canals.py. Those extra canals have no soil
+    reading, so they are never ranked or priced.
+  - The forecast model frozen at the end of 2019 is packed in from app/forecast_pre2020.py.
 
 Run it with:   python -m app.build_site        (from the repo root)
 Run it again whenever the pipeline outputs change (the daily refresh changes them).
 """
 import json
+import math
+from collections import Counter, defaultdict
 from pathlib import Path
 
 import pandas as pd
@@ -26,7 +32,12 @@ OUT = SITE / "data"
 
 TEXAS = "48"                       # every Texas county code starts with 48
 DM_LABELS = ["None", "D0", "D1", "D2", "D3", "D4"]   # U.S. Drought Monitor classes
-SIM_START = "2008-01-01"           # the first week the model has an out-of-sample forecast for
+SIM_START = "2000-01-01"           # the Drought Monitor record starts in January 2000
+APP_DATA = ROOT / "app" / "data"   # files made by app/osm_canals.py and app/forecast_pre2020.py
+NOT_MAINLAND = {"02", "15", "60", "66", "69", "72", "78"}   # Alaska, Hawaii and the territories
+MAP_WINDOW = (-109.5, 24.5, -92.5, 38.5)   # rivers are kept inside this box (Texas with a margin)
+LAKES = [("Amistad", "amistad.csv", -101.058, 29.450), ("Falcon", "falcon.csv", -99.165, 26.559),
+         ("Elephant Butte", "elephant-butte.csv", -107.19, 33.15)]   # dam positions, typed in by hand (approximate)
 # The four Lower Rio Grande Valley counties. The published farm-loss figures cover only these.
 VALLEY = ["48061", "48215", "48427", "48489"]
 
@@ -108,6 +119,237 @@ def rio_grande_line():
     return lines
 
 
+def simplify(points, tolerance):
+    """Douglas-Peucker: drop points that sit within `tolerance` degrees of the simplified line."""
+    if len(points) < 3:
+        return points
+    keep = [False] * len(points)
+    keep[0] = keep[-1] = True
+    stack = [(0, len(points) - 1)]
+    while stack:
+        a, b = stack.pop()
+        (ax, ay), (bx, by) = points[a], points[b]
+        dx, dy = bx - ax, by - ay
+        norm = (dx * dx + dy * dy) ** 0.5
+        worst, where = 0.0, -1
+        for i in range(a + 1, b):
+            px, py = points[i]
+            d = ((px - ax) ** 2 + (py - ay) ** 2) ** 0.5 if norm == 0 else abs(dx * (ay - py) - (ax - px) * dy) / norm
+            if d > worst:
+                worst, where = d, i
+        if worst > tolerance:
+            keep[where] = True
+            stack += [(a, where), (where, b)]
+    return [p for p, k in zip(points, keep) if k]
+
+
+def join_edges(edges):
+    """Join loose two-point edges into long lines, so they can be simplified and drawn."""
+    near = defaultdict(list)
+    for i, (a, b) in enumerate(edges):
+        near[a].append(i)
+        near[b].append(i)
+    used, lines = [False] * len(edges), []
+
+    def walk(start, first):
+        line, node, edge = [start], start, first
+        while edge is not None:
+            used[edge] = True
+            a, b = edges[edge]
+            node = b if a == node else a
+            line.append(node)
+            if len(near[node]) != 2:          # a junction or a loose end: stop here
+                break
+            edge = next((e for e in near[node] if not used[e]), None)
+        return line
+
+    for node, touching in near.items():       # lines that start at a junction or a loose end
+        if len(touching) != 2:
+            for e in touching:
+                if not used[e]:
+                    lines.append(walk(node, e))
+    for i, (a, _) in enumerate(edges):        # what is left are closed loops
+        if not used[i]:
+            lines.append(walk(a, i))
+    return lines
+
+
+def base_map(counties):
+    """What the scan animation draws before it reaches Texas: state lines, the Texas outline,
+    and one dot per county in the mainland United States.
+
+    State lines are found from the county shapes: an edge that belongs to only one county, or
+    to counties in two different states, is a state line.
+    """
+    owners = defaultdict(set)
+    dots = []
+    for feature in counties:
+        fips = feature["id"]
+        if fips[:2] in NOT_MAINLAND:
+            continue
+        geometry = feature["geometry"]
+        polys = geometry["coordinates"] if geometry["type"] == "MultiPolygon" else [geometry["coordinates"]]
+        rings = [ring for poly in polys for ring in poly]
+        for ring in rings:
+            pts = [(round(x, 5), round(y, 5)) for x, y in (p[:2] for p in ring)]
+            for a, b in zip(pts, pts[1:]):
+                if a != b:
+                    owners[(a, b) if a < b else (b, a)].add(fips)
+        biggest = max(rings, key=len)
+        dots += [round(sum(p[0] for p in biggest) / len(biggest), 2), round(sum(p[1] for p in biggest) / len(biggest), 2)]
+    state_edges, texas_edges = [], []
+    for edge, fips in owners.items():
+        states = {f[:2] for f in fips}
+        if len(fips) == 1 or len(states) > 1:
+            state_edges.append(edge)
+            if TEXAS in states:
+                texas_edges.append(edge)
+    return {
+        "states": [rounded(simplify(line, 0.03), 2) for line in join_edges(state_edges)],
+        "texasEdge": [rounded(simplify(line, 0.004), 3) for line in join_edges(texas_edges)],
+        "dots": dots, "nCounties": len(dots) // 2,
+    }
+
+
+def rivers_in_window():
+    """Every river line inside the map window, with its name (the Rio Grande and its neighbours)."""
+    west, south, east, north = MAP_WINDOW
+    out = []
+    for feature in load_json(RAW / "ne_10m_rivers_lake_centerlines.geojson")["features"]:
+        geometry, props = feature["geometry"], feature["properties"]
+        if not geometry or props.get("featurecla") != "River":
+            continue
+        parts = geometry["coordinates"] if geometry["type"] == "MultiLineString" else [geometry["coordinates"]]
+        for part in parts:
+            inside = [(p[0], p[1]) for p in part if west <= p[0] <= east and south <= p[1] <= north]
+            if len(inside) > 1:
+                out.append({"name": props.get("name") or "", "line": rounded(simplify(inside, 0.003), 3)})
+    return out
+
+
+def lakes():
+    """The three reservoirs: where the dam is and how full it was at the last saved reading."""
+    out = []
+    for name, file, lon, lat in LAKES:
+        last = pd.read_csv(RAW / "reservoirs" / file, comment="#").dropna(subset=["conservation_storage"]).iloc[-1]
+        out.append({"name": name, "lon": lon, "lat": lat, "date": str(last["date"])[:10],
+                    "pct": round(100 * float(last["conservation_storage"]) / float(last["conservation_capacity"]), 1)})
+    return out
+
+
+# ---------- OpenStreetMap detail for the canals (see app/osm_canals.py) ----------
+CELL = 0.0005        # grid cell in degrees, about 50 metres
+STEP = 0.0004        # put a point on a line at least every ~40 metres, so straight canals still match
+OSM_KINDS = ["canal", "ditch", "drain"]
+
+
+def dense(line):
+    """The points of a line with extra points added along long straight stretches."""
+    out = [line[0]]
+    for (x1, y1), (x2, y2) in zip(line, line[1:]):
+        n = max(1, int(max(abs(x2 - x1), abs(y2 - y1)) / STEP))
+        out += [(x1 + (x2 - x1) * k / n, y1 + (y2 - y1) * k / n) for k in range(1, n + 1)]
+    return out
+
+
+def point_grid(lines):
+    """A lookup from grid cell to the number of the first line that passes through it."""
+    grid = {}
+    for i, line in enumerate(lines):
+        for x, y in dense(line):
+            grid.setdefault((round(x / CELL), round(y / CELL)), i)
+    return grid
+
+
+def line_near(grid, x, y):
+    """The number of a line within about 50 to 75 metres of the point, or None."""
+    gx, gy = round(x / CELL), round(y / CELL)
+    for dx in (0, -1, 1):
+        for dy in (0, -1, 1):
+            hit = grid.get((gx + dx, gy + dy))
+            if hit is not None:
+                return hit
+    return None
+
+
+def inside_ring(x, y, ring):
+    """Is the point inside this ring? (Ray casting: count the edges a ray going east crosses.)"""
+    inside = False
+    for (x1, y1), (x2, y2) in zip(ring, ring[1:]):
+        if (y1 > y) != (y2 > y) and x < x1 + (y - y1) * (x2 - x1) / (y2 - y1):
+            inside = not inside
+    return inside
+
+
+def line_km(line):
+    """Length of a [lon, lat] line in kilometres (flat-earth maths, fine over a few km)."""
+    total = 0.0
+    for (x1, y1), (x2, y2) in zip(line, line[1:]):
+        total += math.hypot((x2 - x1) * math.cos(math.radians((y1 + y2) / 2)) * 111.32, (y2 - y1) * 110.57)
+    return total
+
+
+def add_osm_detail(names, canals, district_list, river, counties):
+    """Label the USGS canals with OpenStreetMap's kind, pipe flag and names, then add the canals
+    only OpenStreetMap has. Returns a short summary for the page to show.
+
+    Each canal list gains three items at the end: kind (0 canal, 1 ditch, 2 drain, None unknown),
+    piped (1 if OpenStreetMap maps most of it underground), source (0 USGS, 1 OpenStreetMap).
+    """
+    path = APP_DATA / "osm_canals.json"
+    if not path.exists():
+        for canal in canals:
+            canal += [None, 0, 0]
+        return None
+    osm = load_json(path)
+    ways = osm["ways"]
+
+    # 1. Label each USGS canal by the OpenStreetMap lines that run along it.
+    grid = point_grid([w["line"] for w in ways])
+    named = piped = 0
+    for canal in canals:
+        points = dense(canal[10])
+        hits = [ways[i] for i in (line_near(grid, x, y) for x, y in points) if i is not None]
+        kind, is_piped = None, 0
+        if len(hits) >= 0.5 * len(points):                       # OpenStreetMap follows at least half of it
+            kind = OSM_KINDS.index(Counter(w["kind"] for w in hits).most_common(1)[0][0])
+            is_piped = int(sum(w["piped"] for w in hits) >= 0.5 * len(points))
+            osm_names = Counter(w["name"] for w in hits if w["name"])
+            if canal[0] == 0 and osm_names and osm_names.most_common(1)[0][1] >= 0.5 * len(points):
+                name = osm_names.most_common(1)[0][0]
+                if name not in names:
+                    names.append(name)
+                canal[0] = names.index(name)
+                named += 1
+        piped += is_piped
+        canal += [kind, is_piped, 0]
+
+    # 2. Add the lines only OpenStreetMap has. They must sit inside a Texas river county.
+    usgs = point_grid([c[10] for c in canals])
+    shapes = {f["id"]: ([f["geometry"]["coordinates"]] if f["geometry"]["type"] == "Polygon" else f["geometry"]["coordinates"])
+              for f in counties if f["id"] in {c["fips"] for c in river}}
+    chance = {c["fips"]: c["pSeason"] for c in river}
+    added = 0
+    for way in ways:
+        line = way["line"]
+        points = dense(line)
+        if sum(line_near(usgs, x, y) is not None for x, y in points) >= 0.3 * len(points):
+            continue                                             # the USGS file already has this canal
+        mx, my = line[len(line) // 2]
+        fips = next((f for f, polys in shapes.items() if any(inside_ring(mx, my, poly[0]) for poly in polys)), None)
+        if fips is None:
+            continue                                             # in Mexico or outside the river counties
+        district = next((i for i, d in enumerate(district_list) if any(inside_ring(mx, my, ring) for ring in d["rings"])), -1)
+        if way["name"] not in names:
+            names.append(way["name"])
+        level = "Drain" if way["kind"] == "drain" else "Unknown soil"   # no soil reading, so no seepage rate
+        canals.append([names.index(way["name"]), None, level, fips, round(line_km(line), 3), None, chance[fips],
+                       district, None, None, rounded(line, 4), OSM_KINDS.index(way["kind"]), int(way["piped"]), 1])
+        added += 1
+    return {"source": osm["source"], "added": added, "addedKm": round(sum(c[4] for c in canals if c[13] == 1), 1),
+            "namesGained": named, "pipedUsgs": piped}
+
+
 def texas_canals(district_names):
     """Every canal segment in Texas, as a short list (short lists keep the file small).
 
@@ -148,7 +390,11 @@ def districts(name_to_fips):
 
 
 def weekly_history(usdm, fips_list):
-    """Weekly records from 2008 on, for the simulation: drought class, forecast, reservoirs, losses."""
+    """Weekly records from 2000 on, for the simulation: drought class, forecast, reservoirs, losses.
+
+    The forecasts only exist from 2008 (the first year the model was tested on), so earlier
+    weeks hold None there.
+    """
     all_weeks = pd.date_range(usdm["week0"], periods=usdm["weeks"], freq="7D")
     start = int((all_weeks >= SIM_START).argmax())
     weeks = all_weeks[start:]
@@ -168,7 +414,7 @@ def weekly_history(usdm, fips_list):
         storage = capacity = None
         for name in files:
             lake = pd.read_csv(RAW / "reservoirs" / name, comment="#", parse_dates=["date"]).set_index("date")
-            lake = lake[~lake.index.duplicated()].reindex(pd.date_range("2007-12-01", weeks[-1])).ffill()
+            lake = lake[~lake.index.duplicated()].reindex(pd.date_range("1999-12-01", weeks[-1])).ffill()
             storage = lake["conservation_storage"] if storage is None else storage + lake["conservation_storage"]
             capacity = lake["conservation_capacity"] if capacity is None else capacity + lake["conservation_capacity"]
         pct = (100 * storage / capacity).reindex(weeks)
@@ -189,6 +435,8 @@ def weekly_history(usdm, fips_list):
                        "Elephant Butte": percent_full(["elephant-butte.csv"])},
         "insuredDroughtLoss": insured,
         "valley": VALLEY,
+        # The forecast model frozen at the end of 2019 (see app/forecast_pre2020.py), if it has been run.
+        "pre2020": load_json(APP_DATA / "pre2020.json") if (APP_DATA / "pre2020.json").exists() else None,
     }
 
 
@@ -214,6 +462,8 @@ def build():
     district_list = districts(name_to_fips)
     district_names = [d["name"] for d in district_list]
     canal_names, soils, canals = texas_canals(district_names)
+    counties = load_json(RAW / "geojson-counties-fips.json")["features"]
+    osm = add_osm_detail(canal_names, canals, district_list, river, counties)
 
     def optional(name):
         path = ROOT / "reports" / name
@@ -228,6 +478,10 @@ def build():
         "texas": texas_counties(usdm, profiles, photo_files),
         "river": river,
         "riverLine": rio_grande_line(),
+        "rivers": rivers_in_window(),
+        "lakes": lakes(),
+        "base": base_map(counties),
+        "osm": osm,
         "districts": district_list,
         "canalNames": canal_names, "soils": soils, "canals": canals,
         "levels": metrics["canal_priority"]["levels"],

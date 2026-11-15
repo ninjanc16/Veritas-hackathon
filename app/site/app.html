@@ -4,8 +4,12 @@
   that follow the order of a real decision:
 
       1 Risk profile   what is the drought risk here, and which canals leak
-      2 Budget plan    given a budget and a drought severity, exactly which canals to seal
-      3 Simulation     what doing nothing, waiting, or acting early would have cost
+      2 Budget plan    given a budget and a drought severity, exactly which canals to seal,
+                       what it costs, how long it takes and how much water it keeps
+      3 Simulation     from today forward: what doing nothing costs against acting early
+
+  The map is drawn by js/scanmap.js on a <canvas>. It opens with a "scan" that builds the
+  picture one layer at a time. On the Simulation step the map gives way to js/fork.js.
 
   The first visit asks who you are: a district manager (pick your district) or a state
   agency (all of Texas). There is no sign-in. All logic is in js/platform.js.
@@ -17,8 +21,7 @@
   <title>Headgate Platform: Rio Grande Drought and Canal Portal</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@700;900&family=Public+Sans:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/site.css">
 </head>
 <body class="app">
@@ -32,14 +35,35 @@
     <button class="scopeBtn" id="scopeBtn" title="Change district or switch to the state view"></button>
     <span class="spacer"></span>
     <span class="live saved" id="live"><i></i><span id="liveText"></span></span>
+    <button class="topBtn" id="themeBtn" title="Switch between dark and light">Light mode</button>
     <a class="plain" href="index.html">Intro</a>
   </header>
 
   <main class="shell" id="shell">
-    <section class="mapPane">
-      <div id="map"></div>
-      <div class="mapCard modeCard" id="modeCard"></div>
-      <div class="mapCard legendCard"><h4 id="legendTitle"></h4><div class="legend" id="legend"></div></div>
+    <section class="stage" id="stage">
+      <canvas id="map"></canvas>
+      <canvas id="fork"></canvas>
+      <div id="vig" class="mapOnly"></div><div class="cine t"></div><div class="cine b"></div>
+      <div id="bar"></div>
+      <!-- Map controls -->
+      <div id="views" class="mapOnly">
+        <button class="sbtn" data-view="scope" id="viewScope">My view</button>
+        <button class="sbtn" data-view="texas">Texas</button>
+        <button class="sbtn" data-view="corridor">River corridor</button>
+        <button class="sbtn" data-view="elpaso">El Paso</button>
+        <button class="sbtn" data-view="maverick">Eagle Pass</button>
+        <button class="sbtn" data-view="valley">Lower Valley</button>
+      </div>
+      <div id="actions" class="mapOnly"><button class="sbtn main" id="replay">Replay scan</button><button class="sbtn" id="skip">Skip animation</button></div>
+      <div id="hud" class="mapOnly"><div class="phase" id="phase"></div><div id="hud1"></div><div id="hud2"></div></div>
+      <div id="legend" class="mapOnly"></div>
+      <div id="zoom" class="mapOnly"><button id="zin" aria-label="Zoom in">+</button><button id="zout" aria-label="Zoom out">&minus;</button></div>
+      <div id="coords" class="mapOnly"></div>
+      <div id="tip"></div>
+      <!-- Simulation controls (The Fork) -->
+      <div id="forkTop" class="simOnly"></div>
+      <div id="forkLedger" class="simOnly"></div>
+      <div id="forkBar" class="simOnly"><button class="sbtn main" id="forkPlay">Play</button><input type="range" id="forkSeek" min="0" max="1" value="0" aria-label="Week"><span id="forkDate"></span></div>
     </section>
     <aside class="panel">
       <nav class="stepper" id="stepper">
@@ -76,11 +100,14 @@
     </div>
   </div>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <div id="lightbox"><div><img alt=""><p></p></div></div>
+
   <script src="data/core.js"></script>
   <script src="data/sim.js"></script>
   <script src="sim/engine.js"></script>
   <script src="js/common.js"></script>
+  <script src="js/scanmap.js"></script>
+  <script src="js/fork.js"></script>
   <script src="js/platform.js"></script>
 </body>
 </html>
