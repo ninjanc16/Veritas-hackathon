@@ -199,3 +199,15 @@ The test was run once, as declared, and it did not pass. The result is in `repor
 - **The water-table factor made the model worse.** M1, which has it, had a higher median held-out error than M2, which does not (32.7% against 28.3%). That difference was not tested and is not claimed as a finding. M1 stays the primary model because it was declared as such; M2 does not replace it.
 - **Districts.** 14 districts were fitted, not the 18 expected: four names in the 1998 table have no match in the district map under the no-guess rule, and one matched district has no authorised water. "Adams Garden" is one letter away from the map's "Adams Gardens Irrigation District 19". It was left unmatched by the no-guess rule before the run, and it was not added after the result was seen.
 - **What follows.** Nothing is recalibrated, refitted or rerun. No width, factor, segment set or rule is changed in the light of this result. The site stays uncalibrated: the sealant plan and the canal ranking it shows are the ones built before this test, and the fitted factors are not applied to them.
+
+## Declared but not run (written Nov 15, 2026)
+
+The round-3 declaration above names five items that had not been done when this section was written. Their status then:
+
+- **Daily inputs lagged 7 days.** Not built. Not run. No result.
+- **Gradient boosting chosen on validation years.** Not built. Not run. No result. If a boosting comparison is run later today it gets its own declaration below, written before its code.
+- **A GRU chosen on validation years.** Not built. Not run. No result.
+- **A holdout of six named rivers, scored once.** Not built. Not run. No result.
+- **A weekly prospective log.** Not built. No forecast had been logged, so nothing can be scored from it yet.
+
+Nothing in the reported results depends on any of these. They were declared and not delivered.
