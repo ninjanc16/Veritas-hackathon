@@ -849,7 +849,7 @@
   // There is no sign-in, so every visit starts by asking who you are and which district.
   // A link that names a scope (#state or #d=District name) skips the question.
   const byName = (name) => HG.districts.findIndex((d) => d.name === name);
-  const hash = decodeURIComponent(location.hash.slice(1));
+  const hash = window.HGLogic.safeDecode(location.hash.slice(1));   // a malformed link must not stop the page from starting
   if (location.search.indexOf("step=") >= 0) state.step = location.search.split("step=")[1].split("&")[0];   // for links straight to a step
   if (hash === "state") setScope(STATE);
   else if (hash.indexOf("d=") === 0 && byName(hash.slice(2)) >= 0) setScope(byName(hash.slice(2)));

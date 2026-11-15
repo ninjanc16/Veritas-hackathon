@@ -112,6 +112,22 @@ test("percentOrNull keeps a real number from 0 to 100 inclusive and gives null f
   }
 });
 
+test("safeDecode decodes a well-formed link fragment", () => {
+  assert.strictEqual(L.safeDecode("state"), "state");
+  assert.strictEqual(L.safeDecode("d=Delta%20Lake%20Irrigation%20District"), "d=Delta Lake Irrigation District");
+  assert.strictEqual(L.safeDecode("d=Ca%C3%B1on%20%26%20Sons"), "d=Ca\u00f1on & Sons");
+  assert.strictEqual(L.safeDecode(""), "");
+  assert.strictEqual(L.safeDecode(null), "");
+  assert.strictEqual(L.safeDecode(undefined), "");
+});
+
+test("safeDecode returns a malformed fragment as it came, where the browser's decoder would throw", () => {
+  for (const bad of ["%", "d=Delta%", "d=Delta%2", "%E0%A4%A", "d=%C3", "%zz", "state%"]) {
+    assert.throws(() => decodeURIComponent(bad), URIError, bad);            // this is the failure being guarded
+    assert.strictEqual(L.safeDecode(bad), bad);
+  }
+});
+
 /* ---------- csvText, csvNumber ---------- */
 test("csvText puts every text field in double quotes and doubles a double quote inside it", () => {
   assert.strictEqual(L.csvText("Main Canal"), '"Main Canal"');

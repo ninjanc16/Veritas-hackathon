@@ -4,7 +4,7 @@
 
   TWO KINDS OF FUNCTION
     Plain ones need nothing but their arguments: esc, usd, num, pct, niceDate, workTime, gal,
-    money, usesElephantButte, and the guards safeUrl, cssClass, finiteOrNull, percentOrNull, csvText, csvNumber.
+    money, usesElephantButte, and the guards safeUrl, safeDecode, cssClass, finiteOrNull, percentOrNull, csvText, csvNumber.
 
     Bound ones read the generated data (window.HG and window.HG_SIM in the browser). They come
     from makeLogic(data), so a test can hand in a small made-up data object instead:
@@ -40,6 +40,12 @@
   /* A web address is used as a link only if it is a string starting with https:// or http://.
      Anything else (javascript:, data:, a relative path, not a string) gives null: show no link. */
   const safeUrl = (url) => (typeof url === "string" && /^https?:\/\//.test(url) ? url : null);
+  /* The part of a link after "#", decoded. A malformed percent sequence (say "%E0%A4%A" or a
+     lone "%") makes the browser's decoder throw; then the text is returned as it came. */
+  const safeDecode = (text) => {
+    const raw = String(text == null ? "" : text);
+    try { return decodeURIComponent(raw); } catch (error) { return raw; }
+  };
   /* A value used as a CSS class must be one of the names we know. Anything else gives "". */
   const cssClass = (value, allowed) => (typeof value === "string" && allowed.indexOf(value) >= 0 ? value : "");
   const TIER_CLASSES = ["Low", "Watch", "Warning"];                 // .chip.Low, .chip.Watch, .chip.Warning in css/site.css
@@ -297,6 +303,6 @@
     return { actionFor, tierFor, planFor, canalNumbers, USD_PER_AF, scopeP, simScope, replayScope, hitRates };
   }
 
-  return { usd, num, pct, niceDate, esc, safeUrl, cssClass, TIER_CLASSES, SEVERITY_CLASSES, finiteOrNull, percentOrNull, csvText, csvNumber,
+  return { usd, num, pct, niceDate, esc, safeUrl, safeDecode, cssClass, TIER_CLASSES, SEVERITY_CLASSES, finiteOrNull, percentOrNull, csvText, csvNumber,
            workTime, gal, money, usesElephantButte, REPLAY_POLICIES, replay, replaySentence, makeLogic };
 });
