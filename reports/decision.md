@@ -171,3 +171,18 @@ Version 1 and its baseline list are unchanged and remain the reported system. Sc
 **Physical model, declared at the same time.** Seepage is recomputed from soil-survey permeability, with one factor fitted to the 1998 district loss figures. It is tested by leaving each district out in turn, against two rivals (canal length alone, and the old texture table), each with its own fitted factor. It passes only if a bootstrap over districts of (rival error minus model error) excludes zero. The model is not adjusted after that result is seen.
 
 **What was already known when this was written.** On the machine used for this round (macOS, Python 3.13, the pinned library versions) the unchanged version 1 code gives a 4-week cost of 1912, a 6-month cost of 2324 and a 12-month error of 14.0 weeks. The committed `reports/metrics.json`, produced by the GitHub runner, has 2328 for the 6-month cost. Same code and same data, so the 4-point difference comes from the machine. No round-3 item had been run.
+
+## Physical model: choices fixed on Nov 15, 2026 after the soil download and before any calibration or held-out test was run
+
+The soil download showed two things, written here before the model is fitted or tested so that neither can be adjusted afterwards.
+
+**What was seen.** Permeability exists for 11,710 of 12,171 canal segments. Its spread across soil textures is about 1,400 times (clay to sand), against about 7 times in the 1946 texture table, and the two orderings agree with a rank correlation of 0.70 across texture classes. A water-table depth is recorded for 3,924 segments (0 to 168 cm) and is missing for 8,247.
+
+**What is fixed now.**
+- Primary model (M1): seepage = permeability x 2.1205 x water-table factor x one fitted factor, as specified in ARCHITECTURE.md sections 4.1 and 4.3. A missing water-table depth is read as "no water table found in the surveyed profile" and gets a factor of 1. That reading is our assumption.
+- Sensitivity model (M2): the same without the water-table factor. It is reported beside M1 whichever does better; it does not replace M1.
+- Rivals, each with its own single fitted factor inside the same leave-one-district-out loop: canal length alone, and the 1946 texture table.
+- Canal width by class and the lined share are assumptions with ranges (section 4.2). They are not fitted.
+- The test, its metric (median absolute percent error on the held-out district, and rank correlation) and its pass rule (a bootstrap over districts of rival error minus model error must exclude zero) are those already declared above. With 18 districts the interval will be wide.
+- Known weakness, stated before the result: one fitted factor can move the level of modelled seepage but not its spread, so canals on sand will dominate any ranking built on M1 or M2. If the held-out test does not pass, the site keeps the ranking order only as an illustration and says the volumes are not reliable.
+- Nothing here is changed after the held-out result is seen.
