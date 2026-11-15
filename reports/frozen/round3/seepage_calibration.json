@@ -1,0 +1,758 @@
+{
+  "added": true,
+  "declared_in": "reports/decision.md, sections \"Evaluation round 3\" (physical model, declared at the same time), \"Physical model: choices fixed on Nov 15, 2026 after the soil download and before any calibration or held-out test was run\", and its paragraph \"Canal classes, fixed on Nov 15, 2026 before any fit\"",
+  "computed_at": "2026-11-15T09:56:43-08:00",
+  "git_commit": "571e6689f3d6934fd20c8ad298fe18f35d9d60d0",
+  "git_dirty_source": false,
+  "git_dirty_source_paths": [],
+  "git_dirty_source_means": "a file under src/ or a Python file in app/ differed from git_commit",
+  "frozen_v1_manifest_sha256": "f353768186ac5af41c19a0be285fa209498745e3ae8369e8f434e90042689221",
+  "manifest_sha256_now": "f353768186ac5af41c19a0be285fa209498745e3ae8369e8f434e90042689221",
+  "canal_ksat_csv_sha256": "6c95eedc4e4c1bf562eef9a3f6085c79b1c8896332a486d6e3e66715a5456925",
+  "district_crosswalk_csv_sha256": "49030969483e1a0b5ea4aacaff6c96736b70e70a596b498258d77cc8dd4b111d",
+  "draws": 10000,
+  "seed": 0,
+  "what": "One factor per model fitted to the districts' 1998 loss estimates, and a leave-one-district-out test of the permeability model against canal length alone and the 1946 texture table. Every volume is MODELLED, not measured.",
+  "target": "Loss = authorised water x (1 - efficiency / 100) from app/reference/districts.csv: 1998 estimates on water rights, not measured diversions; the loss includes evaporation and spills.",
+  "assumptions": {
+    "width_ft_by_class_low_middle_high": {
+      "main": [
+        20,
+        30,
+        40
+      ],
+      "lateral": [
+        8,
+        14,
+        20
+      ],
+      "ditch": [
+        3,
+        5.5,
+        8
+      ],
+      "unknown": [
+        8,
+        20,
+        40
+      ]
+    },
+    "width_used": "the middle of the class range",
+    "lined_share": 0.3,
+    "lined_share_note": "the same constant for every district, so it only shifts the fitted factor",
+    "season_days": 273,
+    "gradient": "hydraulic gradient of 1 and no silt layer on the canal bed",
+    "missing_water_table": "read as no water table found in the surveyed profile: factor 1"
+  },
+  "crosswalk": [
+    {
+      "district": "Adams Garden",
+      "map_district": "",
+      "match": "none"
+    },
+    {
+      "district": "Bayview",
+      "map_district": "Bayview Irrigation District 11",
+      "match": "normalised"
+    },
+    {
+      "district": "Brownsville",
+      "map_district": "Brownsville Irrigation District",
+      "match": "normalised"
+    },
+    {
+      "district": "CCID#2 (San Benito)",
+      "map_district": "Cameron County Irrigation District 2",
+      "match": "normalised"
+    },
+    {
+      "district": "CCID#6 (Los Fresnos)",
+      "map_district": "Cameron County Irrigation District 6",
+      "match": "normalised"
+    },
+    {
+      "district": "Delta Lake",
+      "map_district": "Delta Lake Irrigation District",
+      "match": "normalised"
+    },
+    {
+      "district": "Donna",
+      "map_district": "Donna Irrigation District Hidalgo County 1",
+      "match": "normalised"
+    },
+    {
+      "district": "Harlingen",
+      "map_district": "Harlingen Irrigation District-Cameron County-1",
+      "match": "normalised"
+    },
+    {
+      "district": "HCID#1 (Edinburg)",
+      "map_district": "Hidalgo County Irrigation District 1",
+      "match": "normalised"
+    },
+    {
+      "district": "HCID#2 (San Juan)",
+      "map_district": "Hidalgo County Irrigation District 2",
+      "match": "normalised"
+    },
+    {
+      "district": "HCMUD",
+      "map_district": "",
+      "match": "none"
+    },
+    {
+      "district": "HCWID#3 (McAllen)",
+      "map_district": "",
+      "match": "none"
+    },
+    {
+      "district": "HCID#5 (Progreso)",
+      "map_district": "Hidalgo County Irrigation District 5",
+      "match": "normalised"
+    },
+    {
+      "district": "HCCID#9 (Mercedes)",
+      "map_district": "Hidalgo & Cameron Counties Irrigation District 9",
+      "match": "normalised"
+    },
+    {
+      "district": "HCID#16 (Mission)",
+      "map_district": "Hidalgo County Irrigation District 16",
+      "match": "normalised"
+    },
+    {
+      "district": "HCWCID#18",
+      "map_district": "Hidalgo County WCID 18",
+      "match": "normalised"
+    },
+    {
+      "district": "La Feria",
+      "map_district": "La Feria Irrigation District Cameron County 3",
+      "match": "normalised"
+    },
+    {
+      "district": "Santa Cruz",
+      "map_district": "Santa Cruz Irrigation District 15",
+      "match": "normalised"
+    },
+    {
+      "district": "Santa Maria",
+      "map_district": "",
+      "match": "none"
+    }
+  ],
+  "districts_without_a_loss": [
+    "HCWCID#18"
+  ],
+  "districts_unmatched": [
+    "Adams Garden",
+    "HCMUD",
+    "HCWID#3 (McAllen)",
+    "Santa Maria"
+  ],
+  "districts_matched_but_with_no_segment_in_the_set": [],
+  "segment_set": "fundable segments inside a matched district that have a permeability AND a 1946 texture rate; the same segments for all four models",
+  "segments_by_district": [
+    {
+      "district": "Bayview",
+      "segments": 140,
+      "km": 84.0415577,
+      "kept_segments": 84,
+      "kept_km": 55.20365949,
+      "dropped_not_fundable": 1,
+      "dropped_no_permeability": 13,
+      "dropped_no_texture_rate": 42,
+      "dropped_segments": 56,
+      "dropped_km": 28.83789821
+    },
+    {
+      "district": "Brownsville",
+      "segments": 317,
+      "km": 155.55487844,
+      "kept_segments": 229,
+      "kept_km": 111.12630556,
+      "dropped_not_fundable": 4,
+      "dropped_no_permeability": 1,
+      "dropped_no_texture_rate": 83,
+      "dropped_segments": 88,
+      "dropped_km": 44.428572880000004
+    },
+    {
+      "district": "CCID#2 (San Benito)",
+      "segments": 750,
+      "km": 760.1466332900001,
+      "kept_segments": 639,
+      "kept_km": 672.08161887,
+      "dropped_not_fundable": 9,
+      "dropped_no_permeability": 31,
+      "dropped_no_texture_rate": 71,
+      "dropped_segments": 111,
+      "dropped_km": 88.06501442000001
+    },
+    {
+      "district": "CCID#6 (Los Fresnos)",
+      "segments": 388,
+      "km": 303.18824038,
+      "kept_segments": 298,
+      "kept_km": 227.77528867,
+      "dropped_not_fundable": 7,
+      "dropped_no_permeability": 17,
+      "dropped_no_texture_rate": 66,
+      "dropped_segments": 90,
+      "dropped_km": 75.41295171000002
+    },
+    {
+      "district": "Delta Lake",
+      "segments": 632,
+      "km": 628.19980485,
+      "kept_segments": 610,
+      "kept_km": 613.46391358,
+      "dropped_not_fundable": 20,
+      "dropped_no_permeability": 2,
+      "dropped_no_texture_rate": 0,
+      "dropped_segments": 22,
+      "dropped_km": 14.735891269999911
+    },
+    {
+      "district": "Donna",
+      "segments": 280,
+      "km": 286.15670975,
+      "kept_segments": 230,
+      "kept_km": 259.17788386,
+      "dropped_not_fundable": 3,
+      "dropped_no_permeability": 42,
+      "dropped_no_texture_rate": 5,
+      "dropped_segments": 50,
+      "dropped_km": 26.978825889999996
+    },
+    {
+      "district": "HCCID#9 (Mercedes)",
+      "segments": 637,
+      "km": 594.54537662,
+      "kept_segments": 588,
+      "kept_km": 552.29104516,
+      "dropped_not_fundable": 8,
+      "dropped_no_permeability": 28,
+      "dropped_no_texture_rate": 13,
+      "dropped_segments": 49,
+      "dropped_km": 42.25433146
+    },
+    {
+      "district": "HCID#1 (Edinburg)",
+      "segments": 173,
+      "km": 157.65166007,
+      "kept_segments": 150,
+      "kept_km": 150.63869294,
+      "dropped_not_fundable": 12,
+      "dropped_no_permeability": 7,
+      "dropped_no_texture_rate": 4,
+      "dropped_segments": 23,
+      "dropped_km": 7.012967129999993
+    },
+    {
+      "district": "HCID#16 (Mission)",
+      "segments": 23,
+      "km": 33.112,
+      "kept_segments": 23,
+      "kept_km": 33.112,
+      "dropped_not_fundable": 0,
+      "dropped_no_permeability": 0,
+      "dropped_no_texture_rate": 0,
+      "dropped_segments": 0,
+      "dropped_km": 0.0
+    },
+    {
+      "district": "HCID#2 (San Juan)",
+      "segments": 311,
+      "km": 332.98256162,
+      "kept_segments": 225,
+      "kept_km": 256.95369347,
+      "dropped_not_fundable": 29,
+      "dropped_no_permeability": 19,
+      "dropped_no_texture_rate": 38,
+      "dropped_segments": 86,
+      "dropped_km": 76.02886815
+    },
+    {
+      "district": "HCID#5 (Progreso)",
+      "segments": 47,
+      "km": 43.42222604,
+      "kept_segments": 35,
+      "kept_km": 32.79603556,
+      "dropped_not_fundable": 0,
+      "dropped_no_permeability": 8,
+      "dropped_no_texture_rate": 4,
+      "dropped_segments": 12,
+      "dropped_km": 10.626190479999998
+    },
+    {
+      "district": "HCWCID#18",
+      "segments": 6,
+      "km": 5.84782828,
+      "kept_segments": 4,
+      "kept_km": 5.018,
+      "dropped_not_fundable": 1,
+      "dropped_no_permeability": 0,
+      "dropped_no_texture_rate": 1,
+      "dropped_segments": 2,
+      "dropped_km": 0.8298282800000001
+    },
+    {
+      "district": "Harlingen",
+      "segments": 236,
+      "km": 228.61786396,
+      "kept_segments": 215,
+      "kept_km": 214.75744093,
+      "dropped_not_fundable": 9,
+      "dropped_no_permeability": 8,
+      "dropped_no_texture_rate": 4,
+      "dropped_segments": 21,
+      "dropped_km": 13.860423029999993
+    },
+    {
+      "district": "La Feria",
+      "segments": 163,
+      "km": 211.2497516,
+      "kept_segments": 148,
+      "kept_km": 201.5685757,
+      "dropped_not_fundable": 7,
+      "dropped_no_permeability": 0,
+      "dropped_no_texture_rate": 8,
+      "dropped_segments": 15,
+      "dropped_km": 9.6811759
+    },
+    {
+      "district": "Santa Cruz",
+      "segments": 61,
+      "km": 105.79526535,
+      "kept_segments": 56,
+      "kept_km": 102.43298252,
+      "dropped_not_fundable": 3,
+      "dropped_no_permeability": 2,
+      "dropped_no_texture_rate": 0,
+      "dropped_segments": 5,
+      "dropped_km": 3.362282829999998
+    }
+  ],
+  "segments_kept": 3534,
+  "km_kept": 3488.39713631,
+  "class_counts_in_the_set": {
+    "unknown": 3421,
+    "ditch": 78,
+    "main": 25,
+    "lateral": 10
+  },
+  "feature_code_33601_in_the_set": 0,
+  "raw_af_by_district": [
+    {
+      "district": "Bayview",
+      "M1": 14285.118593441588,
+      "M2": 15054.192452583282,
+      "texture": 5093.990727442165,
+      "length": 2124.342531392808,
+      "loss_af": 2696.7000000000003,
+      "authorized_af": 17978.0
+    },
+    {
+      "district": "Brownsville",
+      "M1": 29774.295913631482,
+      "M2": 38046.512941948655,
+      "texture": 9951.399014198472,
+      "length": 4124.329276034206,
+      "loss_af": 3487.599999999999,
+      "authorized_af": 34876.0
+    },
+    {
+      "district": "CCID#2 (San Benito)",
+      "M1": 144954.6591345715,
+      "M2": 222629.57566859273,
+      "texture": 55320.500539343266,
+      "length": 25810.25798789375,
+      "loss_af": 91164.59999999999,
+      "authorized_af": 151941.0
+    },
+    {
+      "district": "CCID#6 (Los Fresnos)",
+      "M1": 88573.60973360277,
+      "M2": 104148.12752899787,
+      "texture": 25560.77065637577,
+      "length": 8669.128647069332,
+      "loss_af": 20856.800000000003,
+      "authorized_af": 52142.0
+    },
+    {
+      "district": "Delta Lake",
+      "M1": 241382.899280603,
+      "M2": 326717.0779941678,
+      "texture": 46438.49334520062,
+      "length": 23415.212614267377,
+      "loss_af": 43694.0,
+      "authorized_af": 174776.0
+    },
+    {
+      "district": "Donna",
+      "M1": 139991.52667742604,
+      "M2": 141135.40451037086,
+      "texture": 26893.571228263892,
+      "length": 9900.790976605143,
+      "loss_af": 39506.46000000001,
+      "authorized_af": 94063.0
+    },
+    {
+      "district": "HCCID#9 (Mercedes)",
+      "M1": 245371.71593915243,
+      "M2": 265122.95769252843,
+      "texture": 55047.50115852893,
+      "length": 21118.211906905086,
+      "loss_af": 44287.75,
+      "authorized_af": 177151.0
+    },
+    {
+      "district": "HCID#1 (Edinburg)",
+      "M1": 104155.76109135986,
+      "M2": 104155.76109135986,
+      "texture": 16338.148588367085,
+      "length": 5764.250990273341,
+      "loss_af": 17122.999999999996,
+      "authorized_af": 85615.0
+    },
+    {
+      "district": "HCID#16 (Mission)",
+      "M1": 29455.80353907941,
+      "M2": 29455.80353907941,
+      "texture": 3655.42096327738,
+      "length": 1274.2131690059566,
+      "loss_af": 4612.35,
+      "authorized_af": 30749.0
+    },
+    {
+      "district": "HCID#2 (San Juan)",
+      "M1": 61686.67737187733,
+      "M2": 61914.838875969865,
+      "texture": 20685.25842020005,
+      "length": 9921.100676737706,
+      "loss_af": 33965.25,
+      "authorized_af": 147675.0
+    },
+    {
+      "district": "HCID#5 (Progreso)",
+      "M1": 6284.4546880300395,
+      "M2": 9305.648068569764,
+      "texture": 2708.626871036485,
+      "length": 1230.4163458818978,
+      "loss_af": 1138.7199999999993,
+      "authorized_af": 14234.0
+    },
+    {
+      "district": "Harlingen",
+      "M1": 42272.54052554941,
+      "M2": 61207.31875635916,
+      "texture": 14862.298409668192,
+      "length": 8450.479418438206,
+      "loss_af": 14734.950000000003,
+      "authorized_af": 98233.0
+    },
+    {
+      "district": "La Feria",
+      "M1": 91324.70135285685,
+      "M2": 104408.61683959323,
+      "texture": 17362.280786989035,
+      "length": 7850.505979735355,
+      "loss_af": 18906.5,
+      "authorized_af": 75626.0
+    },
+    {
+      "district": "Santa Cruz",
+      "M1": 73000.75398284996,
+      "M2": 76981.4096933277,
+      "texture": 10275.444570961688,
+      "length": 4076.9648376715686,
+      "loss_af": 20502.0,
+      "authorized_af": 82008.0
+    }
+  ],
+  "fit_all_districts": {
+    "M1": {
+      "c": 0.23505353169871937,
+      "sd": 0.4772838553263248,
+      "n": 14,
+      "excluded": []
+    },
+    "M2": {
+      "c": 0.20043842590372274,
+      "sd": 0.47439659913112814,
+      "n": 14,
+      "excluded": []
+    },
+    "texture": {
+      "c": 0.9576359805687336,
+      "sd": 0.5192474951130551,
+      "n": 14,
+      "excluded": []
+    },
+    "length": {
+      "c": 2.279829425606189,
+      "sd": 0.5437757108575186,
+      "n": 14,
+      "excluded": []
+    }
+  },
+  "held_out": {
+    "districts": [
+      "Bayview",
+      "Brownsville",
+      "CCID#2 (San Benito)",
+      "CCID#6 (Los Fresnos)",
+      "Delta Lake",
+      "Donna",
+      "HCCID#9 (Mercedes)",
+      "HCID#1 (Edinburg)",
+      "HCID#16 (Mission)",
+      "HCID#2 (San Juan)",
+      "HCID#5 (Progreso)",
+      "Harlingen",
+      "La Feria",
+      "Santa Cruz"
+    ],
+    "n_districts": 14,
+    "models": {
+      "M1": {
+        "predicted_af": {
+          "Bayview": 3414.87721075138,
+          "Brownsville": 7383.734930683327,
+          "CCID#2 (San Benito)": 31587.840692496608,
+          "CCID#6 (Los Fresnos)": 20816.676371292237,
+          "Delta Lake": 57889.56909036862,
+          "Donna": 32445.97806279874,
+          "HCCID#9 (Mercedes)": 58859.280288159476,
+          "HCID#1 (Edinburg)": 25164.826518233687,
+          "HCID#16 (Mission)": 7143.451012491329,
+          "HCID#2 (San Juan)": 13580.679293247498,
+          "HCID#5 (Progreso)": 1507.051274924629,
+          "Harlingen": 9639.66144026936,
+          "La Feria": 21676.885329932535,
+          "Santa Cruz": 16925.74567934128
+        },
+        "abs_pct_error": {
+          "Bayview": 0.26631705816419315,
+          "Brownsville": 1.1171392736217824,
+          "CCID#2 (San Benito)": 0.6535076039109851,
+          "CCID#6 (Los Fresnos)": 0.001923767246546274,
+          "Delta Lake": 0.3248860047230425,
+          "Donna": 0.1787171499851231,
+          "HCCID#9 (Mercedes)": 0.32901943061364547,
+          "HCID#1 (Edinburg)": 0.4696505587942354,
+          "HCID#16 (Mission)": 0.5487660330398447,
+          "HCID#2 (San Juan)": 0.6001595956677045,
+          "HCID#5 (Progreso)": 0.32346079363199903,
+          "Harlingen": 0.3457961214480295,
+          "La Feria": 0.14653084018366883,
+          "Santa Cruz": 0.1744344122845928
+        },
+        "median_abs_pct_error": 0.326952717668344,
+        "rank_correlation": 0.8857142857142857
+      },
+      "M2": {
+        "predicted_af": {
+          "Bayview": 3043.636197358905,
+          "Brownsville": 8099.009948876884,
+          "CCID#2 (San Benito)": 42237.43188410632,
+          "CCID#6 (Los Fresnos)": 20876.70947839108,
+          "Delta Lake": 67557.03648245356,
+          "Donna": 27571.42255408345,
+          "HCCID#9 (Mercedes)": 53891.016272147506,
+          "HCID#1 (Edinburg)": 21197.573946383185,
+          "HCID#16 (Mission)": 6017.280944096058,
+          "HCID#2 (San Juan)": 11485.249030866948,
+          "HCID#5 (Progreso)": 1937.3721063755784,
+          "Harlingen": 12096.619101330341,
+          "La Feria": 21091.628319648204,
+          "Santa Cruz": 15096.36108335467
+        },
+        "abs_pct_error": {
+          "Bayview": 0.12865212940219703,
+          "Brownsville": 1.3222301722895073,
+          "CCID#2 (San Benito)": 0.5366904271602538,
+          "CCID#6 (Los Fresnos)": 0.0009545797241703829,
+          "Delta Lake": 0.5461398929476259,
+          "Donna": 0.3021034394353874,
+          "HCCID#9 (Mercedes)": 0.2168379805284194,
+          "HCID#1 (Edinburg)": 0.23795911618193014,
+          "HCID#16 (Mission)": 0.30460198035623004,
+          "HCID#2 (San Juan)": 0.6618529517413548,
+          "HCID#5 (Progreso)": 0.7013595145211988,
+          "Harlingen": 0.17905258576850688,
+          "La Feria": 0.11557550681766607,
+          "Santa Cruz": 0.26366397993587604
+        },
+        "median_abs_pct_error": 0.2828837096856317,
+        "rank_correlation": 0.8725274725274725
+      },
+      "texture": {
+        "predicted_af": {
+          "Bayview": 5105.762425424125,
+          "Brownsville": 10295.9393181664,
+          "CCID#2 (San Benito)": 50810.41416716115,
+          "CCID#6 (Los Fresnos)": 24781.21571705538,
+          "Delta Lake": 44531.524037677766,
+          "Donna": 24920.40799200949,
+          "HCCID#9 (Mercedes)": 53426.612323550915,
+          "HCID#1 (Edinburg)": 15537.80672878752,
+          "HCID#16 (Mission)": 3427.075470273942,
+          "HCID#2 (San Juan)": 19004.13324849757,
+          "HCID#5 (Progreso)": 2763.4534432198825,
+          "Harlingen": 14194.751653942398,
+          "La Feria": 16463.21395368445,
+          "Santa Cruz": 9299.901996229823
+        },
+        "abs_pct_error": {
+          "Bayview": 0.8933371993266304,
+          "Brownsville": 1.9521560150723716,
+          "CCID#2 (San Benito)": 0.4426519266561675,
+          "CCID#6 (Los Fresnos)": 0.18816001098228763,
+          "Delta Lake": 0.019167941540663834,
+          "Donna": 0.3692067577806393,
+          "HCCID#9 (Mercedes)": 0.2063519217741004,
+          "HCID#1 (Edinburg)": 0.09257684232975977,
+          "HCID#16 (Mission)": 0.256978444768081,
+          "HCID#2 (San Juan)": 0.440483045215402,
+          "HCID#5 (Progreso)": 1.4268068034458727,
+          "Harlingen": 0.03666102335315727,
+          "La Feria": 0.12922994982231234,
+          "Santa Cruz": 0.5463904986718455
+        },
+        "median_abs_pct_error": 0.31309260127436017,
+        "rank_correlation": 0.9296703296703297
+      },
+      "length": {
+        "predicted_af": {
+          "Bayview": 5066.266091655998,
+          "Brownsville": 10148.192273634293,
+          "CCID#2 (San Benito)": 56894.357585062025,
+          "CCID#6 (Los Fresnos)": 19682.4936470867,
+          "Delta Lake": 54211.462814968385,
+          "Donna": 21620.840073389667,
+          "HCCID#9 (Mercedes)": 48456.266655438325,
+          "HCID#1 (Edinburg)": 12876.686225035553,
+          "HCID#16 (Mission)": 2803.4963624262077,
+          "HCID#2 (San Juan)": 21921.976281556726,
+          "HCID#5 (Progreso)": 3006.5796657708306,
+          "Harlingen": 19667.09630346045,
+          "La Feria": 17822.489917390263,
+          "Santa Cruz": 8746.048193180603
+        },
+        "abs_pct_error": {
+          "Bayview": 0.8786910266829819,
+          "Brownsville": 1.9097924858453654,
+          "CCID#2 (San Benito)": 0.37591611672664577,
+          "CCID#6 (Los Fresnos)": 0.056303284919704995,
+          "Delta Lake": 0.2407072553432596,
+          "Donna": 0.4527264636368416,
+          "HCCID#9 (Mercedes)": 0.09412346880205756,
+          "HCID#1 (Edinburg)": 0.2479888906712868,
+          "HCID#16 (Mission)": 0.3921761439556392,
+          "HCID#2 (San Juan)": 0.35457633076286127,
+          "HCID#5 (Progreso)": 1.6403151483866378,
+          "Harlingen": 0.33472433251965206,
+          "La Feria": 0.05733531233225276,
+          "Santa Cruz": 0.5734051217841868
+        },
+        "median_abs_pct_error": 0.3652462237447535,
+        "rank_correlation": 0.9032967032967033
+      }
+    },
+    "gaps": {
+      "length_minus_M1": {
+        "gap": 0.03829350607640952,
+        "lo": -0.16471990269870224,
+        "hi": 0.27851619588609067,
+        "passes": false,
+        "n_districts": 14,
+        "draws": 10000,
+        "seed": 0
+      },
+      "texture_minus_M1": {
+        "gap": -0.013860116393983823,
+        "lo": -0.2379853755231447,
+        "hi": 0.2515015727737494,
+        "passes": false,
+        "n_districts": 14,
+        "draws": 10000,
+        "seed": 0
+      },
+      "length_minus_M2": {
+        "gap": 0.08236251405912182,
+        "lo": -0.1868388292910786,
+        "hi": 0.2905214120985551,
+        "passes": false,
+        "n_districts": 14,
+        "draws": 10000,
+        "seed": 0
+      },
+      "texture_minus_M2": {
+        "gap": 0.03020889158872847,
+        "lo": -0.21429428198414152,
+        "hi": 0.2635067889862138,
+        "passes": false,
+        "n_districts": 14,
+        "draws": 10000,
+        "seed": 0
+      }
+    },
+    "pass_test": "length_minus_M1",
+    "m1_median_error_interval": [
+      0.22037573522439297,
+      0.5092082959170401
+    ]
+  },
+  "passes": false,
+  "sentence": "The model did not predict held-out district losses better than canal length. Volumes are not reliable; only the ranking order is shown.",
+  "description_only": {
+    "note": "Calibrated M1 seepage (c x raw, fitted on all districts) as a share of authorised water. A description for the chart in ARCHITECTURE.md section 4.5, not a test.",
+    "share_of_authorised_water": {
+      "Bayview": 0.18677091868525353,
+      "Brownsville": 0.20066961258005012,
+      "CCID#2 (San Benito)": 0.2242456253793582,
+      "CCID#6 (Los Fresnos)": 0.39928540875277896,
+      "Delta Lake": 0.32463211749657844,
+      "Donna": 0.34982408336353804,
+      "HCCID#9 (Mercedes)": 0.3255724687440248,
+      "HCID#1 (Edinburg)": 0.28595666053018975,
+      "HCID#16 (Mission)": 0.22516799410986543,
+      "HCID#2 (San Juan)": 0.0981863644829473,
+      "HCID#5 (Progreso)": 0.10377850704103093,
+      "Harlingen": 0.10115042749796532,
+      "La Feria": 0.2838467403316296,
+      "Santa Cruz": 0.2092367212996078
+    },
+    "calibrated_af": {
+      "Bayview": 3357.7675761234877,
+      "Brownsville": 6998.553408341828,
+      "CCID#2 (San Benito)": 34072.10456576506,
+      "CCID#6 (Los Fresnos)": 20819.5397831874,
+      "Delta Lake": 56737.902967582,
+      "Donna": 32905.50275342448,
+      "HCCID#9 (Mercedes)": 57675.48841047273,
+      "HCID#1 (Edinburg)": 24482.179491292198,
+      "HCID#16 (Mission)": 6923.690650884252,
+      "HCID#2 (San Juan)": 14499.671375019243,
+      "HCID#5 (Progreso)": 1477.1832692220344,
+      "Harlingen": 9936.309944407627,
+      "La Feria": 21466.19358431982,
+      "Santa Cruz": 17159.085040338236
+    },
+    "districts_above_their_own_loss": [
+      "Bayview",
+      "Brownsville",
+      "Delta Lake",
+      "HCCID#9 (Mercedes)",
+      "HCID#1 (Edinburg)",
+      "HCID#16 (Mission)",
+      "HCID#5 (Progreso)",
+      "La Feria"
+    ],
+    "sum_calibrated_af": 308511.1728203804,
+    "sum_loss_af": 356676.68,
+    "sum_note": "The factor matches the losses on average in log terms, so these two sums need not be equal."
+  }
+}
