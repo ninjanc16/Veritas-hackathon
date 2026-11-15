@@ -241,3 +241,14 @@ A cheap version of the model comparison in ARCHITECTURE.md section 3.6. No GRU. 
 - **"The water-table factor made the model worse."** That heading, in the section on the seepage test, claims more than was shown. Read it as: M1, which has the water-table factor, had the higher held-out error than M2, which does not (32.7% against 28.3%), and the difference was not tested. It is not evidence that the factor hurts.
 - **The budget ranking against rule B.** The interval on the k-average (+0.020, from 0.001 to 0.046) clears zero because the forecast was ahead in 4 of the 18 years, behind in none, and level in the other 14. So the result rests on four years. That is thin, and it is stated here so that the interval is not read as more than it is.
 - **"Left unmatched by the no-guess rule before the run."** This was said of the district "Adams Garden". Git cannot show it. The commit that added the calibration code and the commit that added its result and the name crosswalk were made 17 seconds apart (09:56:41 and 09:56:58), and the crosswalk file first appears in the second. The order of events is the coder's account, not something the history proves. What the history does show is that the matching rule in the code never changed after that first commit.
+
+## Gradient boosting: what the result looks like inside, and what it does not show (written Nov 15, 2026)
+
+The figures in this section are the checker's, computed after the result was known. They are descriptive only, were not declared in advance, and are not in the frozen file. They were not recomputed by the coder, and nothing was tuned or rerun.
+
+- The default model fitted its training rows almost exactly in the early folds.
+- 60% of its forecasts were below 0.05 or above 0.95, against 14% for the forest. It was far more sure of itself than the forest.
+- At the 0.25 warning line it missed 848 drought seasons, against 431 for the forest.
+- Its ranking skill was only a little lower: an AUC of 0.837 against 0.868.
+
+This is one untuned model at one fixed warning line. It does not show that boosting cannot work here.
