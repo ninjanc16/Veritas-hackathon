@@ -1,5 +1,10 @@
-# Checks on every push and pull request: the two Python test folders, the simulation tests,
-# and a banned-word gate. First version; the other gates in ARCHITECTURE.md section 5.3 come later.
+# Checks on every push and pull request: the two Python test folders, the simulation and site
+# logic tests, a banned-word gate, a frozen gate and a size gate (ARCHITECTURE.md section 5.3).
+#
+# Left out on purpose: the reproduction job, which would retrain the models on the runner and
+# compare with the frozen numbers. Random forests are not identical across computers (see
+# "machine_note" in reports/frozen/v1/metrics.json), so that comparison needs a tolerance that
+# nobody has set yet.
 name: CI
 
 on:
@@ -44,3 +49,27 @@ jobs:
             echo "Banned word found (see the lines above)."
             exit 1
           fi
+
+  frozen-gate:
+    # Scored results and the inputs they were scored on must not change. Needs no libraries.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Raw inputs match data/manifest.json
+        run: PYTHONPATH=src python -m farmdrought.manifest
+      - name: Frozen results match reports/frozen.sha256
+        run: PYTHONPATH=src python -m farmdrought.manifest frozen
+
+  size-gate:
+    # Prints the website's file sizes and fails if one grew past its limit (tools/site_size.py).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Website files are within their size limits
+        run: python tools/site_size.py

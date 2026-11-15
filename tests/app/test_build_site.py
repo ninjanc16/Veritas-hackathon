@@ -124,3 +124,22 @@ def test_deployment_files_route_the_live_reading_and_keep_the_site_deployable():
     assert all(line.startswith("/") for line in ignored)                  # root folders only
     assert not {"/app", "/api", "/vercel.json"} & set(ignored)
     assert not any(line.startswith("/app") or line.startswith("/api") for line in ignored)
+
+
+def test_site_size_gate_passes_today_and_names_a_file_that_grew():
+    # Arrange: load tools/site_size.py (it is a script, not a package)
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("site_size", REPO_ROOT / "tools" / "site_size.py")
+    gate = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(gate)
+
+    # Act
+    today = gate.tracked_sizes()
+    grown = {**today, "app/site/data/core.js": int(3.3 * gate.MB), "app/site/photos/new.jpg": int(1.2 * gate.MB)}
+
+    # Assert: today's files are within their limits; a core.js of 3.3 MB and a 1.2 MB photo are not
+    assert "app/site/data/core.js" in today and gate.problems(today) == []
+    found = gate.problems(grown)
+    assert len(found) == 2 and "core.js is 3.30 MB, over its limit of 3.2 MB" in found[0]
+    assert "new.jpg is 1.20 MB, over its limit of 1.0 MB" in found[1]
+    assert any("in all" in line for line in gate.problems({"app/site/a.bin": 0.9 * gate.MB} | {f"app/site/{i}": 0.9 * gate.MB for i in range(60)}))

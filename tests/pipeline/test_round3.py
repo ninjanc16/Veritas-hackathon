@@ -20,7 +20,8 @@ from farmdrought.config import (ALERT_WEEKS, COUNTY_RESERVOIR, FROZEN, METRICS, 
                                 SEASON_WEEKS, YEAR_WEEKS)
 from farmdrought.drought import build_panel, load_usdm
 from farmdrought.leaks import bed_layer, seepage_rate, water_table_factor
-from farmdrought.manifest import build_manifest, check_manifest, guard_scored_writer, sha256_of
+from farmdrought.manifest import (add_new_frozen_files, build_manifest, check_frozen, check_manifest, guard_scored_writer,
+                                  sha256_of)
 from farmdrought.prob_calibration import (brier, calibrate_by_past, calibration_coverage, class_frequency_by_past,
                                           reliability)
 from farmdrought.trigger import run_trigger, run_trigger_annual
@@ -1876,3 +1877,37 @@ def test_crosswalk_refuses_a_name_that_fits_two_map_districts():
     # Assert: the ambiguous one is left unmatched, not given the first candidate
     assert crosswalk.loc["Donna"].tolist() == ["", "none"]
     assert crosswalk.loc["Delta Lake"].tolist() == ["Delta Lake Irrigation District", "normalised"]
+
+
+# ---------------------------------------------------------------------------------------------
+# The frozen gate: scored files under reports/frozen are never rewritten
+# ---------------------------------------------------------------------------------------------
+def test_every_frozen_result_is_listed_and_unchanged():
+    assert check_frozen() == []
+
+
+def test_frozen_gate_names_a_changed_a_missing_and_an_unlisted_file(tmp_path):
+    # Arrange: two result files, listed
+    folder = tmp_path / "reports" / "frozen" / "round3"
+    folder.mkdir(parents=True)
+    (folder / "one.json").write_text('{"cost": 2324}')
+    (folder / "two.json").write_text('{"cost": 1912}')
+    added = add_new_frozen_files(tmp_path)
+    clean = check_frozen(tmp_path)
+    listed_before = (tmp_path / "reports" / "frozen.sha256").read_text()
+
+    # Act: one result is edited, one is deleted, a new one appears
+    (folder / "one.json").write_text('{"cost": 2000}')
+    (folder / "two.json").unlink()
+    (folder / "three.json").write_text("{}")
+    problems = check_frozen(tmp_path)
+    added_later = add_new_frozen_files(tmp_path)
+
+    # Assert
+    assert added == ["reports/frozen/round3/one.json", "reports/frozen/round3/two.json"] and clean == []
+    assert problems == ["reports/frozen/round3/one.json (changed)", "reports/frozen/round3/three.json (not listed)",
+                        "reports/frozen/round3/two.json (missing)"]
+    # listing the new file only appends: the edited file's recorded hash is NOT updated, so it stays a problem
+    assert added_later == ["reports/frozen/round3/three.json"]
+    assert (tmp_path / "reports" / "frozen.sha256").read_text().startswith(listed_before)
+    assert check_frozen(tmp_path) == ["reports/frozen/round3/one.json (changed)", "reports/frozen/round3/two.json (missing)"]

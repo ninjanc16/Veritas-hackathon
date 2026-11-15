@@ -8,8 +8,15 @@ downloads in data/live (see refresh.py and config.live_data), so this check keep
 a refresh. export.predict() (this week's forecast) reads data/live and does not check the
 manifest. A few files under data/raw are not scored inputs and are left out (NOT_SCORED_INPUTS).
 
-Run it with:  PYTHONPATH=src python -m farmdrought.manifest          (check, and list differences)
-              PYTHONPATH=src python -m farmdrought.manifest build    (write a new manifest)
+The same idea guards the RESULTS: reports/frozen.sha256 lists the sha256 of every file under
+reports/frozen. A scored file is never rewritten, so a listed file whose bytes changed, a listed
+file that is gone, or a file that is there but not listed is a problem. A new result is added
+with "frozen-add", which only ever appends lines for files not yet listed.
+
+Run it with:  PYTHONPATH=src python -m farmdrought.manifest              (check the raw inputs)
+              PYTHONPATH=src python -m farmdrought.manifest build        (write a new manifest)
+              PYTHONPATH=src python -m farmdrought.manifest frozen       (check the frozen results)
+              PYTHONPATH=src python -m farmdrought.manifest frozen-add   (list new result files)
 """
 import hashlib
 import json
@@ -101,7 +108,59 @@ def guard_scored_writer(output, force=False, frozen_metrics=None):
                            "To replace it on purpose, run the same command again with --force")
 
 
+FROZEN_LIST = Path("reports") / "frozen.sha256"   # relative to the repo root
+
+
+def frozen_files(root=ROOT):
+    """{path relative to root: sha256} for every file under reports/frozen as it is now."""
+    root = Path(root)
+    files = [p for p in (root / "reports" / "frozen").rglob("*") if p.is_file() and not p.name.startswith(".")]
+    return {p.relative_to(root).as_posix(): sha256_of(p) for p in sorted(files)}
+
+
+def read_frozen_list(root=ROOT):
+    """The recorded {path: sha256}, from lines of "<sha256>  <path>". Empty if there is no list."""
+    path = Path(root) / FROZEN_LIST
+    if not path.exists():
+        return {}
+    return {name: digest for digest, name in (line.split(maxsplit=1) for line in path.read_text().splitlines() if line)}
+
+
+def check_frozen(root=ROOT):
+    """Compare reports/frozen with reports/frozen.sha256. Returns [] when all agree, else one
+    line per problem: "(changed)", "(missing)" or "(not listed)"."""
+    recorded, now = read_frozen_list(root), frozen_files(root)
+    problems = []
+    for name in sorted(set(recorded) | set(now)):
+        if name not in now:
+            problems.append(f"{name} (missing)")
+        elif name not in recorded:
+            problems.append(f"{name} (not listed)")
+        elif recorded[name] != now[name]:
+            problems.append(f"{name} (changed)")
+    return problems
+
+
+def add_new_frozen_files(root=ROOT):
+    """Append to reports/frozen.sha256 the files that are not listed yet. A line that is already
+    there is NEVER changed: a frozen file whose bytes changed stays a problem. Returns the names added."""
+    recorded, now = read_frozen_list(root), frozen_files(root)
+    new = [name for name in now if name not in recorded]
+    if new:
+        path = Path(root) / FROZEN_LIST
+        with open(path, "a") as f:
+            f.writelines(f"{now[name]}  {name}\n" for name in new)
+    return new
+
+
 if __name__ == "__main__":
+    if sys.argv[1:] == ["frozen"]:
+        problems = check_frozen()
+        print("\n".join(problems) if problems else "every frozen result matches reports/frozen.sha256")
+        sys.exit(1 if problems else 0)
+    if sys.argv[1:] == ["frozen-add"]:
+        print("added:", ", ".join(add_new_frozen_files()) or "nothing new")
+        sys.exit(0)
     if sys.argv[1:] == ["build"]:
         print(f"wrote {MANIFEST_PATH} with {len(build_manifest()['files'])} files")
     else:
