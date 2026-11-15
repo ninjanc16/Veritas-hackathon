@@ -442,6 +442,12 @@ table.t td { padding: 6px 8px 6px 0; }
 table.t td.r, table.t th.r { padding-right: 0; padding-left: 8px; }
 table.t td.save { color: var(--low); font-weight: 600; }
 table.t tr.off td { opacity: .5; }
+/* The replay table has six columns in a narrow panel: headings may wrap onto two lines, policy
+   names wrap, and numbers stay on one line. If the panel is narrower still (a phone), the table
+   scrolls sideways inside its own box and the page does not get wider. */
+.tableWrap { overflow-x: auto; max-width: 100%; }
+table.t.replay th { vertical-align: bottom; }
+table.t.replay th.r { white-space: normal; }
 .scroll { border-radius: 0; }
 .saveHero span { letter-spacing: .1em; font-size: .7rem; }
 .saveHero b { font-weight: 600; font-variant-numeric: tabular-nums lining-nums; }

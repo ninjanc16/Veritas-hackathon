@@ -514,8 +514,10 @@
     return '<section class="replay"><h3>Replay of the real record, ' + U.esc(result.firstYear) + " to " + U.esc(result.lastYear) + ' <span class="tag assumption">modelled, not measured</span></h3>' +
       '<p class="fn">What each policy would have done in the years that really happened: the real weekly drought record, the real reservoir levels, and each year\'s forecast as it was really made, by a model trained only on earlier years. ' +
       "Canal seepage and the sealant's effect are assumptions, shown here as single values until the uncertainty bands are switched on.</p>" +
-      '<div class="scroll" style="max-height:none"><table class="t"><tr><th>Policy</th><th class="r">Years sealed</th><th class="r">Sealant spent</th><th class="r">Modelled water kept, acre-feet</th><th class="r">Modelled crop loss</th><th class="r">Modelled saving against doing nothing</th></tr>' +
+      // Short headings so six columns fit the panel; the line under the table says what they are.
+      '<div class="tableWrap"><table class="t replay"><tr><th>Policy</th><th class="r">Years sealed</th><th class="r">Sealant</th><th class="r">Water kept (af)</th><th class="r">Crop loss</th><th class="r">Saving vs nothing</th></tr>' +
       rows + "</table></div>" +
+      '<p class="fn">Sealant spent, water kept (af = acre-feet), crop loss and saving against doing nothing are all modelled.</p>' +
       '<p class="rec">' + U.esc(window.HGLogic.replaySentence(result).text) + "</p>" +
       '<p class="fn">Modelled, not measured: none of these savings happened. Modelled saving is the crop loss avoided minus the sealant spent, against doing nothing. ' +
       "Water kept counts every week the sealant was working; it lowers the crop loss only in weeks with a shortage. " +
