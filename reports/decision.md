@@ -218,3 +218,16 @@ Two results in `reports/frozen/round3/` were reported too briefly. Nothing is re
 
 - **Budget ranking (`allocation.json`, averaged over k).** The forecast against rule B: +0.020, interval 0.001 to 0.046, 18 years. That interval excludes zero, so by the declared standard the forecast is ahead of rule B on the k-average. Two cautions belong with it: it is one of several comparisons made on the same years (the allocation file alone holds twelve against a named rule: rules A and B at five budgets and on the average), and a percentile interval from 18 years runs narrow. The forecast against rule A: +0.015, interval -0.003 to 0.035, not separated. Against the better of the two rules, picked after both were seen, it is not separated either.
 - **4-week alert against "D1 now" (`intervals_v1.json`).** System cost 1,912 against 2,333, a difference of -421 over 8 years. With single-year blocks the interval is -884 to 11, which includes zero: not separated. With two-year blocks it is -723 to -146, which excludes zero: system better. The two disagree. Both are shown, and neither was declared as the primary one, so this comparison is reported as unsettled rather than as a win.
+
+## Gradient boosting comparison: declared Nov 15, 2026, before any of its code was written or run
+
+A cheap version of the model comparison in ARCHITECTURE.md section 3.6. No GRU. Declared here first; the commit that adds this section comes before the commit that adds the code.
+
+- **What is compared.** The 6-month outlook only. A gradient-boosting classifier against the frozen version 1 forest, and against the simple rule "D1 or worse now".
+- **The model.** scikit-learn `HistGradientBoostingClassifier` with its default settings and `random_state=0`. Nothing is tuned: no settings are tried, and none are chosen on any year.
+- **Same inputs and same splits as the forest.** The same input list (history, long memory and El Nino), trained on Rio Grande counties only, with the same forward chaining: for each test year from 2008 to 2025 the model is trained only on rows whose 26-week answer was fully known before 1 January of that year. Scoring is cut off at 2026-11-10, and the rows scored are exactly the Rio Grande rows in the frozen outlook file.
+- **Same alarm rule as the forest.** Warn when the probability is 0.25 or more. That is the fixed break-even threshold used everywhere in this project; it is not chosen on any data, past or present.
+- **The outcome.** The cost rule (3 x missed + false alarms) summed over the scored rows: boosting cost minus the frozen forest's cost, and boosting cost minus the "D1 now" rule's cost, each with a year-block bootstrap (10,000 draws, seed 0; single years, and adjacent pairs of years). Lower is better.
+- **What counts as a win.** Only an interval that excludes zero, by the direction label already used in round 3. A tie or a loss is reported as plainly as a win.
+- **Once.** It is run one time. After any number is seen only a crash may be fixed. The forest stays the reported system whatever the result.
+- **What was already known when this was written.** The frozen forest costs 2,324 and "D1 now" 2,382 on these rows. No boosting model had been trained on this data.
