@@ -105,6 +105,13 @@ test("finiteOrNull keeps a real number and gives null for everything else", () =
   for (const x of [NaN, Infinity, -Infinity, null, undefined, "", "41.3", "<script>alert(1)</script>", true, {}, [41.3]]) assert.strictEqual(L.finiteOrNull(x), null, String(x));
 });
 
+test("percentOrNull keeps a real number from 0 to 100 inclusive and gives null for everything else", () => {
+  for (const x of [0, 0.1, 38.7, 99.9, 100]) assert.strictEqual(L.percentOrNull(x), x);
+  for (const x of [-0.1, -5, 100.1, 250, NaN, Infinity, -Infinity, null, undefined, "", "38.7", "50%", "<script>alert(1)</script>", true, {}, [50]]) {
+    assert.strictEqual(L.percentOrNull(x), null, String(x));
+  }
+});
+
 /* ---------- csvText, csvNumber ---------- */
 test("csvText puts every text field in double quotes and doubles a double quote inside it", () => {
   assert.strictEqual(L.csvText("Main Canal"), '"Main Canal"');

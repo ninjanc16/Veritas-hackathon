@@ -18,7 +18,7 @@
   "use strict";
   const HG = window.HG, SIM = window.HG_SIM, U = window.HGU, E = window.HGEngine;
   const L = U.logic;                                    // the rules with no page code (js/logic.js), bound to the data
-  const { gal, money, usesElephantButte, safeUrl, cssClass, finiteOrNull } = window.HGLogic, hitRates = L.hitRates;
+  const { gal, money, usesElephantButte, safeUrl, cssClass, finiteOrNull, percentOrNull } = window.HGLogic, hitRates = L.hitRates;
   const $ = (id) => document.getElementById(id);
   const STATE = -1;
   const FROZEN = SIM.pre2020;                           // the forecast model trained only on data before 2020
@@ -47,13 +47,19 @@
   /* The chance of a drought season used by the planner: the "what if" value, or the forecast. */
   function scopeP() { return L.scopeP(state.severity, district()); }
   function scopeP0() { const keep = state.severity; state.severity = null; const p = scopeP(); state.severity = keep; return p; }
+  /* Today's reading for one reservoir system from api/live, or null if there is none or its
+     figure is not a percentage (then the page keeps, and says it shows, the saved reading). */
+  function liveReading(name) {
+    const reading = state.live && state.live.systems && state.live.systems[name];
+    return reading && percentOrNull(reading.pct) != null ? reading : null;
+  }
   function reservoirFor(d) {
     const name = d && usesElephantButte(d) ? "Elephant Butte" : "Amistad-Falcon";
     const county = HG.river.find((c) => c.reservoir === name);
     let pct = county ? finiteOrNull(county.reservoirPct) : null, date = HG.week, live = false;
-    // A live reading is used only if its figure is a real number; otherwise the saved one stays.
-    const reading = state.live && state.live.systems && state.live.systems[name];
-    if (reading && finiteOrNull(reading.pct) != null) { pct = reading.pct; date = reading.date; live = true; }
+    // A live reading is used only if its figure is a real number from 0 to 100; otherwise the saved one stays.
+    const reading = liveReading(name);
+    if (reading) { pct = reading.pct; date = reading.date; live = true; }
     return { name, pct, date, live };
   }
 
@@ -195,8 +201,8 @@
   $("replay").onclick = () => map.runScan(); $("skip").onclick = () => map.skip();
   function syncMap() {
     const lakes = {};
-    const butte = state.live && state.live.systems && state.live.systems["Elephant Butte"];
-    if (butte && finiteOrNull(butte.pct) != null) lakes["Elephant Butte"] = butte.pct;
+    const butte = liveReading("Elephant Butte");
+    if (butte) lakes["Elephant Butte"] = butte.pct;
     map.set({ pick: picking(), mode: state.mapMode, scope: state.scope, county: state.county, canal: state.canal,
               funded: state.step === "budget" ? currentPlan().fundedIds : null, lakes });
     legend();
@@ -828,9 +834,11 @@
   // read it directly). If it cannot be reached, the page keeps the reading saved by the last
   // pipeline refresh and says so.
   function showLive() {
-    const live = state.live && state.live.systems;
+    // "Live" only if a live reading is really in use. If every one was missing or rejected, the
+    // page is showing the readings saved by the last pipeline refresh, dated the forecast week.
+    const live = ["Amistad-Falcon", "Elephant Butte"].some((name) => liveReading(name));
     $("live").classList.toggle("saved", !live);
-    $("liveText").textContent = (live ? "Reservoirs live · " : "Reservoirs saved · ") + "forecast week of " + U.niceDate(HG.week);
+    $("liveText").textContent = (live ? "Reservoirs live · " : "Reservoirs: saved reading of " + U.niceDate(HG.week) + " · ") + "forecast week of " + U.niceDate(HG.week);
   }
   showLive();
   fetch("api/live").then((r) => (r.ok ? r.json() : Promise.reject())).then((data) => {

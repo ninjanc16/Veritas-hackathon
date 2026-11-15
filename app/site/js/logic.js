@@ -4,7 +4,7 @@
 
   TWO KINDS OF FUNCTION
     Plain ones need nothing but their arguments: esc, usd, num, pct, niceDate, workTime, gal,
-    money, usesElephantButte, and the guards safeUrl, cssClass, finiteOrNull, csvText, csvNumber.
+    money, usesElephantButte, and the guards safeUrl, cssClass, finiteOrNull, percentOrNull, csvText, csvNumber.
 
     Bound ones read the generated data (window.HG and window.HG_SIM in the browser). They come
     from makeLogic(data), so a test can hand in a small made-up data object instead:
@@ -46,6 +46,8 @@
   const SEVERITY_CLASSES = ["Critical", "Important", "Context"];    // the issue list's severities
   /* A reading that should be a number: the number itself, or null if it is anything else. */
   const finiteOrNull = (x) => (typeof x === "number" && isFinite(x) ? x : null);
+  /* A reading that should be a percentage: a real number from 0 to 100 inclusive, or null. */
+  const percentOrNull = (x) => (typeof x === "number" && x >= 0 && x <= 100 ? x : null);
   /*
     One field of a CSV file.
     csvText: always in double quotes, with any double quote inside doubled. A field that starts
@@ -295,6 +297,6 @@
     return { actionFor, tierFor, planFor, canalNumbers, USD_PER_AF, scopeP, simScope, replayScope, hitRates };
   }
 
-  return { usd, num, pct, niceDate, esc, safeUrl, cssClass, TIER_CLASSES, SEVERITY_CLASSES, finiteOrNull, csvText, csvNumber,
+  return { usd, num, pct, niceDate, esc, safeUrl, cssClass, TIER_CLASSES, SEVERITY_CLASSES, finiteOrNull, percentOrNull, csvText, csvNumber,
            workTime, gal, money, usesElephantButte, REPLAY_POLICIES, replay, replaySentence, makeLogic };
 });
