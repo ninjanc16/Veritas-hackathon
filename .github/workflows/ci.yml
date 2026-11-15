@@ -1,10 +1,9 @@
 # Checks on every push and pull request: the two Python test folders, the simulation and site
 # logic tests, a banned-word gate, a frozen gate and a size gate (ARCHITECTURE.md section 5.3).
 #
-# Left out on purpose: the reproduction job, which would retrain the models on the runner and
-# compare with the frozen numbers. Random forests are not identical across computers (see
-# "machine_note" in reports/frozen/v1/metrics.json), so that comparison needs a tolerance that
-# nobody has set yet.
+# The "reproduce" job retrains version 1 on GitHub's computer and compares its three headline
+# numbers with the frozen ones. Random forests are not identical across computers (see
+# "machine_note" in reports/frozen/v1/metrics.json), so each must be within 1%, not equal.
 name: CI
 
 on:
@@ -98,3 +97,19 @@ jobs:
           python-version: "3.13"
       - name: Website files are within their size limits
         run: python tools/site_size.py
+
+  reproduce:
+    # Retrain version 1 here and compare with reports/frozen/v1/metrics.json (tools/reproduce.py).
+    # It writes nothing. Version 2 and the seed checks take hours and are not rerun.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements-pipeline.txt
+      - run: pip install -r requirements-pipeline.txt
+      - name: Version 1 retrained here is within 1% of the frozen numbers
+        run: PYTHONPATH=src python tools/reproduce.py
