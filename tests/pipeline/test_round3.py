@@ -729,6 +729,20 @@ def test_calibration_coverage_names_the_years_left_raw():
     assert json.loads(json.dumps(coverage)) == coverage
 
 
+def test_calibration_passes_over_a_year_that_has_no_forecast_at_all():
+    # Arrange: the newest year has rows but no forecast yet (the real table ends like this)
+    table = tiny_calibration_table()
+    newest = pd.DataFrame({"date": pd.to_datetime(["2006-02-07", "2006-03-07"]), "p": [np.nan, np.nan], "y": [np.nan, np.nan]})
+    table = pd.concat([table, newest], ignore_index=True)
+
+    # Act
+    calibrated = calibrate_by_past(table, "p", "y", horizon=26)
+
+    # Assert: the empty year stays missing and the year before it is calibrated as before
+    assert calibrated[table["date"].dt.year == 2006].isna().all()
+    assert calibrated[table["date"].dt.year == 2005].tolist() == pytest.approx([0.25, 0.25, 0.25, 0.5, 0.75, 0.75])
+
+
 def tiny_trigger_tables():
     """Three Rio Grande counties scored in March 2008 (classes 0, 2 and 4), and a history that
     also holds March 2005 and 2006: class 0 twice (no drought season), class 2 five times (one

@@ -76,6 +76,8 @@ def calibrate_by_past(table, p_column, label, horizon, min_years=3):
         curve = IsotonicRegression(y_min=0.0, y_max=1.0, out_of_bounds="clip")
         curve.fit(table.loc[past, p_column].to_numpy(dtype=float), table.loc[past, label].to_numpy(dtype=float))
         rows = (years == year) & table[p_column].notna()
+        if not rows.any():      # a year with no forecast at all (the newest year): nothing to adjust
+            continue
         out[rows] = curve.predict(table.loc[rows, p_column].to_numpy(dtype=float))
     return out
 
