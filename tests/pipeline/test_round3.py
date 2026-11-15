@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from farmdrought.allocation import model_minus_rule, run_allocation
 from farmdrought.config import COUNTY_RESERVOIR
 from farmdrought.prob_calibration import brier, calibrate_by_past, class_frequency_by_past, reliability
 from farmdrought.trigger import run_trigger, run_trigger_annual
@@ -407,3 +408,137 @@ def test_run_trigger_output_is_unchanged_by_the_annual_addition():
     # Assert
     assert after == before
     assert result["issue_months"] == [1, 2, 3] and "county_years" not in result
+
+
+# ---------------------------------------------------------------------------------------------
+# allocation.py (section 3.4)
+# ---------------------------------------------------------------------------------------------
+def march_table(per_year):
+    """Rows for run_allocation from {year: [(fips, p_season, cls, d2_streak, mean12, y_season), ...]}."""
+    return pd.DataFrame([{"date": pd.Timestamp(year=year, month=3, day=2), "river": "Rio Grande", "fips": fips,
+                          "p_season": p, "cls": cls, "d2_streak": streak, "mean12": mean12, "y_season": y}
+                         for year, counties in per_year.items()
+                         for fips, p, cls, streak, mean12, y in counties])
+
+
+FIVE_COUNTIES = {
+    2010: [("00001", 0.9, 2, 0, 1.0, 0), ("00002", 0.8, 4, 5, 3.0, 1), ("00003", 0.8, 4, 2, 3.5, 1),
+           ("00004", 0.1, 4, 5, 2.0, 0), ("00005", 0.5, 1, 0, 0.5, 1)],
+    2011: [("00001", 0.2, 0, 0, 0.0, 0), ("00002", 0.7, 3, 1, 2.0, 1), ("00003", 0.6, 3, 4, 1.0, 0),
+           ("00004", 0.9, 2, 0, 2.5, 1), ("00005", 0.3, 0, 0, 0.2, 0)],
+}
+
+
+def funded_sets(result):
+    """{(k, ranking): the funded FIPS codes, year by year} - who got the money, nothing else."""
+    return {(entry["k"], name): codes for entry in result["per_k"] for name, codes in entry["funded"].items()}
+
+
+def test_allocation_matches_a_hand_worked_example_and_breaks_ties_by_fips():
+    # Arrange: five counties, two years, worked out by hand.
+    # 2010 model order: 00001 (0.9), then 00002 before 00003 (both 0.8, lower FIPS first).
+    # 2010 rule A: class 4 first; 00002 and 00004 both have a streak of 5, so 00002 then 00004.
+    # 2010 rule B: class 4 first, by 12-week average: 00003 (3.5), 00002 (3.0), 00004 (2.0).
+    # 2011: model 00004, 00002, 00003; rule A 00003, 00002, 00004; rule B 00002, 00003, 00004.
+    table = march_table(FIVE_COUNTIES)
+
+    # Act
+    result = run_allocation(table, ks=(1, 2, 3), draws=200)
+    k1, k2, k3 = result["per_k"]
+
+    # Assert
+    assert result["years"] == [2010, 2011] and result["rows"] == 10 and result["counties_per_year"] == [5, 5]
+    assert k2["funded"] == {"model": [["00001", "00002"], ["00004", "00002"]],
+                            "rule_a": [["00002", "00004"], ["00003", "00002"]],
+                            "rule_b": [["00003", "00002"], ["00002", "00003"]]}
+    assert k1["per_year"]["model"] == [0.0, 1.0] and k1["per_year"]["rule_a"] == [1.0, 0.0]
+    assert k1["per_year"]["rule_b"] == [1.0, 1.0]
+    assert k2["per_year"]["model"] == [0.5, 1.0] and k2["per_year"]["rule_b"] == [1.0, 0.5]
+    assert k3["per_year"]["model"] == pytest.approx([2 / 3, 2 / 3])
+    assert k2["mean"]["model"] == 0.75 and k2["mean"]["rule_a"] == 0.5 and k2["mean"]["rule_b"] == 0.75
+    # the better rule is chosen once per k from its mean over both years: B, B, then A on a tie
+    assert [entry["better_rule"] for entry in result["per_k"]] == ["rule_b", "rule_b", "rule_a"]
+    assert k1["model_minus_better_rule"]["per_year"] == [-1.0, 0.0]
+    assert k1["model_minus_better_rule"]["mean"] == -0.5
+    assert k1["model_minus_better_rule"]["interval"]["diff"] == -0.5
+    # averaged over k: model (0 + 1/2 + 2/3) / 3 in 2010 and (1 + 1 + 2/3) / 3 in 2011
+    average = result["average_over_k"]
+    assert average["per_year"]["model"] == pytest.approx([7 / 18, 16 / 18])
+    assert average["better_rule"] == "rule_b"
+    assert average["model_minus_better_rule"]["mean"] == pytest.approx(23 / 36 - 29 / 36)
+    assert json.loads(json.dumps(result)) == result
+
+
+def test_allocation_random_is_the_base_rate_and_the_oracle_is_never_beaten():
+    # Arrange
+    table = march_table(FIVE_COUNTIES)
+
+    # Act
+    result = run_allocation(table, ks=(1, 2, 3, 4, 5), draws=200)
+
+    # Assert: 3 of 5 counties had a drought season in 2010 and 2 of 5 in 2011
+    for entry in result["per_k"]:
+        assert entry["per_year"]["random"] == [0.6, 0.4]
+        for name in ("model", "rule_a", "rule_b", "random"):
+            assert all(o >= s for o, s in zip(entry["per_year"]["oracle"], entry["per_year"][name]))
+    assert result["per_k"][3]["per_year"]["oracle"] == [0.75, 0.5]       # k = 4: 3 of 4, then 2 of 4
+    funding_everyone = result["per_k"][4]["per_year"]
+    assert funding_everyone["model"] == funding_everyone["oracle"] == funding_everyone["random"]
+
+
+def test_allocation_ranks_use_only_issue_date_columns():
+    # Arrange: the made-up scored table, then one copy with every answer turned round and one
+    # copy with every other column that is not a ranking column rewritten or added
+    scored = scored_table()
+    answers_flipped = scored.assign(y_season=1 - scored["y_season"])
+    others_changed = scored.assign(p_season_res=0.5, y_weeks=13.0, county="Somewhere", p_season_usual=0.9,
+                                   weeks_model=scored["p_season"].rank(ascending=True))
+
+    # Act
+    original = run_allocation(scored, draws=200)
+    flipped = run_allocation(answers_flipped, draws=200)
+    changed = run_allocation(others_changed, draws=200)
+
+    # Assert: the answers move the scores but never who is funded; other columns move nothing
+    assert funded_sets(flipped) == funded_sets(original)
+    assert flipped["per_k"][0]["per_year"] != original["per_k"][0]["per_year"]
+    assert changed == original
+    assert original["rows"] == 31 * 6 and all(len(codes) == 6 for codes in funded_sets(original).values())
+
+
+def test_allocation_reports_a_model_that_funds_better_as_above_zero():
+    # Arrange: six years in which the forecast puts the two drought counties first and both rules
+    # put them last (their class is the lowest). Higher share is better, so the model wins.
+    per_year = {year: [("00001", 0.9, 0, 0, 0.0, 1), ("00002", 0.8, 0, 0, 0.1, 1),
+                       ("00003", 0.2, 3, 4, 2.0, 0), ("00004", 0.1, 4, 6, 3.0, 0)]
+                for year in range(2010, 2016)}
+
+    # Act
+    result = run_allocation(march_table(per_year), ks=(2,), draws=500)
+    gap = result["per_k"][0]["model_minus_better_rule"]
+
+    # Assert: model share 1, rule share 0, so model minus rule is +1 with the interval above zero
+    assert gap["mean"] == 1.0 and gap["interval"]["diff"] == 1.0
+    assert gap["interval"]["lo"] == gap["interval"]["hi"] == 1.0
+    assert gap["interval"]["share_draws_model_better"] == 1.0 and gap["interval"]["years_model_better"] == 6
+    assert gap["interval"]["higher_is_better"] is True and excludes_zero(gap["interval"]) is True
+
+
+def test_model_minus_rule_interval_is_in_plain_shares_with_low_below_high():
+    # Arrange: the model is better in three years of four, by different amounts
+    years = [2010, 2011, 2012, 2013]
+    model = pd.Series([0.8, 0.6, 0.4, 0.9], index=years)
+    rule = pd.Series([0.5, 0.5, 0.6, 0.3], index=years)
+
+    # Act
+    interval = model_minus_rule(model, rule, draws=2000, seed=0)
+
+    # Assert: mean gap (0.3 + 0.1 - 0.2 + 0.6) / 4 = 0.2, inside an interval that is the right way up
+    assert interval["diff"] == pytest.approx(0.2)
+    assert -0.2 <= interval["lo"] < interval["diff"] < interval["hi"] <= 0.6
+    assert interval["years_model_better"] == 3 and interval["share_draws_model_better"] > 0.5
+
+
+def test_allocation_refuses_a_budget_larger_than_the_number_of_counties():
+    with pytest.raises(ValueError, match="cannot fund"):
+        run_allocation(march_table(FIVE_COUNTIES), ks=(6,), draws=10)
