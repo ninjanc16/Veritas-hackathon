@@ -17,10 +17,11 @@
 (function () {
   "use strict";
   const HG = window.HG, SIM = window.HG_SIM, U = window.HGU, E = window.HGEngine;
+  const L = U.logic;                                    // the rules with no page code (js/logic.js), bound to the data
+  const { gal, money, usesElephantButte } = window.HGLogic, hitRates = L.hitRates;
   const $ = (id) => document.getElementById(id);
   const STATE = -1;
   const FROZEN = SIM.pre2020;                           // the forecast model trained only on data before 2020
-  const ELEPHANT_BUTTE = ["48141", "48229"];           // El Paso and Hudspeth draw on Elephant Butte
   const TODAY = new Date().toISOString().slice(0, 10);
   const SEVERITIES = [                                  // the "what if" drought choices in the budget planner
     { p: null, label: "This week's forecast" },
@@ -42,15 +43,9 @@
   const scopeCanals = () => (state.scope >= 0 ? U.canals.filter((c) => c.district === state.scope)
                                               : U.canals.filter((c) => c.district >= 0));
   const scopeName = () => (district() ? district().name : "State of Texas");
-  const usesElephantButte = (d) => d.fips.length > 0 && d.fips.every((f) => ELEPHANT_BUTTE.indexOf(f) >= 0);
   const params = () => E.makeParams(state.overrides);
   /* The chance of a drought season used by the planner: the "what if" value, or the forecast. */
-  function scopeP() {
-    if (state.severity != null) return state.severity;
-    if (district()) return district().pSeason;
-    const km = HG.districts.reduce((s, d) => s + d.canalKm, 0);       // state view: weighted by canal km
-    return HG.districts.reduce((s, d) => s + d.pSeason * d.canalKm, 0) / km;
-  }
+  function scopeP() { return L.scopeP(state.severity, district()); }
   function scopeP0() { const keep = state.severity; state.severity = null; const p = scopeP(); state.severity = keep; return p; }
   function reservoirFor(d) {
     const name = d && usesElephantButte(d) ? "Elephant Butte" : "Amistad-Falcon";
@@ -65,15 +60,9 @@
   /* ---------- Small HTML pieces ---------- */
   const kpi = (label, value, small) => '<div class="kpi"><span>' + label + "</span><b>" + value + "</b>" + (small ? "<small>" + small + "</small>" : "") + "</div>";
   const chip = (tier, text) => '<span class="chip ' + tier + '"><i></i>' + (text || tier) + "</span>";
-  /* Water is shown in gallons, which people can picture. The engine works in acre-feet
-     (the unit water agencies use: 1 acre-foot = 325,851 gallons), so it is converted here. */
-  function gal(acreFeet, long) {
-    const g = acreFeet * E.GALLONS_PER_ACRE_FOOT, unit = long ? " gallons" : " gal";
-    return g >= 1e9 ? (g / 1e9).toFixed(g >= 1e10 ? 0 : 1) + " billion" + unit : g >= 1e6 ? U.num(g / 1e6, g < 1e7 ? 1 : 0) + " million" + unit : U.num(g) + unit;
-  }
+  /* Water is shown in gallons, which people can picture: gal() in js/logic.js converts from acre-feet. */
   const af = (n) => gal(n.afLow).replace(/ (million|billion) gal$/, (m, w) => (gal(n.afHigh).indexOf(w) > 0 ? "" : " " + w)) + " to " + gal(n.afHigh);   // a range, e.g. "20 to 63 billion gal"
   const afMid = (n) => gal((n.afLow + n.afHigh) / 2);
-  const money = (v) => (v < 0 ? "-" + money(-v) : v >= 1e9 ? "$" + (v / 1e9).toFixed(2) + "B" : v >= 1e6 ? "$" + (v / 1e6).toFixed(v >= 1e8 ? 0 : 1) + "M" : v >= 1e4 ? "$" + Math.round(v / 1e3) + "k" : "$" + U.num(v));
   /* A row of key figures: [[label, value, note], ...]. Plain rules between them, no boxes. */
   const stats = (rows) => '<dl class="stats">' + rows.map((r) => "<div class=\"" + (r[3] || "") + "\"><dt>" + r[0] + "</dt><dd>" + r[1] + "</dd>" + (r[2] ? "<small>" + r[2] + "</small>" : "") + "</div>").join("") + "</dl>";
   /* The three numbers every canal decision comes down to. n = U.canalNumbers(...). oneCrew = time for a single crew. */
@@ -376,40 +365,8 @@
     if (!state.simSel) state.simSel = new Set(GROUPABLE);
     return GROUPABLE.filter((i) => state.simSel.has(i)).map((i) => HG.districts[i]);
   }
-  function simScope(list) {
-    const members = list || simMembers();
-    const system = members.length && usesElephantButte(members[0]) ? "Elephant Butte" : "Amistad-Falcon";
-    const fips = Array.from(new Set([].concat.apply([], members.map((x) => x.fips))));
-    const ids = new Set(members.map((x) => HG.districts.indexOf(x)));
-    const canals = U.canals.filter((c) => ids.has(c.district) && c.rank != null);
-    const valleyKm = HG.districts.filter((x) => x.fips.some((f) => SIM.valley.indexOf(f) >= 0)).reduce((s, x) => s + x.canalKm, 0);
-    const kmHere = members.reduce((s, x) => s + x.canalKm, 0), share = kmHere / valleyKm;
-    // The frozen model's monthly forecasts, per county. A week uses the newest one made on or before it.
-    const frozen = fips.map((f) => (FROZEN && FROZEN.monthly[f]) || []), cursor = fips.map(() => -1);
-    const start = new Date(SIM.week0 + "T12:00:00Z").getTime(), weeks = [];
-    for (let i = 0; i < SIM.nWeeks; i++) {
-      const date = new Date(start + i * 7 * 864e5), iso = date.toISOString().slice(0, 10);
-      const cls = fips.map((f) => SIM.cls[f][i]).filter((ch) => ch !== ".").map(Number);
-      const fc = [];
-      frozen.forEach((rows, k) => { while (cursor[k] + 1 < rows.length && rows[cursor[k] + 1][0] <= iso) cursor[k]++; if (cursor[k] >= 0) fc.push(rows[cursor[k]][1]); });
-      weeks.push({ date: iso, year: date.getUTCFullYear(), month: date.getUTCMonth() + 1,
-                   cls: cls.length ? Math.round(cls.reduce((a, b) => a + b, 0) / cls.length) : null,
-                   forecast: fc.length ? fc.reduce((a, b) => a + b, 0) / fc.length : null,
-                   pct: SIM.reservoirs[system][i] });
-    }
-    // Today's forecast from the frozen model, weighted by each district's canal km.
-    const live = (FROZEN && FROZEN.live) || {};
-    const pOf = (x) => { const v = x.fips.map((f) => live[f]).filter((p) => p != null); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : x.pSeason; };
-    const pNow = members.reduce((s, x) => s + pOf(x) * x.canalKm, 0) / (kmHere || 1);
-    return { weeks, canals: canals.slice().sort((a, b) => a.rank - b.rank), canalsUnranked: canals,
-             demandAf: U.PUBLISHED.valleyIrrigationAf * share, revenueAtStake: U.PUBLISHED.worstCaseRevenue * share,
-             share, system, pNow, ids: Array.from(ids), outsideValley: members.some((x) => !x.fips.some((f) => SIM.valley.indexOf(f) >= 0)), members: members.length };
-  }
-  /* The frozen model's hit rates on 2020 to 2025, used to decide how often a simulated warning is right. */
-  function hitRates() {
-    const t = FROZEN ? FROZEN.test.preSeason.forecast : { recall: HG.trigger.rules[0].recall, falseAlarms: HG.trigger.rules[0].false_alarms, rows: HG.trigger.rows, droughtSeasons: HG.trigger.drought_seasons };
-    return { recall: t.recall, falseAlarm: t.falseAlarms / Math.max(1, t.rows - t.droughtSeasons) };
-  }
+  function simScope(list) { return L.simScope(list || simMembers()); }
+  /* hitRates() (js/logic.js): the frozen model's hit rates on 2020 to 2025, used to decide how often a simulated warning is right. */
 
   /* The Simulation step has three small steps of its own, shown as chips on the stage:
        1 District   pick one district (the state view lists them all, with what acting saves in each)
