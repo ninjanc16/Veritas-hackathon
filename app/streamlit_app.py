@@ -1,5 +1,5 @@
 """
-streamlit_app.py - the demo app (seven tabs).
+streamlit_app.py - the portal (five pages: problem, solution, budget planner, county detail, evidence).
 
 How it works, in plain English:
   * It gets ALL its data from app/contract.py -> load(). Nothing else. No internet.
@@ -13,6 +13,7 @@ How it works, in plain English:
 Run it with:  streamlit run app/streamlit_app.py
 """
 import html
+import math
 import sys
 from pathlib import Path
 
@@ -90,14 +91,14 @@ map_fields = has_map_fields(latest)
 # ---------------------------------------------------------------------------
 STATUS_CHIP = {"demo": "Demo data", "provisional": "Provisional results", "final": "Final results"}
 status_key = "demo" if source == "demo" else ("final" if metrics["is_final"] else "provisional")
+theme.notice("A student hackathon project (Veritas AI, AI + Climate track). Not a government website. "
+             "No sign-in. No personal data is collected.")
 theme.hero(
-    title="Rio Grande Farm Drought Outlook",
-    kicker="AI + Climate  -  Veritas AI Hackathon",
-    subtitle=(f"A 4-week alert, a 6-month outlook and a 12-month outlook for severe drought in "
-              f"{metrics['n_focus_counties']} farm counties along the {metrics['focus_river']}, "
-              "then a test of the same method on four other rivers."),
-    chips=[STATUS_CHIP[status_key], f"Week of {latest['date'].max():%B %d, %Y}",
-           f"{metrics['n_focus_counties']} counties"])
+    title="Rio Grande Drought and Canal Portal",
+    kicker="Planning information for irrigation districts",
+    subtitle=(f"See where drought is likely in {metrics['n_focus_counties']} counties along the "
+              f"{metrics['focus_river']}, which canals to check first, and how a sealing budget would be shared out."),
+    chips=[STATUS_CHIP[status_key], f"Data week: {latest['date'].max():%B %d, %Y}", "Updated weekly"])
 
 if source == "demo":
     st.error("DEMO DATA - not real results")
@@ -114,8 +115,9 @@ focus = metrics["focus_river"]
 others = sorted(r for r in latest["river"].unique() if r != focus)
 # Links can open the app on one river, county and tab (?river=Ohio&fips=39900&view=Replay).
 # We read the address ONCE per visit, validate it, and use it as the starting choice.
-TAB_NAMES = ["This week", "Canal action", "Replay", "Outlook check", "Farm brief",
-             "Other rivers and misses", "How good is it"]
+TAB_NAMES = ["The problem", "The solution", "Budget planner", "County detail", "Evidence and limits"]
+DETAIL_VIEWS = ["This week", "Canal action", "Replay", "Outlook check", "Farm brief"]     # inside "County detail"
+EVIDENCE_VIEWS = ["How good is it", "Other rivers and misses"]                            # inside "Evidence and limits"
 if "url_read" not in st.session_state:
     st.session_state["url_read"] = True
     q = st.query_params
@@ -125,9 +127,17 @@ if "url_read" not in st.session_state:
     if not match.empty:
         st.session_state["river"] = match.iloc[0]["river"]  # a county's own river wins
         st.session_state["fips"] = match.iloc[0]["fips"]
-    st.session_state["start_tab"] = q.get("view") if q.get("view") in TAB_NAMES else None
+    # "view" may name a main page, or (older links) one of the views inside a page.
+    view = q.get("view")
+    st.session_state["detail"] = q.get("detail") if q.get("detail") in DETAIL_VIEWS else DETAIL_VIEWS[0]
+    st.session_state["evidence"] = q.get("evidence") if q.get("evidence") in EVIDENCE_VIEWS else EVIDENCE_VIEWS[0]
+    if view in DETAIL_VIEWS:
+        view, st.session_state["detail"] = "County detail", view
+    elif view in EVIDENCE_VIEWS:
+        view, st.session_state["evidence"] = "Evidence and limits", view
+    st.session_state["start_tab"] = view if view in TAB_NAMES else None
 
-theme.sidebar_brand("Choose a place",
+theme.sidebar_brand("Select a county",
                     "The Rio Grande carries mountain snowmelt through Colorado, New Mexico and Texas "
                     "to the Gulf of Mexico.")
 river = st.sidebar.selectbox(
@@ -188,7 +198,7 @@ def tab_this_week():
 
     # The answer first, in plain words: what to do, from the 6-month chance (same rule as the Canal action tab).
     tier, why = canal.action_tier(canal.county_probability(row)[0])
-    theme.callout(f"What to do now: {tier}. {why} Open the Canal action tab for your canals and the sealant plan.")
+    theme.callout(f"What to do now: {tier}. {why} See 'Canal action' on this page for the canal map, and the Budget planner page for the sealing plan.")
 
     # Three cards: the 4-week alert, the 6-month outlook, the 12-month outlook.
     theme.card_grid([
@@ -777,19 +787,8 @@ def tab_canal():
     show_district_plan(fips)
 
     # 4) The fixed "Read this first" box (the five lines the plan requires), always visible.
-    trig = metrics.get("trigger")
-    if isinstance(trig, dict) and trig.get("value_sweep"):
-        d1 = " ".join(canal.trigger_verdict(trig))
-    else:
-        d1 = "How the forecast compared with the simple 'D1 or worse now' rule: not available yet."
     st.markdown("#### Read this first")
-    st.markdown("\n".join(f"{i}. {line}" for i, line in enumerate([
-        "The forecast is tested. The canal plan is a proposal built from published figures.",
-        d1,
-        "The sealant has not been field-tested on the Rio Grande. Results elsewhere ranged from no effect to a full stop of seepage.",
-        "District figures are from 1998. Some canals have been lined since.",
-        "Valley canals also carry city water. Any sealant would need the district's and regulators' approval.",
-    ], start=1)))
+    st.markdown("\n".join(f"{i}. {line}" for i, line in enumerate(read_this_first(), start=1)))
 
     # 5) Extra detail, folded away so the page stays short.
     with st.expander("Older published figures: Texas A&M efficiency by district (1998)"):
@@ -809,16 +808,17 @@ def tab_canal():
         else:
             st.write("No public 1998 district table for this county. Use the calculator below.")
     with st.expander("Size a canal of your own (calculator)"):
-        show_calculator(costs)
+        show_calculator(costs, "county")
 
 
-def show_calculator(costs):
-    """Inputs for one canal -> seepage, sealant cost, water saved, and a cost-per-acre-foot comparison."""
+def show_calculator(costs, where):
+    """Inputs for one canal -> seepage, sealant cost, water saved, and a cost-per-acre-foot comparison.
+    `where` names the page it sits on, so the two copies of the inputs do not clash."""
     c1, c2, c3, c4 = st.columns(4)
-    miles = c1.number_input("Miles of earthen canal", min_value=0.1, max_value=500.0, value=1.0, step=0.5)
-    width = c2.number_input("Wetted width (feet)", min_value=1.0, max_value=200.0, value=20.0, step=1.0)
-    soil = c3.selectbox("Soil type", list(costs["seepage_gal_sqft_day"]), index=len(costs["seepage_gal_sqft_day"]) - 1)
-    days = c4.number_input("Days of flow per year", min_value=1, max_value=365, value=300, step=10)
+    miles = c1.number_input("Miles of earthen canal", min_value=0.1, max_value=500.0, value=1.0, step=0.5, key=f"{where}_miles")
+    width = c2.number_input("Wetted width (feet)", min_value=1.0, max_value=200.0, value=20.0, step=1.0, key=f"{where}_width")
+    soil = c3.selectbox("Soil type", list(costs["seepage_gal_sqft_day"]), index=len(costs["seepage_gal_sqft_day"]) - 1, key=f"{where}_soil")
+    days = c4.number_input("Days of flow per year", min_value=1, max_value=365, value=300, step=10, key=f"{where}_days")
 
     seep = canal.seepage_af_per_year(miles, width, costs["seepage_gal_sqft_day"][soil], days, costs["gallons_per_af"])
     cost = canal.sealant_cost_per_season(miles, width, days, costs)
@@ -848,7 +848,7 @@ def show_calculator(costs):
                                  hovertemplate=f"{name}: $%{{x:,.0f}} per acre-foot<extra></extra>"))
     fig.update_xaxes(type="log", title="Cost per acre-foot (US dollars, log scale)")
     fig.update_layout(showlegend=False)
-    st.plotly_chart(theme.style_fig(fig, 260), width="stretch")
+    st.plotly_chart(theme.style_fig(fig, 260), width="stretch", key=f"{where}_cost_chart")
     st.caption("Each bar runs from the low to the high estimate. Lining assumes it stops all seepage and "
                "lasts 50 years. Fallowing = paying for 3 acre-feet per acre left dry at $425 to $700 an acre. "
                + canal.ESTIMATE_LABEL)
@@ -857,10 +857,236 @@ def show_calculator(costs):
 # ---------------------------------------------------------------------------
 # Put the tabs on the page
 # ---------------------------------------------------------------------------
-# The canal plan is second, because it is what an irrigation district manager acts on.
-TAB_FUNCTIONS = {"This week": tab_this_week, "Canal action": tab_canal, "Replay": tab_replay,
-                 "Outlook check": tab_outlook_check, "Farm brief": tab_farm_brief,
-                 "Other rivers and misses": tab_other_rivers, "How good is it": tab_how_good}
+# ---------------------------------------------------------------------------
+# PAGE 1: The problem - the whole Rio Grande at a glance
+# ---------------------------------------------------------------------------
+def tab_problem():
+    rg = latest[latest["river"] == focus]
+    level_col = "risk_level" if map_fields else "tier"
+    n_warning = int((rg[level_col] == "Warning").sum())
+    n_watch = int((rg[level_col] == "Watch").sum())
+    st.subheader(f"{n_warning} of {len(rg)} {focus} counties are at Warning this week")
+    st.write(f"{n_watch} more are at Watch. Warning means the forecast has crossed its tested threshold for "
+             "severe drought (class D2 or worse on the U.S. Drought Monitor). In a drought, every acre-foot "
+             "that leaks out of an earthen canal is water a farm does not get.")
+
+    cards = [dict(label="Counties at Warning", value=f"{n_warning} of {len(rg)}", accent=TIER_COLOR["Warning"],
+                  caption=f"{n_watch} at Watch, {len(rg) - n_warning - n_watch} at Low")]
+    if "res_name" in rg.columns:                       # one card for the reservoir systems
+        res = rg[rg["res_name"] != "none"].groupby("res_name")["res_pct_full"].first()
+        if len(res):
+            cards.append(dict(label="Reservoir storage", value=" and ".join(f"{round(v)}%" for v in res) + " full",
+                              accent=theme.CHART_COLORS[0], caption=" and ".join(res.index) + ", latest date"))
+    loss = metrics.get("losses")
+    if isinstance(loss, dict) and loss.get("by_year"):
+        cards.append(dict(label="Insured crop losses to drought", value=f"${loss['total_usd'] / 1e6:,.0f}M",
+                          accent=theme.CHART_COLORS[1], caption=f"{loss['years'][0]} to {loss['years'][1]}, insured crops only"))
+    prio = metrics.get("canal_priority")
+    if isinstance(prio, dict):
+        km = {r["level"]: r["km"] for r in prio["by_level"]}
+        cards.append(dict(label="Canals marked 'Inspect first'", value=f"{km.get('Inspect first', 0):,.0f} km",
+                          accent=TIER_COLOR["Warning"], caption=f"of {sum(km.values()):,.0f} km mapped (an estimate)"))
+    theme.card_grid(cards)
+
+    st.markdown("#### Where the risk is")
+    st.caption("Each dot is a county. Hover for its forecast. Scroll to zoom.")
+    st.plotly_chart(theme.risk_map(rg, fips, river_lines=get_river_line(focus), river_name=focus,
+                                   level_col=level_col), key="problem_map", config={"scrollZoom": True}, width="stretch")
+
+    left, right = st.columns(2, gap="large")
+    with left:
+        st.markdown("#### Counties at Warning")
+        hot = rg[rg[level_col] == "Warning"].sort_values("p_season", ascending=False)
+        if hot.empty:
+            st.write("No counties at Warning this week.")
+        else:
+            st.dataframe(pd.DataFrame({"County": hot["county"], "State": hot["state"],
+                                       "Drought now": [CLASS_WORDS[int(c)] for c in hot["cls"]],
+                                       "6-month chance %": (hot["p_season"] * 100).round()}),
+                         hide_index=True, width="stretch")
+    with right:
+        st.markdown("#### What drought has cost")
+        if isinstance(loss, dict) and loss.get("by_year"):
+            by_year = pd.DataFrame(loss["by_year"])
+            fig = go.Figure(go.Bar(x=by_year["year"], y=by_year["usd"], marker_color=theme.CHART_COLORS[0],
+                                   hovertemplate="%{x}: %{y:$,.0f}<extra></extra>"))
+            fig.update_layout(yaxis_title="Insured loss (US dollars)", margin=dict(l=10, r=10, t=10, b=10))
+            st.plotly_chart(theme.style_fig(fig, 300), width="stretch")
+            st.caption(md_escape(f"Source: {loss['source']}. {loss['note']}"))
+        else:
+            st.write("Loss figures: not available yet.")
+    st.caption("These are measured losses and tested forecasts. They are not a prediction of future losses.")
+
+
+# ---------------------------------------------------------------------------
+# PAGE 2: The solution - forecast, find the leaky canals, seal before the season
+# ---------------------------------------------------------------------------
+def tab_solution():
+    st.subheader("Act before the dry season, on the canals most likely to leak")
+    theme.steps([
+        ("Forecast the drought", "A tested AI forecast gives each county its chance of a severe drought season "
+                                 "(8 straight weeks of severe drought in the next 6 months)."),
+        ("Find the leaky canals", "Each mapped canal is matched to the soil under it. Sandy and loamy soils leak "
+                                  "the most. Canals on leaky soil in a warned county are marked 'Inspect first'."),
+        ("Seal before the season", "A low-cost sealant is put on the top-ranked canals first, as far as the budget "
+                                   "goes. The Budget planner page shows who gets what."),
+    ])
+    st.caption("Only step 1 is AI. Steps 2 and 3 are arithmetic on published figures. " + canal.ESTIMATE_LABEL)
+
+    # What the forecast says to do, county by county.
+    rg = latest[latest["river"] == focus]
+    tiers = [canal.action_tier(canal.county_probability(r)[0])[0] for _, r in rg.iterrows()]
+    st.markdown("#### What the forecast says to do this season")
+    theme.card_grid([
+        dict(label="Seal and repair before the season", value=f"{sum(t.startswith('Seal') for t in tiers)} counties",
+             accent=TIER_COLOR["Warning"], caption="6-month chance of 25% or more"),
+        dict(label="Inspect and prepare", value=f"{sum(t.startswith('Inspect') for t in tiers)} counties",
+             accent=TIER_COLOR["Watch"], caption="chance between 12.5% and 25%"),
+        dict(label="No extra action", value=f"{sum(t.startswith('No extra') for t in tiers)} counties",
+             accent=TIER_COLOR["Low"], caption="below 12.5%. Leakage refills groundwater"),
+    ])
+
+    prio = metrics.get("canal_priority")
+    if isinstance(prio, dict):
+        st.markdown("#### How the mapped canals sort out")
+        by_level = pd.DataFrame(prio["by_level"])
+        fig = go.Figure(go.Bar(x=by_level["km"], y=by_level["level"], orientation="h",
+                               marker_color=[theme.CANAL_COLOR.get(lv, "#9a9a92") for lv in by_level["level"]],
+                               hovertemplate="%{y}: %{x:,.0f} km<extra></extra>"))
+        fig.update_layout(xaxis_title="Kilometres of canal", yaxis=dict(autorange="reversed"),
+                          margin=dict(l=10, r=10, t=10, b=10))
+        st.plotly_chart(theme.style_fig(fig, 260), width="stretch")
+        st.caption(md_escape(prio["rule"]))
+        st.caption(md_escape(prio["note"]))
+
+    st.markdown("#### Why sealant, and what it costs")
+    _, costs = get_reference()
+    show_calculator(costs, "solution")
+
+    st.markdown("#### Read this first")
+    st.markdown("\n".join(f"{i}. {line}" for i, line in enumerate(read_this_first(), start=1)))
+
+
+def read_this_first():
+    """The five fixed lines every canal page must show (line 2 is written from metrics.json)."""
+    trig = metrics.get("trigger")
+    if isinstance(trig, dict) and trig.get("value_sweep"):
+        d1 = " ".join(canal.trigger_verdict(trig))
+    else:
+        d1 = "How the forecast compared with the simple 'D1 or worse now' rule: not available yet."
+    return ["The forecast is tested. The canal plan is a proposal built from published figures.",
+            d1,
+            "The sealant has not been field-tested on the Rio Grande. Results elsewhere ranged from no effect to a full stop of seepage.",
+            "District figures are from 1998. Some canals have been lined since.",
+            "Valley canals also carry city water. Any sealant would need the district's and regulators' approval."]
+
+
+# ---------------------------------------------------------------------------
+# PAGE 3: Budget planner - set a budget, see which districts and canals it funds
+# ---------------------------------------------------------------------------
+@st.cache_resource
+def get_ranked_canals():
+    """Every canal segment that has a sealing rank and cost (canals inside a Texas district)."""
+    return [seg for group in get_canals().values() for seg in group if seg.get("seal_rank") is not None]
+
+
+def tab_budget():
+    plan = metrics.get("districts")
+    ranked = get_ranked_canals() if isinstance(plan, dict) else []
+    st.subheader("Given a budget, where should the money go?")
+    if not ranked:
+        st.write("Budget planner: not available yet.")
+        return
+    _, costs = get_reference()
+    everything = math.ceil(sum(seg["seal_usd"] for seg in ranked) / 10_000) * 10_000
+    st.write("Set a sealing budget. Canals are funded from the top of the ranking down "
+             "(leakiest soil x highest chance of a drought season first) until the money runs out.")
+    budget = st.slider("Sealing budget (US dollars)", min_value=10_000, max_value=everything,
+                       value=int(plan["budget_usd"]), step=10_000, format="$%d", key="budget")
+    funded, table, totals = canal.fund_canals(ranked, budget, plan["assumptions"], costs["gallons_per_af"])
+
+    theme.card_grid([
+        dict(label="Money allocated", value=canal.usd(totals["spent"]), accent=theme.CHART_COLORS[0],
+             caption=f"of a {canal.usd(budget)} budget"),
+        dict(label="Canal sealed", value=f"{totals['km']:,.0f} km", accent=theme.CHART_COLORS[1],
+             caption=f"{totals['canals']:,} canal segments"),
+        dict(label="Water that might be saved", value=f"{totals['saved_af_low']:,.0f} to {totals['saved_af_high']:,.0f}",
+             accent=TIER_COLOR["Low"], caption="acre-feet per application, a rough range"),
+        dict(label="Districts funded", value=f"{totals['districts']} of {plan['n_districts']}",
+             accent=TIER_COLOR["Watch"], caption="Texas irrigation districts"),
+    ])
+    st.caption(canal.ESTIMATE_LABEL)
+
+    # The allocation table: one row per funded district, biggest share first.
+    info = {d["district"]: d for d in plan["districts"]}
+    alloc = pd.DataFrame({
+        "District": [r["district"] for r in table],
+        "Drought risk": [info.get(r["district"], {}).get("risk", "") for r in table],
+        "Counties": [", ".join(info.get(r["district"], {}).get("counties", [])) for r in table],
+        "Allocation (USD)": [round(r["usd"]) for r in table],
+        "Share of budget %": [round(100 * r["usd"] / totals["spent"], 1) if totals["spent"] else 0 for r in table],
+        "Km sealed": [round(r["km"], 1) for r in table],
+        "Water saved, low (acre-ft)": [round(r["saved_af_low"]) for r in table],
+        "Water saved, high (acre-ft)": [round(r["saved_af_high"]) for r in table],
+    })
+    st.markdown("#### Allocation by district")
+    top = alloc.head(12).iloc[::-1]
+    fig = go.Figure(go.Bar(x=top["Allocation (USD)"], y=top["District"], orientation="h",
+                           marker_color=[TIER_COLOR.get(r, "#9a9a92") for r in top["Drought risk"]],
+                           hovertemplate="%{y}<br>%{x:$,.0f}<extra></extra>"))
+    fig.update_layout(xaxis_title="Allocation (US dollars)", margin=dict(l=10, r=10, t=10, b=10))
+    st.plotly_chart(theme.style_fig(fig, 420), width="stretch")
+    st.caption("Bar color = the district's drought risk: green Low, amber Watch, red Warning. Top 12 shown.")
+    st.dataframe(alloc, hide_index=True, width="stretch",
+                 column_config={"Allocation (USD)": st.column_config.NumberColumn(format="dollar")})
+    st.download_button("Download the allocation (CSV)", alloc.to_csv(index=False),
+                       file_name="sealing_budget_allocation.csv", mime="text/csv")
+    unfunded = plan["n_districts"] - totals["districts"]
+    if unfunded:
+        st.caption(f"{unfunded} districts get nothing at this budget: their canals rank lower. Raise the budget to reach them.")
+
+    st.markdown("#### The canals this budget seals")
+    st.plotly_chart(theme.canal_map(funded), width="stretch", key="budget_map", config={"scrollZoom": True})
+    named = sorted((seg for seg in funded if seg["name"]), key=lambda seg: seg["seal_rank"])[:15]
+    if named:
+        st.markdown("**First named canals in the ranking**")
+        st.dataframe(pd.DataFrame({"Rank": [seg["seal_rank"] for seg in named],
+                                   "Canal": [seg["name"] for seg in named],
+                                   "District": [seg["district"] for seg in named],
+                                   "Soil": [seg["soil"] for seg in named],
+                                   "Km": [round(seg["length_km"], 1) for seg in named],
+                                   "Cost (USD)": [round(seg["seal_usd"]) for seg in named]}),
+                     hide_index=True, width="stretch")
+
+    st.markdown("#### How to read this plan")
+    st.write(md_escape(plan["rule"]))
+    st.write(md_escape(plan["note"]))
+    st.caption(f"Sealing every treatable canal in these districts would cost about {canal.usd(plan['cost_to_treat_everything_usd'])}. "
+               + canal.ESTIMATE_LABEL)
+
+
+# ---------------------------------------------------------------------------
+# PAGES 4 and 5: the detailed views, one at a time, chosen with a row of buttons
+# ---------------------------------------------------------------------------
+DETAIL_FUNCTIONS = {"This week": tab_this_week, "Canal action": tab_canal, "Replay": tab_replay,
+                    "Outlook check": tab_outlook_check, "Farm brief": tab_farm_brief}
+EVIDENCE_FUNCTIONS = {"How good is it": tab_how_good, "Other rivers and misses": tab_other_rivers}
+
+
+def tab_detail():
+    st.caption("Everything for one county. Choose the county in the panel on the left.")
+    choice = st.radio("Show", DETAIL_VIEWS, key="detail", horizontal=True)
+    DETAIL_FUNCTIONS[choice]()
+
+
+def tab_evidence():
+    st.caption("How the forecasts were tested, where they fail, and every stated limit.")
+    choice = st.radio("Show", EVIDENCE_VIEWS, key="evidence", horizontal=True)
+    EVIDENCE_FUNCTIONS[choice]()
+
+
+TAB_FUNCTIONS = {"The problem": tab_problem, "The solution": tab_solution, "Budget planner": tab_budget,
+                 "County detail": tab_detail, "Evidence and limits": tab_evidence}
 tabs = st.tabs(TAB_NAMES, key="view", on_change="rerun", default=st.session_state["start_tab"])
 for tab, name in zip(tabs, TAB_NAMES):
     with tab:
@@ -875,3 +1101,5 @@ st.query_params["river"] = river
 st.query_params["fips"] = fips
 if st.session_state.get("view"):
     st.query_params["view"] = st.session_state["view"]
+st.query_params["detail"] = st.session_state["detail"]
+st.query_params["evidence"] = st.session_state["evidence"]

@@ -24,26 +24,27 @@ import streamlit as st
 # ---------------------------------------------------------------------------
 # Colors
 # ---------------------------------------------------------------------------
+# A plain public-sector look: white page, navy header, blue accents, dark grey text.
 LIGHT = dict(
-    bg="#f4f1e8", surface="#fbf9f3", ink="#1d2b24", muted="#5b6a60", line="#d8d2c2",
-    forest="#2f5d46", forest_deep="#1d3a2c", river="#2c6e7f", sidebar="#1f3d30",
-    sidebar_ink="#eef0e4", tint="#e6eadb", paper_plot="rgba(0,0,0,0)",
-    heading="#1d3a2c", field_ink="#1d2b24", map_style="carto-positron")      # heading = titles and big numbers; field_ink = text inside inputs
+    bg="#ffffff", surface="#f7f9fb", ink="#1b1b1b", muted="#565c65", line="#dfe1e2",
+    forest="#005ea2", forest_deep="#162e51", river="#0b6fb8", sidebar="#f0f2f5",
+    sidebar_ink="#1b1b1b", tint="#eef4fa", paper_plot="rgba(0,0,0,0)",
+    heading="#162e51", field_ink="#1b1b1b", map_style="carto-positron")      # heading = titles and big numbers; field_ink = text inside inputs
 DARK = dict(
-    bg="#121a16", surface="#1a2520", ink="#e8e4d6", muted="#9fada4", line="#2c3a32",
-    forest="#86bb97", forest_deep="#0f1914", river="#6fb3c4", sidebar="#0d1511",
-    sidebar_ink="#e8e4d6", tint="#22302a", paper_plot="rgba(0,0,0,0)",
-    heading="#eae6d6", field_ink="#e8e4d6", map_style="carto-darkmatter")
+    bg="#11181f", surface="#1a232d", ink="#e6e9ec", muted="#a3acb5", line="#2f3b47",
+    forest="#73b3e7", forest_deep="#0c1622", river="#73b3e7", sidebar="#0c1622",
+    sidebar_ink="#e6e9ec", tint="#1f2c39", paper_plot="rgba(0,0,0,0)",
+    heading="#e6e9ec", field_ink="#e6e9ec", map_style="carto-darkmatter")
 
 # Warning tiers, as earth tones: sage -> ochre -> clay.
-TIER_COLOR = {"Low": "#7a9e7e", "Watch": "#d4a031", "Warning": "#b5472f"}
+TIER_COLOR = {"Low": "#4a8f5a", "Watch": "#e5a000", "Warning": "#c9372c"}
 
 # Drought class 0..5 (none ... exceptional): pale sand darkening to deep soil brown.
 DROUGHT_SCALE = [[0.0, "#f3ecd8"], [0.2, "#e8d9a8"], [0.4, "#d9b45f"],
                  [0.6, "#c47f3a"], [0.8, "#a8482f"], [1.0, "#6e2a1f"]]
 
 # Line colors for charts, in the order plotly picks them.
-CHART_COLORS = ["#2c6e7f", "#2f5d46", "#d4a031", "#b5472f", "#7a9e7e"]
+CHART_COLORS = ["#005ea2", "#162e51", "#e5a000", "#c9372c", "#4a8f5a"]
 
 
 def palette():
@@ -59,7 +60,8 @@ def palette():
 # ---------------------------------------------------------------------------
 CSS = Template("""
 <style>
-:root { --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif; }
+:root { --serif: "Public Sans", "Source Sans 3", "Helvetica Neue", Helvetica, Arial, sans-serif; }
+.stApp, .stApp p, .stApp li, .stApp label { font-family: var(--serif); }
 
 /* page and text */
 .stApp { background: $bg; }
@@ -71,7 +73,7 @@ CSS = Template("""
 
 /* headings in a serif, with a thin rule under the big ones */
 h1, h2, h3, h4 { font-family: var(--serif) !important; color: $heading !important;
-                 letter-spacing: -0.01em; font-weight: 600 !important; }
+                 letter-spacing: 0; font-weight: 700 !important; }
 h2 { border-bottom: 1px solid $line; padding-bottom: .35rem; margin-top: 2rem !important; }
 .stCaption, [data-testid="stCaptionContainer"] { color: $muted !important; }
 
@@ -84,10 +86,10 @@ h2 { border-bottom: 1px solid $line; padding-bottom: .35rem; margin-top: 2rem !i
 
 /* slider and toggle: Streamlit draws them in its default red, so we rotate that red to green */
 [data-testid="stSlider"] [style*="position: relative"][style*="touch-action: none"],
-label:has(input[role="switch"]) > div { filter: hue-rotate(150deg) saturate(.75) brightness(.85); }
+label:has(input[role="switch"]) > div { filter: hue-rotate(205deg) saturate(1.1) brightness(.9); }
 
-/* sidebar: deep forest green. (".stApp" in front makes these win over the general text color) */
-.stApp [data-testid="stSidebar"] { background: $sidebar; }
+/* sidebar: light grey panel with a rule. (".stApp" in front makes these win over the general text color) */
+.stApp [data-testid="stSidebar"] { background: $sidebar; border-right: 1px solid $line; }
 .stApp [data-testid="stSidebar"] * { color: $sidebar_ink; }
 .stApp [data-testid="stSidebar"] [data-testid="stSelectbox"] input { color: $field_ink; -webkit-text-fill-color: $field_ink; }
 .stApp [data-testid="stSidebar"] [data-testid="stSelectbox"] svg { color: $field_ink; fill: $field_ink; }
@@ -96,29 +98,24 @@ label:has(input[role="switch"]) > div { filter: hue-rotate(150deg) saturate(.75)
 .brand { font-family: var(--serif); font-size: 1.25rem; line-height: 1.2; margin: .2rem 0 .3rem; }
 .brand-sub { font-size: .8rem; opacity: .75; margin-bottom: 1.2rem; }
 
-/* hero banner at the top of the page */
-.hero { position: relative; overflow: hidden; border-radius: 10px; padding: 2.2rem 2.4rem 1.8rem;
-  margin-bottom: 1.4rem; color: #f3f1e6;
-  background-color: #1f3d30;
-  background-image:
-    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 900 260' preserveAspectRatio='none'><g fill='none' stroke='rgba(255,255,255,0.13)' stroke-width='1.4'><path d='M0 190 C150 120 250 250 420 180 S700 90 900 150'/><path d='M0 215 C160 150 270 275 440 205 S710 118 900 176'/><path d='M0 240 C170 180 290 300 460 230 S720 146 900 202'/><path d='M0 165 C140 95 240 225 400 155 S690 62 900 124'/></g></svg>"),
-    linear-gradient(115deg, #1d3a2c 0%, #2f5d46 55%, #2c6e7f 120%);
-  background-size: cover; background-position: center; }
-.hero * { color: #f3f1e6 !important; }
+/* header band at the top of the page: flat navy, square, like a public-agency site */
+.hero { padding: 1.6rem 1.8rem 1.4rem; margin-bottom: 1.2rem; color: #ffffff;
+  background-color: #162e51; border-bottom: 6px solid #005ea2; }
+.hero * { color: #ffffff !important; }
 .hero-kicker { font-size: .74rem; letter-spacing: .16em; text-transform: uppercase; opacity: .8; }
-.hero-title { font-family: var(--serif); font-size: 2.5rem; line-height: 1.1; margin: .5rem 0 .6rem;
-  font-weight: 600; border: none; padding: 0; }
+.hero-title { font-family: var(--serif); font-size: 2rem; line-height: 1.15; margin: .4rem 0 .5rem;
+  font-weight: 700; border: none; padding: 0; }
 .hero-sub { max-width: 46rem; font-size: 1.02rem; opacity: .92; margin: 0 0 1rem; }
 .chip { display: inline-block; font-size: .78rem; padding: .2rem .7rem; margin-right: .5rem;
-  border: 1px solid rgba(243,241,230,.55); border-radius: 999px; }
+  border: 1px solid rgba(255,255,255,.6); border-radius: 2px; }
 
 /* forecast cards: a grid, so all cards are the same height */
-.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(175px, 1fr)); gap: 1rem;
   margin: .4rem 0 1.2rem; }
 .card { background: $surface; border: 1px solid $line; border-top: 4px solid var(--accent);
-  border-radius: 8px; padding: 1.1rem 1.2rem 1rem; }
+  border-radius: 2px; padding: 1.1rem 1.2rem 1rem; }
 .card-label { font-size: .72rem; letter-spacing: .14em; text-transform: uppercase; color: $muted !important; }
-.card-value { font-family: var(--serif); font-size: 2.2rem; line-height: 1.15; margin: .35rem 0 .1rem;
+.card-value { font-family: var(--serif); font-size: 1.75rem; line-height: 1.2; margin: .35rem 0 .1rem; font-weight: 700;
   color: $heading !important; }
 .card-caption { font-size: .88rem; color: $muted !important; margin-bottom: .6rem; }
 .card-row { font-size: .9rem; padding-top: .4rem; margin-top: .4rem; border-top: 1px solid $line; }
@@ -126,17 +123,26 @@ label:has(input[role="switch"]) > div { filter: hue-rotate(150deg) saturate(.75)
   background: var(--accent); }
 
 /* a gentle note box, used for the USDA program sentence */
-.callout { border-left: 4px solid #d4a031; background: $tint; padding: .8rem 1rem; border-radius: 4px;
+.callout { border-left: 6px solid #005ea2; background: $tint; padding: .8rem 1rem; border-radius: 4px;
   margin: .2rem 0 .6rem; font-size: .95rem; }
 
 /* buttons */
 .stButton button, .stDownloadButton button { border: 1px solid $forest; color: $heading;
-  background: transparent; border-radius: 6px; }
-.stButton button:hover, .stDownloadButton button:hover { background: $forest; color: #f3f1e6; border-color: $forest; }
-.stButton button:hover p, .stDownloadButton button:hover p { color: #f3f1e6; }
+  background: transparent; border-radius: 2px; }
+.stButton button:hover, .stDownloadButton button:hover { background: $forest; color: #ffffff; border-color: $forest; }
+.stButton button:hover p, .stDownloadButton button:hover p { color: #ffffff; }
 
 /* boxes Streamlit draws for success/warning/info */
 [data-testid="stAlert"] { border-radius: 6px; }
+
+/* thin notice strip above the header, and numbered step boxes */
+.notice { font-size: .8rem; background: $surface; border: 1px solid $line; padding: .35rem .8rem;
+  margin-bottom: 0; color: $muted; }
+.steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 1rem; margin: .4rem 0 1rem; }
+.step { border: 1px solid $line; border-left: 6px solid $forest; background: $surface; padding: .9rem 1rem; }
+.step-n { font-size: .75rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: $forest !important; }
+.step-t { font-size: 1.1rem; font-weight: 700; color: $heading !important; margin: .15rem 0 .3rem; }
+.step-d { font-size: .92rem; }
 
 .footer { margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid $line; font-size: .82rem; color: $muted; }
 </style>
@@ -204,7 +210,7 @@ def style_fig(fig, height=None):
     p = palette()
     fig.update_layout(
         paper_bgcolor=p["paper_plot"], plot_bgcolor=p["paper_plot"], colorway=CHART_COLORS,
-        font=dict(family='"Iowan Old Style","Palatino Linotype",Georgia,serif', color=p["ink"], size=13),
+        font=dict(family='"Public Sans","Source Sans 3","Helvetica Neue",Helvetica,Arial,sans-serif', color=p["ink"], size=13),
         hoverlabel=dict(bgcolor=p["surface"], font=dict(color=p["ink"])),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0, bgcolor="rgba(0,0,0,0)"))
     fig.update_xaxes(gridcolor=p["line"], zerolinecolor=p["line"], linecolor=p["line"])
@@ -280,7 +286,7 @@ def risk_map(df, selected_fips, river_lines=None, river_name="River", level_col=
 
 # Canal levels (from the pipeline) -> line colors. Same sage / ochre / clay as the tiers,
 # plus grey for "no published seepage rate" and slate blue for drains.
-CANAL_COLOR = {"Inspect first": "#b5472f", "Watch": "#d4a031", "Low": "#7a9e7e",
+CANAL_COLOR = {"Inspect first": "#c9372c", "Watch": "#e5a000", "Low": "#4a8f5a",
                "Unknown soil": "#9a9a92", "Drain": "#5b7f95"}
 
 
@@ -316,3 +322,16 @@ def canal_map(segments, height=560, width_px=980):
     fig.update_layout(map=dict(style=p["map_style"], zoom=zoom, center=dict(lat=lat_c, lon=lon_c)),
                       margin=dict(l=0, r=0, t=0, b=0), legend_title_text="Canal level", legend_traceorder="reversed")
     return style_fig(fig, height)
+
+
+def notice(text):
+    """A thin grey strip at the very top (who made this and what it is not)."""
+    st.markdown(f'<div class="notice">{html.escape(text)}</div>', unsafe_allow_html=True)
+
+
+def steps(items):
+    """A row of numbered step boxes. items = [(title, description), ...]. Text is escaped."""
+    out = "".join(
+        f'<div class="step"><div class="step-n">Step {i}</div><div class="step-t">{html.escape(t)}</div>'
+        f'<div class="step-d">{html.escape(d)}</div></div>' for i, (t, d) in enumerate(items, start=1))
+    st.markdown(f'<div class="steps">{out}</div>', unsafe_allow_html=True)

@@ -46,9 +46,10 @@ def test_app_runs_for_every_river():
         assert not at.exception, f"app crashed on river {river}"
 
 
-def test_replay_buttons_work():
-    at = _run_app()
-    at.button[2].click().run()                            # "Next week"
+def test_replay_buttons_work():   # (uses _run_with_link, defined below)
+    at = _run_with_link(view="Replay")                   # an old-style link opens County detail > Replay
+    next_week = [b for b in at.button if b.label == "Next week"][0]
+    next_week.click().run()
     assert not at.exception
 
 
@@ -73,7 +74,8 @@ def test_link_opens_the_right_river_county_and_tab():
     assert not at.exception
     assert at.sidebar.selectbox[0].value == "Ohio"
     assert at.sidebar.selectbox[1].value == ohio["fips"]
-    assert at.session_state["view"] == "Replay"
+    assert at.session_state["view"] == "County detail"     # the page that holds the Replay view
+    assert at.session_state["detail"] == "Replay"
 
 
 def test_bad_link_values_are_ignored():
@@ -195,3 +197,26 @@ def test_canal_tab_on_a_transfer_river_says_rio_grande_only():
     assert not at.exception
     assert any("cover the Rio Grande counties only" in str(e.value) for e in at.info)
     assert not any("Texas districts only" in str(e.value) for e in at.info)
+
+
+# --- the portal pages ----------------------------------------------------------------------
+def test_portal_pages_show_problem_solution_and_budget():
+    at = _run_app()
+    assert not at.exception
+    text = _all_text(at) + " ".join(str(h.value) for h in at.subheader)
+    assert "counties are at Warning this week" in text
+    assert "Act before the dry season" in text
+    assert "Given a budget, where should the money go?" in text
+    assert "Not a government website" in text             # we never pose as an agency
+
+
+def test_budget_slider_changes_the_allocation():
+    _, _, _, metrics, *_ = load()
+    if "districts" not in metrics:
+        return                                            # demo data has no district plan
+    at = _run_app()
+    slider = [s for s in at.slider if s.key == "budget"][0]
+    assert slider.value == metrics["districts"]["budget_usd"]
+    slider.set_value(slider.max).run()
+    assert not at.exception
+    assert f"{metrics['districts']['n_districts']} of {metrics['districts']['n_districts']}" in _all_text(at)

@@ -58,3 +58,26 @@ def test_trigger_verdict_calls_a_tiny_gap_a_tie():
     assert "did not help" in res
     trig["value_sweep"][1]["d1_rule"] = 0.25
     assert "did better" in canal.trigger_verdict(trig)[0]
+
+
+def test_budget_planner_reproduces_the_pipeline_plan_and_respects_the_budget():
+    """Funding from rank 1 down with the plan's own budget gives the plan's published totals."""
+    import json
+    from app.contract import REAL_METRICS
+    from app.mapdata import CANALS_FILE, load_canals
+    if not (CANALS_FILE.exists() and REAL_METRICS.exists()):
+        return
+    plan = json.loads(REAL_METRICS.read_text(encoding="utf-8")).get("districts")
+    if not plan:
+        return
+    ranked = [s for g in load_canals().values() for s in g if s["seal_rank"] is not None]
+    funded, table, totals = canal.fund_canals(ranked, plan["budget_usd"], plan["assumptions"], costs["gallons_per_af"])
+    assert round(totals["spent"]) == plan["spent_usd"]
+    assert round(totals["km"], 1) == plan["sealed_km"]
+    assert round(totals["saved_af_low"]) == plan["saved_af_low"]
+    assert round(totals["saved_af_high"]) == plan["saved_af_high"]
+    assert sum(r["usd"] for r in table) == pytest.approx(totals["spent"])
+    # Never over budget, and a bigger budget never funds less.
+    small = canal.fund_canals(ranked, 20_000, plan["assumptions"], costs["gallons_per_af"])[2]
+    assert small["spent"] <= 20_000 and small["km"] < totals["km"]
+    assert canal.fund_canals(ranked, 0, plan["assumptions"], costs["gallons_per_af"])[2]["canals"] == 0

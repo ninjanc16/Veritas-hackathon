@@ -153,3 +153,44 @@ def districts_in_county(plan, county):
 def usd(x):
     """Dollars for people: 31117 -> '$31,117'."""
     return f"${x:,.0f}"
+
+
+FEET_PER_KM = 3280.84
+
+
+def fund_canals(segments, budget, assumptions, gallons_per_af):
+    """
+    The budget planner. `segments` = every canal segment that has a sealing rank and cost
+    (from the pipeline's file). We pay for canals from rank 1 downward and STOP at the first
+    one the remaining budget cannot cover - the same rule the pipeline used, so a $100,000
+    budget gives exactly the pipeline's published plan.
+
+    Returns (funded_segments, per_district_rows, totals). Water saved uses the plan's own
+    assumptions: wetted width, days one application lasts, and the 28% to 87% trial range.
+    """
+    width = assumptions["wetted_width_ft"]
+    days = assumptions["days_one_application_lasts"]
+    funded, spent = [], 0.0
+    for seg in sorted(segments, key=lambda s: s["seal_rank"]):
+        if spent + seg["seal_usd"] > budget:
+            break
+        spent += seg["seal_usd"]
+        funded.append(seg)
+
+    def seepage_af(seg):
+        """Acre-feet this segment leaks while one application lasts."""
+        area = seg["length_km"] * FEET_PER_KM * width
+        return seg["seepage_rate"] * area * days / gallons_per_af
+
+    rows = {}
+    for seg in funded:
+        r = rows.setdefault(seg["district"], dict(district=seg["district"], usd=0.0, km=0.0, canals=0, af=0.0))
+        r["usd"] += seg["seal_usd"]; r["km"] += seg["length_km"]; r["canals"] += 1; r["af"] += seepage_af(seg)
+    low, high = assumptions["sealant_cut_low"], assumptions["sealant_cut_high"]
+    table = [dict(district=r["district"], usd=r["usd"], km=r["km"], canals=r["canals"],
+                  saved_af_low=r["af"] * low, saved_af_high=r["af"] * high)
+             for r in sorted(rows.values(), key=lambda r: r["usd"], reverse=True)]
+    total_af = sum(r["af"] for r in rows.values())
+    totals = dict(spent=spent, km=sum(s["length_km"] for s in funded), canals=len(funded),
+                  districts=len(rows), saved_af_low=total_af * low, saved_af_high=total_af * high)
+    return funded, table, totals

@@ -40,6 +40,9 @@ def load_canals(path=CANALS_FILE):
             seg = dict(name=prop.get("name") or "", soil=prop.get("soil") or "", level=prop["level"],
                        seepage_rate=prop.get("seepage_rate"), score=prop.get("score"),
                        length_km=prop.get("length_km"),
+                       # Sealing plan fields (empty for canals outside a Texas district):
+                       district=prop.get("district") or "", seal_rank=prop.get("seal_rank"),
+                       seal_usd=prop.get("seal_usd"), fips=prop["fips"],
                        line=[(lat, lon) for lon, lat in f["geometry"]["coordinates"]])
             by_county.setdefault(prop["fips"], []).append(seg)
         return by_county
