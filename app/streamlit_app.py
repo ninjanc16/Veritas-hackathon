@@ -23,8 +23,16 @@ import pandas as pd                      # noqa: E402
 import plotly.graph_objects as go        # noqa: E402
 import streamlit as st                   # noqa: E402
 
-from app import theme                    # noqa: E402
-from app import canal                    # noqa: E402
+import importlib                         # noqa: E402
+
+from app import brief as _brief, canal, mapdata as _mapdata, tallies as _tallies, theme   # noqa: E402
+
+# A web host can keep OLD copies of our helper files in memory after an update, while this main
+# file is new. That mismatch crashes the page. Re-reading the helpers on each run avoids it
+# (they are small, so it costs almost nothing).
+for _module in (_brief, canal, _mapdata, _tallies, theme):
+    importlib.reload(_module)
+
 from app.brief import CLASS_WORDS, build_brief, md_escape, streak_sentence   # noqa: E402
 from app.contract import has_map_fields, load, load_reference   # noqa: E402
 from app.mapdata import load_canals, load_river_line   # noqa: E402
