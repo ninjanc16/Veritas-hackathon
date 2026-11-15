@@ -417,6 +417,9 @@ details.assume summary { font-weight: 700; cursor: pointer; }
 .stats.three { grid-template-columns: repeat(3, 1fr); }
 .stats.three dd { font-size: clamp(1.15rem, 1.55vw, 1.5rem); }
 .stats.three .cost dd { color: var(--watch); } .stats.three .time dd { color: var(--blue); } .stats.three .save dd { color: var(--low); }
+.stats .good dd { color: var(--low); } .stats .bad dd { color: var(--warning); }
+table.src td { font-size: .8rem; } table.src td:first-child { width: 30%; color: var(--head); } table.src td:last-child { width: 28%; }
+.watching b { font: 600 1.15rem var(--serif); color: var(--head); }
 .rec { border-left: 3px solid var(--blue); padding: 1px 0 1px 12px; margin: 14px 0; font-size: .88rem; color: var(--ink); }
 .rec.seal { border-left-color: var(--warning); } .rec.inspect { border-left-color: var(--watch); } .rec.none { border-left-color: var(--low); }
 .rec b { color: var(--head); }
@@ -484,7 +487,7 @@ ul.plain { margin: 0; padding-left: 18px; font-size: .84rem; } ul.plain li { mar
   .stage { height: 62vh; }
   #views .sbtn:not(#viewScope) { display: none; }
   .view { padding: 16px 14px 60px; }
-  .stepper button b { display: none; }
+  .stepper button b { display: none; } .stepper button { font-size: .7rem; padding: 12px 2px 10px; letter-spacing: .02em; }
   .scopeBtn { max-width: 34vw; }
   .kpis { grid-template-columns: 1fr; }
   #simCards { width: 52%; top: 108px; gap: 6px; } .stage.cards #simPrompt { left: 50%; width: 92%; } .scase p, .scase svg, .scase .go { display: none; } .scase .big { font-size: 20px; } .scase h3 { font-size: 15px; }

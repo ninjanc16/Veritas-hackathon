@@ -16,7 +16,8 @@
     A picture only:
       - WHICH squares go dry. The district is tiled with squares and the right share of them
         is coloured dry; the model does not know which farm loses water.
-      - canals are drawn as thin lines for orientation only; the fields carry the story.
+      - the dots on the canals. Red dots show an unsealed canal leaking, white dots a sealed
+        stretch holding its water. The amounts are in the numbers, not in the dots.
 
   window.HGTwin.create({ canvas, stage, onTick }) returns { load, play, pause, seek, playing, readTheme }.
 */
@@ -128,18 +129,20 @@
     const index = () => Math.min(data.weeks.length - 1, Math.floor(at));
     function arrives(w, s) { return w.demand > 0 ? Math.max(0, 1 - (s.missing - s.recovered) / w.demand) : null; }   // null = outside the season
 
-    /* ---------- Leak dots ---------- */
+    /* ---------- Dots on the canals ----------
+       A red dot is water leaking out of an unsealed canal. A white dot marks a sealed stretch
+       holding its water. On a sealed canal the sealant's tested share of dots turn white. */
     function spawn(sideDots, sealedNow) {
       if (!shape.total || sideDots.length >= MAX_DOTS) return;
       const r = Math.random() * shape.total, c = shape.leaky.find((x) => x.upTo >= r) || shape.leaky[0];
-      if (c.funded && sealedNow && Math.random() < data.cut) return;   // a sealed canal seeps less, by the sealant's tested share
+      const fixed = c.funded && sealedNow && Math.random() < data.cut;
       const i = Math.floor(Math.random() * (c.pts.length - 1)), u = Math.random(), a = c.pts[i], b = c.pts[i + 1], ang = Math.random() * 6.283;
-      sideDots.push({ x: a[0] + (b[0] - a[0]) * u, y: a[1] + (b[1] - a[1]) * u, dx: Math.cos(ang), dy: Math.sin(ang), life: 1 });
+      sideDots.push({ x: a[0] + (b[0] - a[0]) * u, y: a[1] + (b[1] - a[1]) * u, dx: Math.cos(ang), dy: Math.sin(ang), life: 1, fixed });
     }
     function stepDots(dt) {
       const w = data.weeks[index()];
       [w.left, w.right].forEach((s, k) => {
-        if (w.demand > 0) for (let n = 0; n < 3; n++) if (Math.random() < dt * 60) spawn(dots[k], s.sealed);   // canals only carry water in the season
+        if (w.demand > s.missing) for (let n = 0; n < 3; n++) if (Math.random() < dt * 60) spawn(dots[k], s.sealed);   // only a canal with water in it can leak
         dots[k].forEach((d) => { d.life -= dt * 0.9; });
         dots[k] = dots[k].filter((d) => d.life > 0);
       });
@@ -187,30 +190,33 @@
       }
       ctx.globalAlpha = 0.95; ctx.strokeStyle = C.text; ctx.lineWidth = 1.6; ctx.stroke(p.outline);
 
-      // 2. Canals, kept quiet: thin lines under the story the fields tell. Sealed ones are picked out.
+      // 2. Canals. Red = unsealed and leaking. White = sealed. Both sides start red; only the
+      //    acting side ever turns white. Canals with no soil reading stay thin and grey.
       ctx.lineJoin = ctx.lineCap = "round";
-      ctx.globalAlpha = 0.28; ctx.strokeStyle = C.map; ctx.lineWidth = 1; ctx.stroke(p.other); ctx.stroke(p.all);
-      if (s.sealed) { ctx.globalAlpha = 0.4; ctx.strokeStyle = C.hl; ctx.lineWidth = 1; ctx.stroke(p.funded); }
-      ctx.restore();                                               // end of the zoomed, clipped map
+      const running = share != null && w.demand > s.missing;         // is any water in the canals this week?
+      ctx.globalAlpha = 0.35; ctx.strokeStyle = C.unknown; ctx.lineWidth = 0.8; ctx.stroke(p.other);
+      ctx.globalAlpha = running ? 0.95 : 0.45; ctx.strokeStyle = C.warning; ctx.lineWidth = 1.5; ctx.stroke(p.all);
+      if (s.sealed) {
+        ctx.globalAlpha = 0.3; ctx.strokeStyle = C.low; ctx.lineWidth = 6; ctx.stroke(p.funded);                // a soft green glow
+        ctx.globalAlpha = 1; ctx.strokeStyle = C.hl; ctx.lineWidth = 1.9; ctx.stroke(p.funded);
+      }
+      for (const d of dots[k]) {
+        const far = d.fixed ? 0 : (1 - d.life) * 9;
+        ctx.globalAlpha = Math.min(1, d.life * 1.4); ctx.fillStyle = d.fixed ? C.hl : C.warning;
+        ctx.beginPath(); ctx.arc(p.sx(d.x) + d.dx * far, p.sy(d.y) + d.dy * far, d.fixed ? 2.2 * d.life + 0.6 : 1.7, 0, 7); ctx.fill();
+      }
+      ctx.restore();                                               // end of the clipped map
 
-      // 3. The words and numbers. Left: what is lost. Right: what acting has saved so far.
-      const a = Math.min(1, e * 1.5), bad = share != null && share < 0.999, base = p.h - p.foot, big = p.narrow ? 26 : 36;
+      // 3. The numbers. Left: what is lost. Right: what acting has saved. Few words on purpose.
+      const a = Math.min(1, e * 1.5), base = p.h - p.foot, big = p.narrow ? 26 : 38, med = p.narrow ? 18 : 24;
       const savedSoFar = Math.max(0, w.sumL.loss - w.sumR.loss);     // crops the right side kept that the left side lost
       text(right ? data.rightName : data.leftName, 12, 18, p.narrow ? 16 : 18, right ? C.accent : C.head, { weight: 700, alpha: a });
-      text(s.sealed ? "canals sealed now" : right ? data.rightNote : data.leftNote, p.w - 12, 18, 13.5, s.sealed ? C.low : C.muted, { italic: !s.sealed, weight: s.sealed ? 700 : 400, align: "right", alpha: a });
-      if (right) {
-        text(money(savedSoFar), 12, base + 24, big, savedSoFar > 1e4 ? C.low : C.muted, { weight: 700 });
-        text("in crops saved so far", 12, base + (p.narrow ? 46 : 54), 13.5, C.muted, { italic: true });
-      } else {
-        text(money(sum.loss), 12, base + 24, big, sum.loss > 1e4 ? C.warning : C.muted, { weight: 700 });
-        text("in crops lost so far", 12, base + (p.narrow ? 46 : 54), 13.5, C.muted, { italic: true });
-      }
-      text(share == null ? "off season" : Math.round((1 - share) * 100) + "% dry", p.w - 12, base + 22, p.narrow ? 19 : 24, bad ? (right && share > other + 0.005 ? C.watch : C.warning) : C.head, { weight: 700, align: "right" });
-      text(share == null ? "fields are resting" : "of fields without water this week", p.w - 12, base + (p.narrow ? 42 : 48), 13, C.muted, { italic: true, align: "right" });
-      if (!p.narrow) {
-        text(right ? num(sum.recovered) + " acre-feet put back on fields · sealing cost " + money(sum.spend)
-                   : "No sealing · no water recovered", 12, p.h - 18, 13, C.muted);
-      }
+      text(share == null ? "off season" : Math.round((1 - share) * 100) + "% of fields dry", p.w - 12, 18, 14, share != null && share < 0.999 ? (right && share > other + 0.005 ? C.watch : C.warning) : C.muted, { weight: 600, align: "right", alpha: a });
+      text(money(right ? savedSoFar : sum.loss), 12, base + 26, big, right ? C.low : C.warning, { weight: 700 });
+      text(right ? "crops saved" : "crops lost", 12, base + (p.narrow ? 48 : 56), 13.5, C.muted);
+      text(num(right ? sum.saved : sum.leak), p.w - 12, base + 30, med, right ? C.low : C.warning, { weight: 700, align: "right" });
+      text(right ? "acre-feet kept in canals" : "acre-feet leaked", p.w - 12, base + (p.narrow ? 48 : 56), 13.5, C.muted, { align: "right" });
+      if (!p.narrow && right) text("still leaking: " + num(sum.leak) + " acre-feet", p.w - 12, base + 78, 12.5, C.muted, { align: "right" });
       ctx.restore();
     }
 
@@ -220,15 +226,13 @@
       const i = index(), w = data.weeks[i], narrow = panels[0].narrow, tone = C[data.tone] || C.watch;
       // Header: which future this is (left) and the week and reservoir (right).
       text(data.caseName, 14, narrow ? 64 : 70, narrow ? 19 : 24, tone, { weight: 700 });
-      const room = Math.floor((W - (narrow ? 28 : 250)) / 6.2);     // letters that fit beside the reservoir reading
-      text(data.caseNote.length > room ? data.caseNote.slice(0, room - 1) + "…" : data.caseNote, 14, narrow ? 86 : 96, 13.5, C.muted, { italic: true });
       text(w.date.slice(0, 4), W - 14, narrow ? 64 : 70, narrow ? 24 : 34, C.head, { weight: 700, align: "right" });
-      if (!narrow) text(data.system + " " + w.pct.toFixed(1) + "% full", W - 14, 96, 13.5, w.pct < data.fullAt ? C.warning : C.muted, { italic: true, align: "right" });
+      text("reservoirs " + w.pct.toFixed(0) + "% full", narrow ? 14 : W - 14, narrow ? 86 : 96, 13.5, w.pct < data.fullAt ? C.warning : C.muted, { align: narrow ? "left" : "right" });
       panels.forEach((p, k) => drawPanel(p, k, w, i));
       // The verdict, once the run has finished.
       if (i >= data.weeks.length - 1 && split >= 1) {
         const diff = (w.sumL.loss + w.sumL.spend) - (w.sumR.loss + w.sumR.spend), small = Math.abs(diff) < 1000;
-        const label = small ? "No measurable difference in this future" : "Acting " + (diff > 0 ? "saves " : "costs ") + money(Math.abs(diff)) + (diff > 0 ? "" : " more") + " in this future";
+        const label = small ? "No measurable difference" : "Acting " + (diff > 0 ? "saves " : "costs ") + money(Math.abs(diff)) + (diff > 0 ? "" : " more");
         ctx.font = "700 " + (narrow ? 16 : 20) + "px " + C.serif;
         const tw = ctx.measureText(label).width + 30, ty = narrow ? panels[1].y - 6 : panels[0].y + 56;
         ctx.globalAlpha = 1; ctx.fillStyle = C.map; ctx.strokeStyle = small ? C.muted : diff > 0 ? C.low : C.warning; ctx.lineWidth = 2;
@@ -247,6 +251,7 @@
           opt.onTick(index(), playing);
         }
         const want = 1;                                                              // no zoom: the whole district stays in view
+        if (!reduced) stepDots(dt);
         zoom = reduced ? want : zoom + (want - zoom) * Math.min(1, dt * 2.5);
         draw();
       }

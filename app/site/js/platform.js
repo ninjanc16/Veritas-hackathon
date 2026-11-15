@@ -69,7 +69,7 @@
   const afMid = (n) => U.num((n.afLow + n.afHigh) / 2, (n.afLow + n.afHigh) / 2 < 10 ? 1 : 0);
   const money = (v) => (v < 0 ? "-" + money(-v) : v >= 1e9 ? "$" + (v / 1e9).toFixed(2) + "B" : v >= 1e6 ? "$" + (v / 1e6).toFixed(v >= 1e8 ? 0 : 1) + "M" : v >= 1e4 ? "$" + Math.round(v / 1e3) + "k" : "$" + U.num(v));
   /* A row of key figures: [[label, value, note], ...]. Plain rules between them, no boxes. */
-  const stats = (rows) => '<dl class="stats">' + rows.map((r) => "<div><dt>" + r[0] + "</dt><dd>" + r[1] + "</dd>" + (r[2] ? "<small>" + r[2] + "</small>" : "") + "</div>").join("") + "</dl>";
+  const stats = (rows) => '<dl class="stats">' + rows.map((r) => "<div class=\"" + (r[3] || "") + "\"><dt>" + r[0] + "</dt><dd>" + r[1] + "</dd>" + (r[2] ? "<small>" + r[2] + "</small>" : "") + "</div>").join("") + "</dl>";
   /* The three numbers every canal decision comes down to. n = U.canalNumbers(...). oneCrew = time for a single crew. */
   function triple(n, oneCrew, cls) {
     const p = params(), days = oneCrew ? n.crewDays : n.days;
@@ -398,7 +398,7 @@
     const d = district(), p = params();
     $("view").innerHTML =
       "<h2>" + (d ? "Simulation" : "Simulation: choose a district") + "</h2>" +
-      '<div class="sub">' + U.esc(scopeName()) + " · do nothing against sealing when the forecast warns · same weather, reservoir and prices on both sides</div>" +
+      '<div class="sub">' + U.esc(scopeName()) + " · do nothing against sealing when the forecast warns</div>" +
       '<div id="simLead"></div>' +
       '<div class="controls"><div class="field"><label for="simBudget">Sealing budget, each application <output id="simBudgetOut"></output></label><input id="simBudget" type="range" min="0" max="' + maxBudget() + '" step="' + budgetStep() + '" value="' + state.budget + '"></div><div id="shockRow"></div></div>' +
       '<div id="simResult"></div>' +
@@ -446,8 +446,16 @@
   let twinWeeks = [];
   function loadTwin(nothing, act, scope, P, plan, which, note) {
     const flat = (run) => [].concat.apply([], run.years.map((y) => y.weekly));
-    const a = flat(nothing), b = flat(act), sums = [{ spend: 0, loss: 0, saved: 0, recovered: 0 }, { spend: 0, loss: 0, saved: 0, recovered: 0 }];
-    const add = (sum, w) => { sum.spend += w.spend; sum.loss += w.loss; sum.saved += w.saved; sum.recovered += w.recovered; return Object.assign({}, sum); };
+    // Water leaking out of this district's canals in a week, if none were sealed. The rate per
+    // square foot comes from each canal's soil (Fipps, Texas A&M, 1998). A canal cannot leak more
+    // than the water released into it, and leaks nothing outside the season.
+    const leakWeek = E.savedAcreFeet(E.fundCanals(scope.canals, Infinity, P).gallonsPerDay, 7, 1);
+    const a = flat(nothing), b = flat(act), blank = () => ({ spend: 0, loss: 0, saved: 0, recovered: 0, leak: 0 }), sums = [blank(), blank()];
+    const add = (sum, w) => {
+      sum.spend += w.spend; sum.loss += w.loss; sum.saved += w.saved; sum.recovered += w.recovered;
+      sum.leak += Math.max(0, Math.min(leakWeek, w.demand - w.missing) - w.saved);      // sealing takes its saving off the leak
+      return Object.assign({}, sum);
+    };
     twinWeeks = a.map((w, i) => ({ date: w.date, pct: w.pct == null ? 0 : w.pct, demand: w.demand, left: w, right: b[i], sumL: add(sums[0], w), sumR: add(sums[1], b[i]) }));
     $("simSeek").max = twinWeeks.length - 1;
     const funded = new Set(plan.funded.map((c) => c.id));
@@ -554,40 +562,38 @@
         (state.budget < top ? '<div class="rowBtns"><button class="btn small" data-act="fullBudget">Fund every rankable canal: ' + U.usd(top) + "</button></div>" : "");
       const policyRows = POLICIES.map((pol, i) => {
         const c = run.policies[i].summary.cost, gains = run.policies[i].draws.map((t, k) => base[k].cost - t.cost).sort((a, b) => a - b);
-        return "<tr><td>" + pol.name + '</td><td class="r">' + money(c.mid) + '</td><td class="r muted">' + money(c.low) + " to " + money(c.high) + '</td><td class="r save">' + (i ? money(gains[Math.floor(gains.length / 2)]) : "") + '</td><td class="r">' + (i ? gains.filter((g) => g < 0).length : "") + "</td></tr>";
+        return "<tr><td>" + pol.name + '</td><td class="r">' + money(c.mid) + '</td><td class="r save">' + (i ? money(gains[Math.floor(gains.length / 2)]) : "") + '</td><td class="r">' + (i ? gains.filter((g) => g < 0).length + " / 300" : "") + "</td></tr>";
       }).join("");
       const keptYear = E.savedAcreFeet(plan.gallonsPerDay, Math.min(273, P.daysLast * P.applications), P.cut);
-      html = '<p class="fn">Start ' + U.niceDate(TODAY) + " · " + scope.system + " " + (res.pct == null ? "n/a" : res.pct + "%") + " (" + (res.live ? "live" : "saved") + ") · drought chance " + U.pct(scope.pNow) +
-        (FROZEN ? " from a model frozen at " + U.niceDate(FROZEN.trainedOn.to) : "") + " · futures drawn from " + run.libraryYears.length + " real years, " + run.libraryYears[0] + " to " + run.libraryYears[run.libraryYears.length - 1] + " (" + run.dryYears.length + " dry)" +
-        (on.length ? " · <b>added: " + on.map((s) => s.label.toLowerCase()).join(", ") + "</b>" : "") + ".</p>" + heroHtml +
-        "<h3>One application</h3>" + triple(planN) + '<p class="fn">' + P.applications + (P.applications === 1 ? " application" : " applications") + " in a season you act, about " + Math.min(9, 3 * P.applications) + " months sealed.</p>" + curveHtml +
-        "<h3>Total cost to " + endYear + ": crops lost plus sealing</h3><table class=\"t\"><tr><th>Policy</th><th class=\"r\">Middle</th><th class=\"r\">8 in 10 futures</th><th class=\"r\">Saves</th><th class=\"r\">Worse in</th></tr>" + policyRows + "</table>" +
-        '<p class="fn">For ' + who + ". Declaration: 8 straight weeks at D2, then " + P.paperworkWeeks + " weeks of paperwork.</p>" +
+      simFacts = {
+        start: U.niceDate(TODAY), system: scope.system, pct: res.pct, live: res.live, pNow: scope.pNow, library: run.libraryYears, dry: run.dryYears,
+        recall: hit.recall, falseAlarm: hit.falseAlarm, shocks: on.map((x) => x.label + " (" + x.note + ")"), keptYear, wrongWarning: plan.spent * P.applications,
+        cases: d ? CASES.filter((c) => c.key !== "check").map((c) => c.name + ": " + run.cases[c.key].sourceYears.join(", ")) : [], share: scope.share,
+        outsideValley: scope.outsideValley, who, P,
+      };
+      html = "<h3>All 300 futures, to " + endYear + "</h3>" + heroHtml +
+        "<table class=\"t\"><tr><th>Policy</th><th class=\"r\">Total cost</th><th class=\"r\">Saves</th><th class=\"r\">Worse in</th></tr>" + policyRows + "</table>" +
+        more("Net saving by budget", curveHtml) +
         more("Reservoir storage in the 300 futures", '<div class="chart">' +
           lineChart([{ name: "Middle future", color: U.TIER_COLOR.Low, values: run.fan.map((w) => w.mid) },
                      { name: "Full supply above", color: U.LEVEL_COLOR["Unknown soil"], values: run.fan.map(() => P.fullAt), dash: true },
                      { name: "No supply below", color: U.TIER_COLOR.Warning, values: run.fan.map(() => P.zeroAt), dash: true }],
-                    run.fan.map((w) => w.date.slice(0, 4)), (v) => Math.round(v) + "%", { low: run.fan.map((w) => w.low), high: run.fan.map((w) => w.high), color: U.TIER_COLOR.Low }) + '</div><p class="fn">Band: 8 in 10 futures. Starts at today\'s reading.</p>') +
-        more("Read before quoting", "<ul class=\"plain\">" +
-          "<li>The forecast warns before " + Math.round(hit.recall * 100) + "% of dry seasons and before " + Math.round(hit.falseAlarm * 100) + "% of wet ones (test on 2020 to 2025). A wrong warning costs " + U.usd(plan.spent * P.applications) + ".</li>" +
-          "<li>Saved water only counts in a shortage, and never exceeds the water released that week. Over " + P.fullAt + "% storage, sealing earns nothing.</li>" +
-          "<li>In a year you act the model keeps " + U.num(keptYear) + " acre-feet here. Published potential for 28 Valley districts is 54,000 to 223,000 a year (Fipps, 1998). The model assumes every canal is unlined and wet all season, so treat the saving as an upper estimate.</li>" +
-          "<li>Sealant strength is the middle of field tests (28% to 87%). It has not been tested on the Rio Grande.</li></ul>");
+                    run.fan.map((w) => w.date.slice(0, 4)), (v) => Math.round(v) + "%", { low: run.fan.map((w) => w.low), high: run.fan.map((w) => w.high), color: U.TIER_COLOR.Low }) + "</div>");
     } else {
       const d1 = E.simulate(test, { trigger: "d1" }, over), always = E.simulate(test, { trigger: "always" }, over);
       const [nothing, react, act] = runs, years = nothing.years.map((y) => y.year);
       const diff = (a, b) => a.totals.cost - b.totals.cost;
       const better = (v, other) => (Math.abs(v) < 0.002 * act.totals.cost ? "ended level with " + other : v > 0 ? "ended " + money(v) + " ahead of " + other : "ended " + money(-v) + " behind " + other);
       const t = FROZEN && FROZEN.test.preSeason;
-      html = '<p class="fn">A test, not a forecast: the model was frozen at ' + (FROZEN ? U.niceDate(FROZEN.trainedOn.to) : "2019") + " and is run on the real record after it.</p>" + "<h3>One application</h3>" + triple(planN) +
+      html =
         "<h3>Total cost, 2020 to 2025</h3><table class=\"t\"><tr><th>Policy</th><th class=\"r\">Crops lost</th><th class=\"r\">Sealing</th><th class=\"r\">Total</th><th class=\"r\">Saves</th></tr>" + POLICIES.map((pol, i) => {
           const tt = runs[i].totals;
           return "<tr><td>" + pol.name + '</td><td class="r">' + money(tt.loss) + '</td><td class="r">' + money(tt.spend) + '</td><td class="r">' + money(tt.cost) + '</td><td class="r save">' + (i ? money(nothing.totals.cost - tt.cost) : "") + "</td></tr>";
         }).join("") + "</table>" +
-        '<p class="fn">For ' + who + ".</p>" +
+
         "<h3>Running gain over doing nothing</h3><div class=\"chart\">" +
         lineChart(POLICIES.slice(1).map((pol, i) => { let sum = 0; return { name: pol.name, color: i ? U.LEVEL_COLOR.Low : U.TIER_COLOR.Watch, values: runs[i + 1].years.map((y, k) => (sum += nothing.years[k].loss - y.loss - y.spend)) }; }), years, money) +
-        '</div><p class="fn">Crop loss avoided minus sealing cost. Flat in wet years.</p>' +
+        '</div>' +
         (t ? "<h3>Forecast accuracy, January to March warnings</h3><div class=\"scroll\" style=\"max-height:none\"><table class=\"t\"><tr><th>Rule</th><th class=\"r\">Drought seasons caught</th><th class=\"r\">Warnings that were right</th></tr>" +
           "<tr><td><b>Our forecast</b> (trained before 2020)</td><td class=\"r\">" + t.forecast.caught + " of " + t.forecast.droughtSeasons + " (" + Math.round(t.forecast.recall * 100) + "%)</td><td class=\"r\">" + Math.round(t.forecast.precision * 100) + "%</td></tr>" +
           "<tr><td>Simple rule: already in moderate drought</td><td class=\"r\">" + t.d1Rule.caught + " of " + t.d1Rule.droughtSeasons + " (" + Math.round(t.d1Rule.recall * 100) + "%)</td><td class=\"r\">" + Math.round(t.d1Rule.precision * 100) + "%</td></tr></table></div>" +
@@ -605,34 +611,91 @@
     if (!d) lead = districtTable(over, hit, on);
     else if (state.simStep === 2) {
       buildCards(run, runs, endYear);
-      lead = '<p class="fn">Cards on the map: the mild, middle and harsh futures of 300, ranked by what doing nothing costs here, and the real 2020 to 2025 record.</p>';
+      lead = "";
     } else {
       const pair = showCheck ? [runs[0], runs[2]] : [run.cases[which.key].sample[0], run.cases[which.key].sample[2]];
       const gain = pair[0].totals.cost - pair[1].totals.cost;
       const note = showCheck ? "The real record: real drought, real reservoir levels, the forecasts the frozen model made"
                              : "Weather borrowed from " + run.cases[which.key].sourceYears.join(", ") + ", started from today's reservoir level";
       loadTwin(pair[0], pair[1], scope, P, plan, which, note);
-      lead = '<p class="watching ' + which.key + '"><b>' + which.name + ".</b> " + note + ".</p>" +
+      const end = twinWeeks[twinWeeks.length - 1];
+      simFacts = Object.assign(simFacts || {}, { watching: which.name + ": " + note });
+      lead = '<p class="watching ' + which.key + '"><b>' + which.name + "</b></p>" +
         stats([
-          ["Do nothing, crops lost", money(pair[0].totals.loss), ""],
-          ["Act, crops lost", money(pair[1].totals.loss), money(pair[1].totals.spend) + " sealing, " + pair[1].totals.yearsActed + " of " + pair[1].years.length + " years"],
-          ["Net saving, this future", (gain >= 0 ? "" : "-") + money(Math.abs(gain)), U.num(plan.funded.length) + " segments sealed, " + U.num(plan.km, 1) + " km"],
-        ]) +
-        '<p class="fn">Green fields have water, brown fields do not; bright green on the right are fields that sealing kept watered. The dry share is the model\'s number; which squares are dry is illustration.</p>';
+          ["Saved by acting", (gain >= 0 ? "" : "-") + money(Math.abs(gain)), "after " + money(pair[1].totals.spend) + " of sealant", gain >= 0 ? "good" : "bad"],
+          ["Water kept in canals", U.num(end.sumR.saved) + " af", U.num(plan.km) + " km sealed", "good"],
+          ["Crops lost, do nothing", money(pair[0].totals.loss), "", "bad"],
+          ["Leaked from canals, do nothing", U.num(end.sumL.leak) + " af", "", "bad"],
+        ]);
     }
     $("simLead").innerHTML = lead;
     $("shockRow").innerHTML = showCheck ? "" : '<div class="shocks"><span>Stress tests (our assumptions):</span>' + SHOCKS.map((s) => '<button class="sbtn ' + (state.shocks[s.key] ? "on" : "") + '" data-shock="' + s.key + '" title="' + s.note + '">' + s.label + "</button>").join("") + "</div>";
     $("simResult").innerHTML = html;
 
-    $("simNotes").innerHTML =
-      (scope.outsideValley ? '<p class="fn warn">The published farm-loss figure covers only Cameron, Hidalgo, Starr and Willacy counties. Applying its value per acre-foot here is our extrapolation.</p>' : "") +
-      (!district() ? '<p class="fn">The state run covers the districts on the Amistad-Falcon system. El Paso and Hudspeth districts draw on Elephant Butte; open one of them to simulate it.</p>' : "") +
-      '<details class="more"><summary>Sources and method</summary><div class="src">' +
-      '<p><span class="tag published">published</span> A year with no irrigation water costs the Valley ' + U.usd(U.PUBLISHED.worstCaseRevenue) + ' in net crop revenue and 8,404 jobs (<a target="_blank" rel="noopener" href="' + U.PUBLISHED.worstCaseUrl + '">Texas A&amp;M AgriLife, 2023</a>). Full irrigation demand is 1,349,369 acre-feet a year (<a target="_blank" rel="noopener" href="' + U.PUBLISHED.valleyIrrigationUrl + '">Region M Water Plan, Table 2-8</a>, 2011 use). Dividing the two gives about $367 per acre-foot; that division is ours.</p>' +
-      '<p><span class="tag assumption">assumption</span> This scope holds ' + Math.round(scope.share * 100) + "% of the Valley districts' canal length, so it is given that share of the water and of the revenue: " + U.usd(scope.revenueAtStake) + " a year at stake.</p>" +
-      '<p><span class="tag assumption">assumption</span> How much water farms get is read off reservoir storage with a straight line between two of the sliders above. The real rule is an accounting of reserves (<a target="_blank" rel="noopener" href="' + U.PUBLISHED.allocationRule.url + '">' + U.PUBLISHED.allocationRule.text + "</a>): cities are served first and irrigation gets what is left.</p>" +
-      '<p><span class="tag pipeline">pipeline</span> Drought classes and reservoir levels are the real weekly records. "Declaration" uses the federal fast-track rule: 8 straight weeks at D2 (<a target="_blank" rel="noopener" href="' + U.PUBLISHED.disasterRule.url + '">' + U.PUBLISHED.disasterRule.text + "</a>).</p>" +
-      '<p style="margin:0"><span class="tag assumption">assumption</span> Sealing is one application of sealant on unlined canals, materials only, and it has not been field-tested on the Rio Grande. Crew speed is our own guess. Permanent lining is a different job: one 3,900-foot main-canal project was budgeted at $5.1 million (<a target="_blank" rel="noopener" href="' + U.PUBLISHED.liningExample.url + '">' + U.PUBLISHED.liningExample.text + "</a>).</p></div></details>";
+    $("simNotes").innerHTML = '<div class="rowBtns"><button class="btn ghost" data-act="go" data-step="sources">Data and sources &rarr;</button></div>';
+  }
+
+  /* ---------- Step 4: Data and sources ----------
+     Everything a researcher needs to check the numbers: each dataset, what it was used for,
+     and where it came from. The simulation's own inputs are listed last. */
+  let simFacts = null;
+  function renderSources() {
+    renderSim();                                           // runs the simulation once so its inputs can be listed
+    const F = simFacts || {}, a = HG.plan.assumptions, t = FROZEN && FROZEN.test.preSeason, P = params();
+    const link = (text, url) => '<a target="_blank" rel="noopener" href="' + url + '">' + text + "</a>";
+    const table = (rows) => '<table class="t src"><tr><th>Used for</th><th>Data</th><th>Source</th></tr>' + rows.map((r) => "<tr><td>" + r[0] + "</td><td>" + r[1] + "</td><td>" + r[2] + "</td></tr>").join("") + "</table>";
+    const tag = (k) => ' <span class="tag ' + k + '">' + k + "</span>";
+    $("view").innerHTML =
+      "<h2>Data and sources</h2><div class=\"sub\">Every dataset, what it is used for and where it comes from. Data as of " + U.niceDate(HG.week) + ".</div>" +
+      "<h3>1. Drought forecast model</h3>" + table([
+        ["Drought class each week, each county (the model's main input and its answer)", "U.S. Drought Monitor, weekly, 2000 on", link("droughtmonitor.unl.edu", "https://droughtmonitor.unl.edu/")],
+        ["El Ni&ntilde;o signal", "Oceanic Ni&ntilde;o Index, monthly", link("NOAA Climate Prediction Center", "https://www.cpc.ncep.noaa.gov/data/indices/oni.ascii.txt")],
+        ["Model", "Random forest, 80 trees. Predicts a drought season (8 straight weeks at D2 or worse) in the next 26 weeks. Warning line " + U.pct(HG.threshold) + ".", "Our pipeline" + tag("pipeline")],
+        ["Frozen copy used by the simulation", FROZEN ? U.num(FROZEN.trainedOn.rows) + " county-months, " + U.niceDate(FROZEN.trainedOn.from) + " to " + U.niceDate(FROZEN.trainedOn.to) + ". Nothing after 2019 is learned from." : "n/a", "Our pipeline" + tag("pipeline")],
+      ]) +
+      (t ? '<table class="t"><tr><th>Test, ' + U.niceDate(FROZEN.test.from) + " to " + U.niceDate(FROZEN.test.to) + '</th><th class="r">Seasons caught</th><th class="r">Warnings right</th><th class="r">False alarms</th></tr>' +
+        [["Forecast", t.forecast], ["Rule: already in D1", t.d1Rule]].map(([n, x]) => "<tr><td>" + n + '</td><td class="r">' + x.caught + " / " + x.droughtSeasons + " (" + Math.round(x.recall * 100) + '%)</td><td class="r">' + Math.round(x.precision * 100) + '%</td><td class="r">' + x.falseAlarms + "</td></tr>").join("") +
+        '</table><p class="fn">January to March warnings, ' + t.forecast.rows + " county-months in the 14 Texas river counties. The forecast matches the simple rule; it does not clearly beat it.</p>" : "") +
+      "<h3>2. Canals, soils and districts</h3>" + table([
+        ["Canal lines", "National Hydrography Dataset, Canal/Ditch features", link("U.S. Geological Survey", "https://hydro.nationalmap.gov/arcgis/rest/services/nhd/MapServer/6")],
+        ["Extra canals, names, piped stretches", HG.osm ? U.num(HG.osm.added) + " segments, " + U.num(HG.osm.addedKm) + " km" : "n/a", link("OpenStreetMap contributors (ODbL)", "https://www.openstreetmap.org/copyright")],
+        ["Soil under each canal", "SSURGO soil survey", link("USDA NRCS Soil Data Access", "https://sdmdataaccess.sc.egov.usda.gov/")],
+        ["District boundaries", HG.districts.length + " active districts", link("TCEQ Water Districts", "https://gisweb.tceq.texas.gov/arcgis/rest/services/iwud/WaterDistricts_PRD/MapServer")],
+      ]) +
+      "<h3>3. Water leaking from canals</h3>" + table([
+        ["Leak rate by soil, unlined canals", Object.keys(HG.seepage).filter((k) => !/sand$/i.test(k) || k === "Sand").map((k) => k + " " + HG.seepage[k]).join(" · ") + " gallons per sq ft per day", link("Fipps, Texas A&amp;M, 1998, Tables 6 to 8", "https://gfipps.tamu.edu/files/2019/12/RGV-Potential-Water-Savings.pdf") + " (Table 7 quotes the Texas Board of Water Engineers, 1946)"],
+        ["Canal size", a.wetted_width_ft + " ft wetted width for every canal", "Ours" + tag("assumption")],
+        ["Scale check", "Published potential saving in 28 Valley districts: 54,000 to 223,000 acre-feet a year." + (F.keptYear ? " This simulation keeps " + U.num(F.keptYear) + " in a year it acts, for " + F.who + "." : ""), link("Fipps, 1998", "https://gfipps.tamu.edu/files/2019/12/RGV-Potential-Water-Savings.pdf")],
+      ]) +
+      '<p class="fn">Leakage counts only weeks when water is released, and never more than was released. It assumes every ranked canal is unlined, because no source records lining. Treat it as an upper estimate.</p>' +
+      "<h3>4. Sealant</h3>" + table([
+        ["Price", "$" + a.sealant_usd_per_sqft + " per sq ft, materials only", link("U.S. Bureau of Reclamation", "https://www.usbr.gov/research/projects/detail.cfm?id=845")],
+        ["Share of leakage stopped", Math.round(a.sealant_cut_low * 100) + "% to " + Math.round(a.sealant_cut_high * 100) + "% in field trials; the simulation uses " + Math.round(P.cut * 100) + "%", "Desert Research Institute field trials"],
+        ["How long it lasts", "About " + a.days_one_application_lasts + " days; " + P.applications + " applications cover a season", "Lund et al., 2021"],
+        ["Crew speed", P.kmPerCrewDay + " km per crew per day, " + P.crews + " crews", "Ours" + tag("assumption")],
+      ]) +
+      "<h3>5. Money</h3>" + table([
+        ["Crop revenue lost in a year with no irrigation water", U.usd(U.PUBLISHED.worstCaseRevenue) + "; total output " + U.usd(U.PUBLISHED.worstCaseOutput) + "; " + U.num(U.PUBLISHED.worstCaseJobs) + " jobs", link("Texas A&amp;M AgriLife, 2023", U.PUBLISHED.worstCaseUrl)],
+        ["Full irrigation demand", U.num(U.PUBLISHED.valleyIrrigationAf) + " acre-feet a year (2011 use)", link("Region M Water Plan, Table 2-8", U.PUBLISHED.valleyIrrigationUrl)],
+        ["Value of an acre-foot in a shortage", "$" + U.num(U.USD_PER_AF) + ": the two figures above, divided", "Ours" + tag("assumption")],
+        ["A district's share", "By canal length" + (F.share ? "; " + F.who + " holds " + Math.round(F.share * 100) + "% of Valley canal length" : ""), "Ours" + tag("assumption")],
+      ]) +
+      "<h3>6. Reservoirs</h3>" + table([
+        ["Storage, daily", "Amistad, Falcon, Elephant Butte", link("Texas Water Development Board", "https://www.waterdatafortexas.org/reservoirs/statewide")],
+        ["Water released to farms", "Full supply at " + P.fullAt + "% storage, none at " + P.zeroAt + "%, a straight line between", "Ours" + tag("assumption") + "; the real rule is " + link(U.PUBLISHED.allocationRule.text, U.PUBLISHED.allocationRule.url)],
+        ["Drought declaration", "8 straight weeks at D2", link(U.PUBLISHED.disasterRule.text, U.PUBLISHED.disasterRule.url)],
+      ]) +
+      "<h3>7. This simulation run</h3>" + (F.start ? table([
+        ["Start", F.start + "; " + F.system + " at " + (F.pct == null ? "n/a" : F.pct + "%") + " (" + (F.live ? "live" : "saved") + " reading)", "Texas Water Development Board"],
+        ["Chance the first season is dry", U.pct(F.pNow), "Frozen forecast model, this week's data"],
+        ["Weather the futures are built from", F.library.length + " real years, " + F.library[0] + " to " + F.library[F.library.length - 1] + "; " + F.dry.length + " had a drought season (" + F.dry.join(", ") + ")", "U.S. Drought Monitor, Texas Water Development Board"],
+        ["Forecast accuracy inside the simulation", "Warns before " + Math.round(F.recall * 100) + "% of dry seasons and " + Math.round(F.falseAlarm * 100) + "% of wet ones. A wrong warning costs " + U.usd(F.wrongWarning) + ".", "Test above"],
+        ["Futures", "300 draws, fixed seed, so every visit shows the same result", "Ours"],
+      ].concat((F.cases || []).map((c) => ["Scenario weather", c, "Real years, replayed from today's storage"]))
+       .concat(F.shocks && F.shocks.length ? [["Stress tests switched on", F.shocks.join("; "), "Ours" + tag("assumption")]] : [])) : "") +
+      (F.outsideValley ? '<p class="fn warn">The crop-loss figure covers Cameron, Hidalgo, Starr and Willacy counties. Using its value per acre-foot here is our extrapolation.</p>' : "") +
+      "<h3>Limits</h3><ul class=\"plain\"><li>Saved water counts only in a shortage. Above " + P.fullAt + "% storage, sealing earns nothing.</li><li>The sealant has not been field-tested on the Rio Grande. Prices are materials only.</li>" +
+      "<li>Which field squares are dry in the picture is illustration; the share is the model's.</li><li>" + U.esc(HG.plan.note) + "</li></ul>";
   }
 
   /* ---------- Putting it together ---------- */
@@ -646,7 +709,7 @@
     if (sim) simChrome();
     $("scopeBtn").innerHTML = "<small>" + (district() ? "District" : "View") + "</small>" + U.esc(scopeName()) + " &#9662;";
     $("viewScope").textContent = district() ? "My district" : "All of Texas";
-    ({ risk: renderRisk, budget: renderBudget, sim: renderSim })[state.step]();
+    ({ risk: renderRisk, budget: renderBudget, sim: renderSim, sources: renderSources })[state.step]();
     syncMap();
     $("view").scrollTop = 0;
     if (sim && state.simStep === 3) twin.play(); else twin.pause();
