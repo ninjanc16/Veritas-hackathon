@@ -14,6 +14,7 @@ import inspect
 from farmdrought import alert as alert_module
 from farmdrought import config, export, refresh, robustness, round3, v2
 from farmdrought.allocation import model_minus_rule, run_allocation
+from farmdrought.canal_class import match_line, match_segments, point_grid, site_line
 from farmdrought.config import (ALERT_WEEKS, COUNTY_RESERVOIR, FROZEN, METRICS, OUTLOOK, PREDICTIONS, SCORE_THROUGH,
                                 SEASON_WEEKS, YEAR_WEEKS)
 from farmdrought.drought import build_panel, load_usdm
@@ -1492,3 +1493,30 @@ def test_seepage_rate_rises_with_permeability_and_is_missing_without_it():
     assert all(s < d for s, d in zip(shallow, deep))
     assert np.isnan(seepage_rate(None, 200)) and np.isnan(seepage_rate(float("nan"), None))
     assert seepage_rate(0.0, None) == 0.0
+
+
+def test_a_segment_takes_the_kind_and_piped_share_of_the_map_lines_it_lies_on():
+    # Arrange: three made-up OpenStreetMap lines running east along latitude 26. A canal from
+    # longitude -98.000 to -97.990, then a stretch tagged as underground to -97.985, and a drain
+    # one kilometre to the north.
+    ways = [{"kind": "canal", "name": "East Main Canal", "piped": False, "line": [[-98.000, 26.0], [-97.990, 26.0]]},
+            {"kind": "canal", "name": "", "piped": True, "line": [[-97.990, 26.0], [-97.985, 26.0]]},
+            {"kind": "drain", "name": "North Drain", "piped": False, "line": [[-98.000, 26.01], [-97.985, 26.01]]}]
+    grid = point_grid([way["line"] for way in ways])
+
+    # Act
+    on_canal = match_line([[-97.998, 26.0], [-97.992, 26.0]], grid, ways)             # wholly on the open canal
+    across_pipe = match_line([[-97.9945, 26.0], [-97.9855, 26.0]], grid, ways)        # half open, half underground
+    on_drain = match_line([[-97.998, 26.01], [-97.990, 26.01]], grid, ways)
+    elsewhere = match_line([[-97.998, 26.05], [-97.990, 26.05]], grid, ways)          # four kilometres away
+
+    # Assert
+    assert on_canal["kind"] == "canal" and on_canal["piped_share"] == 0 and on_canal["name"] == "East Main Canal"
+    assert on_canal["hits"] == on_canal["points"]
+    assert across_pipe["kind"] == "canal" and 0.3 < across_pipe["piped_share"] < 0.7
+    assert on_drain["kind"] == "drain" and on_drain["name"] == "North Drain"
+    assert elsewhere["kind"] is None and elsewhere["hits"] == 0 and elsewhere["piped_share"] == 0
+    # match_segments is the same thing for many lines, on lines rounded as the website draws them
+    both = match_segments([[[-97.998, 26.0], [-97.992, 26.0]], [[-97.998, 26.05], [-97.990, 26.05]]], ways)
+    assert [m["kind"] for m in both] == ["canal", None]
+    assert site_line([[-98.00001, 26.00001], [-98.00002, 26.00002], [-97.9, 26.1]]) == [[-98.0, 26.0], [-97.9, 26.1]]

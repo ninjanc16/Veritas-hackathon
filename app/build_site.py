@@ -19,12 +19,17 @@ Run it again whenever the pipeline outputs change (the daily refresh changes the
 """
 import json
 import math
+import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
+# The line-matching helpers are shared with the pipeline (src/farmdrought/canal_class.py), so
+# both match canals to OpenStreetMap the same way. That module imports nothing heavy.
+sys.path.insert(0, str(ROOT / "src"))
+from farmdrought.canal_class import OSM_KINDS, dense, line_near, point_grid  # noqa: E402
 RAW = ROOT / "data" / "raw"
 LIVE = ROOT / "data" / "live"        # the daily refresh saves its downloads here; data/raw is a fixed snapshot
 PROCESSED = ROOT / "data" / "processed"
@@ -245,40 +250,7 @@ def lakes():
 
 
 # ---------- OpenStreetMap detail for the canals (see app/osm_canals.py) ----------
-CELL = 0.0005        # grid cell in degrees, about 50 metres
-STEP = 0.0004        # put a point on a line at least every ~40 metres, so straight canals still match
-OSM_KINDS = ["canal", "ditch", "drain"]
-
-
-def dense(line):
-    """The points of a line with extra points added along long straight stretches."""
-    out = [line[0]]
-    for (x1, y1), (x2, y2) in zip(line, line[1:]):
-        n = max(1, int(max(abs(x2 - x1), abs(y2 - y1)) / STEP))
-        out += [(x1 + (x2 - x1) * k / n, y1 + (y2 - y1) * k / n) for k in range(1, n + 1)]
-    return out
-
-
-def point_grid(lines):
-    """A lookup from grid cell to the number of the first line that passes through it."""
-    grid = {}
-    for i, line in enumerate(lines):
-        for x, y in dense(line):
-            grid.setdefault((round(x / CELL), round(y / CELL)), i)
-    return grid
-
-
-def line_near(grid, x, y):
-    """The number of a line within about 50 to 75 metres of the point, or None."""
-    gx, gy = round(x / CELL), round(y / CELL)
-    for dx in (0, -1, 1):
-        for dy in (0, -1, 1):
-            hit = grid.get((gx + dx, gy + dy))
-            if hit is not None:
-                return hit
-    return None
-
-
+# dense, point_grid and line_near now live in src/farmdrought/canal_class.py (imported above).
 def inside_ring(x, y, ring):
     """Is the point inside this ring? (Ray casting: count the edges a ray going east crosses.)"""
     inside = False
