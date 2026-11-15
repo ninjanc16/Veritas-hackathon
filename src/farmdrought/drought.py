@@ -96,8 +96,13 @@ def d2_streak(classes):
     return streak
 
 
-def build_panel(buffer_km=BUFFER_KM):
+def build_panel(buffer_km=BUFFER_KM, score_through=None):
     """Build the county-week table for the river counties (436 of them at the default 50 km).
+
+    score_through : None (the default) uses every week in the file, exactly as before. A date
+                    (for example config.SCORE_THROUGH) drops every later week BEFORE the inputs
+                    and the truths are built, so no answer window can reach past that date: a
+                    row whose window would cross it gets NaN, as if the file ended there.
 
     Columns: date, fips, county, state, river, lat, lon, d2_streak, the inputs (sets H, L
     and E), and the three truths: y (4-week), y_season (6-month) and y_weeks (12-month).
@@ -105,6 +110,9 @@ def build_panel(buffer_km=BUFFER_KM):
     Rows from each county's first year are dropped, because the inputs look back 52 weeks.
     """
     usdm = load_usdm()
+    if score_through is not None:
+        in_time = usdm["dates"] <= pd.Timestamp(score_through)
+        usdm = {**usdm, "dates": usdm["dates"][in_time], "classes": usdm["classes"][:, in_time]}
     centers = load_county_centers()
 
     # 1. Keep counties that have a shape on the map and no missing weeks at all,

@@ -80,6 +80,15 @@ OUTLOOK = PROCESSED / "outlook.parquet"
 LATEST = PROCESSED / "latest.parquet"
 METRICS = REPORTS / "metrics.json"
 
+# ---------- 7b. The freeze (ARCHITECTURE.md section 3.0) ----------
+# The last Drought Monitor week that version 1's results are scored on. Answers that were not
+# fully known by this week are never used to score, however much newer data is downloaded later.
+SCORE_THROUGH = "2026-11-10"
+FROZEN = REPORTS / "frozen" / "v1"       # version 1's results, written by export.evaluate()
+ROUND3 = REPORTS / "frozen" / "round3"   # one file per round-3 experiment
+LIVE = REPORTS / "live"                  # what the daily job writes (export.predict())
+MANIFEST = ROOT / "data" / "manifest.json"  # sha256 of every raw input, and the scoring cut-off
+
 # ---------- 8. Pivot: should an irrigation district seal its canals before the season? ----------
 # 8a. Reservoir storage (Texas Water Development Board, waterdatafortexas.org, one CSV per lake)
 RESERVOIR_DIR = RAW / "reservoirs"

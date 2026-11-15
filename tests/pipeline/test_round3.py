@@ -1,6 +1,7 @@
 """Tests for the round 3 evaluation work (ARCHITECTURE.md section 3).
 
-Every table here is small and made up. Nothing in this file reads the real data."""
+The tables in the first sections are small and made up. Only the last section, the freeze,
+reads the real files, and it never scores anything: it checks that what is on disk agrees."""
 import hashlib
 import json
 
@@ -8,8 +9,12 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from farmdrought import export
 from farmdrought.allocation import model_minus_rule, run_allocation
-from farmdrought.config import COUNTY_RESERVOIR
+from farmdrought.config import (ALERT_WEEKS, COUNTY_RESERVOIR, FROZEN, METRICS, OUTLOOK, PREDICTIONS, SCORE_THROUGH,
+                                SEASON_WEEKS, YEAR_WEEKS)
+from farmdrought.drought import build_panel
+from farmdrought.manifest import build_manifest, check_manifest, sha256_of
 from farmdrought.prob_calibration import brier, calibrate_by_past, class_frequency_by_past, reliability
 from farmdrought.trigger import run_trigger, run_trigger_annual
 from farmdrought.uncertainty import direction, excludes_zero, resample_years, year_block_bootstrap
@@ -671,3 +676,188 @@ def test_allocation_refuses_a_budget_larger_than_the_number_of_counties():
     with pytest.raises(ValueError, match="cannot fund"):
         run_allocation(march_table(FIVE_COUNTIES), ks=(6,), draws=10)
 
+
+# ---------------------------------------------------------------------------------------------
+# The freeze (section 3.0): manifest, cut-off, frozen files, and predict() leaving them alone
+# ---------------------------------------------------------------------------------------------
+def test_scored_keys_of_metrics_equal_the_frozen_file():
+    # Arrange
+    metrics = json.loads(METRICS.read_text())
+    frozen = json.loads((FROZEN / "metrics.json").read_text())
+
+    # Act / Assert: every frozen key is in metrics.json with the same value. The one exception
+    # is the reservoir readings' dates, a live piece inside a scored key.
+    for key, value in frozen.items():
+        if key == "reservoir":
+            without_dates = lambda block: {k: v for k, v in block.items() if k != "systems"}
+            assert without_dates(metrics[key]) == without_dates(value)
+        else:
+            assert metrics[key] == value, f"metrics.json differs from the frozen file in '{key}'"
+    # and metrics.json adds nothing but the live keys
+    assert set(metrics) - set(frozen) == set(export.LIVE_KEYS)
+    assert not set(export.LIVE_KEYS) & set(frozen)
+    assert frozen["is_final"] is True and frozen["frozen"]["score_through"] == SCORE_THROUGH
+
+
+def test_handoff_tables_are_byte_identical_to_the_frozen_copies():
+    for path in (PREDICTIONS, OUTLOOK):
+        assert path.read_bytes() == (FROZEN / path.name).read_bytes(), f"{path.name} is not the frozen copy"
+
+
+def test_raw_inputs_match_the_manifest_the_frozen_results_name():
+    # Arrange / Act
+    problems = check_manifest()
+    frozen = json.loads((FROZEN / "metrics.json").read_text())
+
+    # Assert
+    assert problems == []
+    assert frozen["frozen"]["manifest_sha256"] == sha256_of(export.MANIFEST)
+
+
+def test_manifest_names_a_changed_a_missing_and_a_new_file(tmp_path):
+    # Arrange: a small made-up tree (the real data/raw is never touched)
+    (tmp_path / "data" / "raw" / "lakes").mkdir(parents=True)
+    (tmp_path / "notebooks").mkdir()
+    (tmp_path / "data" / "raw" / "drought.json").write_text("0123450")
+    (tmp_path / "data" / "raw" / "lakes" / "one.csv").write_text("date,storage\n2026-01-01,5\n")
+    (tmp_path / "notebooks" / "oni.txt").write_text("1998 2.22\n")
+    (tmp_path / "notebooks" / "not_an_input.py").write_text("print(1)\n")
+
+    # Act
+    manifest = build_manifest(tmp_path)
+    clean = check_manifest(tmp_path)
+    (tmp_path / "data" / "raw" / "drought.json").write_text("0123451")           # one byte changed
+    (tmp_path / "data" / "raw" / "lakes" / "one.csv").unlink()
+    (tmp_path / "data" / "raw" / "lakes" / "two.csv").write_text("date,storage\n")
+    after = check_manifest(tmp_path)
+
+    # Assert
+    assert sorted(manifest["files"]) == ["data/raw/drought.json", "data/raw/lakes/one.csv", "notebooks/oni.txt"]
+    assert manifest["score_through"] == SCORE_THROUGH and clean == []
+    assert after == ["data/raw/drought.json (changed)", "data/raw/lakes/one.csv (missing)",
+                     "data/raw/lakes/two.csv (new)"]
+
+
+def test_a_missing_manifest_is_a_problem_not_a_pass(tmp_path):
+    assert check_manifest(tmp_path) == ["data/manifest.json (missing)"]
+
+
+def test_panel_cut_off_drops_later_weeks_and_every_answer_that_would_cross_it(panel):
+    # Arrange: a cut-off 74 weeks before the last week in the file
+    cut_off = panel["date"].max() - pd.Timedelta(weeks=74)
+
+    # Act
+    cut = build_panel(score_through=str(cut_off.date()))
+
+    # Assert: no later row, and no answer whose window ends after the cut-off
+    assert cut["date"].max() == cut_off
+    for label, weeks in (("y", ALERT_WEEKS), ("y_season", SEASON_WEEKS), ("y_weeks", YEAR_WEEKS)):
+        known = cut[cut[label].notna()]
+        assert (known["date"] + pd.Timedelta(weeks=weeks)).max() == cut_off
+        # the answers that are known are the same ones the full panel has
+        both = known.merge(panel[["fips", "date", label]], on=["fips", "date"], suffixes=("", "_full"))
+        assert len(both) == len(known) and (both[label] == both[label + "_full"]).all()
+        # and the full panel knows answers the cut panel must not
+        full_known = panel[panel[label].notna() & (panel["date"] <= cut_off)]
+        assert len(full_known) > len(known)
+
+
+def test_panel_with_the_cut_off_at_the_last_week_is_the_default_panel(panel):
+    # Arrange / Act
+    same = build_panel(score_through=str(panel["date"].max().date()))
+
+    # Assert
+    pd.testing.assert_frame_equal(same, panel)
+
+
+def stand_in_for_the_heavy_steps(monkeypatch, root):
+    """Point export.py's paths at a temporary folder and replace its slow steps with tiny ones,
+    so predict() can run in a test. The real frozen files are copied in as its input."""
+    frozen = root / "reports" / "frozen" / "v1"
+    frozen.mkdir(parents=True)
+    for path in FROZEN.iterdir():
+        (frozen / path.name).write_bytes(path.read_bytes())
+    for name, path in {"ROOT": root, "FROZEN": frozen, "LIVE": root / "reports" / "live",
+                       "METRICS": root / "reports" / "metrics.json", "PROCESSED": root / "data" / "processed",
+                       "LATEST": root / "data" / "processed" / "latest.parquet",
+                       "PREDICTIONS": root / "data" / "processed" / "predictions.parquet",
+                       "OUTLOOK": root / "data" / "processed" / "outlook.parquet"}.items():
+        monkeypatch.setattr(export, name, path)
+    week = pd.DataFrame({"date": pd.to_datetime(["2027-01-05"]), "fips": ["48061"], "river": ["Rio Grande"]})
+    monkeypatch.setattr(export, "build_panel", lambda: week)
+    monkeypatch.setattr(export, "alert_v2", lambda panel: (None, None))
+    monkeypatch.setattr(export, "latest_table", lambda panel, threshold: week.copy())
+    monkeypatch.setattr(export, "add_map_fields", lambda now, panel, error: now)
+    monkeypatch.setattr(export, "add_v2_alarm", lambda table, alarm: table)
+    monkeypatch.setattr(export, "finish", lambda table, columns, sort_by: table)
+    monkeypatch.setattr(export, "live_metrics", lambda panel, latest: {
+        "generated_at": "2027-01-07T00:00:00+00:00", "latest_week": "2027-01-05",
+        "reservoir_systems": [{"name": "made up"}], "canals": {"total_km": 1},
+        "canal_priority": {"levels": []}, "districts": {"n_districts": 0}})
+    return frozen
+
+
+def test_predict_leaves_every_frozen_file_byte_identical(tmp_path, monkeypatch):
+    # Arrange
+    frozen = stand_in_for_the_heavy_steps(monkeypatch, tmp_path)
+    before = {path.name: sha256_of(path) for path in frozen.iterdir()}
+    real_metrics_before = sha256_of(METRICS)
+
+    # Act
+    export.predict()
+
+    # Assert: the frozen folder is untouched, and so is the real tree
+    assert {path.name: sha256_of(path) for path in frozen.iterdir()} == before
+    assert sha256_of(METRICS) == real_metrics_before
+    # the handoff tables are copies of the frozen ones
+    for name in ("predictions.parquet", "outlook.parquet"):
+        assert (tmp_path / "data" / "processed" / name).read_bytes() == (frozen / name).read_bytes()
+    # metrics.json is the frozen file plus the live keys, each in its old place
+    merged = json.loads((tmp_path / "reports" / "metrics.json").read_text())
+    frozen_metrics = json.loads((frozen / "metrics.json").read_text())
+    assert list(merged)[:3] == ["contract_version", "generated_at", "is_final"]
+    assert list(merged)[12:14] == ["test_years", "latest_week"]
+    assert list(merged)[-7:] == ["trigger", "reservoir", "losses", "canals", "canal_priority", "v2", "districts"]
+    assert merged["latest_week"] == "2027-01-05" and merged["reservoir"]["systems"] == [{"name": "made up"}]
+    assert merged["headline"] == frozen_metrics["headline"] and merged["limits"] == frozen_metrics["limits"]
+    live = json.loads((tmp_path / "reports" / "live" / "latest.json").read_text())
+    assert set(export.LIVE_KEYS) <= set(live)
+
+
+def test_predict_refuses_to_run_before_anything_was_scored(tmp_path, monkeypatch):
+    # Arrange: paths in an empty folder, so there is no frozen file
+    monkeypatch.setattr(export, "ROOT", tmp_path)
+    monkeypatch.setattr(export, "FROZEN", tmp_path / "reports" / "frozen" / "v1")
+
+    # Act / Assert
+    with pytest.raises(RuntimeError, match="evaluate"):
+        export.predict()
+
+
+def test_evaluate_refuses_to_score_when_a_raw_input_changed(monkeypatch):
+    # Arrange: the manifest check reports a changed file; nothing after it may run
+    monkeypatch.setattr(export, "check_manifest", lambda: ["data/raw/usdm-counties.json (changed)"])
+    monkeypatch.setattr(export, "run_alert", lambda **kwargs: pytest.fail("evaluate() went on to score"))
+
+    # Act / Assert
+    with pytest.raises(RuntimeError, match="usdm-counties.json"):
+        export.evaluate(force=True)
+
+
+def test_evaluate_refuses_to_replace_frozen_results_unless_forced(tmp_path, monkeypatch):
+    # Arrange: a frozen metrics file already exists (in a temporary folder)
+    frozen = tmp_path / "reports" / "frozen" / "v1"
+    frozen.mkdir(parents=True)
+    (frozen / "metrics.json").write_text("{}")
+    monkeypatch.setattr(export, "ROOT", tmp_path)
+    monkeypatch.setattr(export, "FROZEN", frozen)
+    monkeypatch.setattr(export, "check_manifest", lambda: ["stopped here on purpose"])
+    monkeypatch.setattr(export, "run_alert", lambda **kwargs: pytest.fail("evaluate() went on to score"))
+
+    # Act / Assert: without the flag it stops at once and names the flag; with it, it gets as far
+    # as the manifest check
+    with pytest.raises(RuntimeError, match="already exists.*--force"):
+        export.evaluate()
+    with pytest.raises(RuntimeError, match="stopped here on purpose"):
+        export.evaluate(force=True)
+    assert (frozen / "metrics.json").read_text() == "{}"

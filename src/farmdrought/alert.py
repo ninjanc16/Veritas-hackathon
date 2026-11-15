@@ -85,12 +85,13 @@ def shuffled_auc(panel, train, test, runs=3):
     return float(np.mean(scores))
 
 
-def run_alert(buffer_km=BUFFER_KM):
+def run_alert(buffer_km=BUFFER_KM, score_through=None):
     """Run the whole 4-week experiment. Returns (panel with scores and alarms, results).
 
-    buffer_km : how close to the river a county must be. The system uses 50 km.
+    buffer_km     : how close to the river a county must be. The system uses 50 km.
+    score_through : passed to build_panel. None (the default) uses every week, as before.
     """
-    panel = build_panel(buffer_km)
+    panel = build_panel(buffer_km, score_through)
     train, val, test = split_masks(panel)
     focus = panel["river"] == FOCUS_RIVER
     panel = add_baselines(panel, train, val)

@@ -1,4 +1,4 @@
-"""refresh.py: fetch the newest data, then rebuild every output. This is the "live data" step.
+"""refresh.py: fetch the newest data, then rebuild this week's outputs. This is the "live data" step.
 
 HOW LIVE CAN THIS BE? Each source updates on its own clock:
   U.S. Drought Monitor  : once a week (Thursdays). THE FORECAST CAN ONLY CHANGE WEEKLY.
@@ -11,17 +11,17 @@ So running this every day gives a new reservoir reading daily and a new forecast
 WHAT IT DOES:
   1. Download the fresh files. A download is checked BEFORE it replaces the saved file.
      If a source fails, the saved file is kept and the failure is reported.
-  2. If anything changed, rerun version 2 (about 11 minutes on a laptop), then the export
-     (every forecast, the canal levels and the sealant plan). Version 2 is rerun every time,
-     even when only a reservoir changed, so that its report and the export's columns always
-     come from the same computer. (A forest retrained on a different computer can differ by
-     a few cost points, because of rounding. See reports/decision.md.)
+  2. If anything changed, rerun the export's predict step (this week's forecast, the canal
+     levels and the sealant plan). Nothing is scored here: the test results were scored once
+     by `python -m farmdrought.export evaluate` and are kept in reports/frozen/v1/. Version 2
+     is no longer rerun either.
   3. Rebuild the issues list (reports/issues.json, see issues.py).
      It is rebuilt on every run, because weather alerts change by the hour.
   4. Write reports/refresh.json: what was fetched, how new it is, and what failed.
 
-HONEST NOTE: each new week also gives a few more weeks their real answer, so the test
-scores in metrics.json can move slightly from one refresh to the next. The models, inputs,
+HONEST NOTE: the downloads still replace files in data/raw, so after a refresh those files no
+longer match data/manifest.json and the scoring step refuses to run until someone decides to
+score again. That is on purpose: new data must not move a reported score. The models, inputs,
 thresholds and rules never change here. Only the data does.
 
 Run it with:  PYTHONPATH=src python -m farmdrought.refresh
@@ -166,8 +166,7 @@ def main():
                                          or changed("county_weather"))
     report["outputs_rebuilt"] = "--download-only" not in sys.argv and any(changed(name) for name in sources)
     if report["outputs_rebuilt"]:
-        run("-m", "farmdrought.v2")          # version 2 first: the export reads its report
-        run("-m", "farmdrought.export")
+        run("-m", "farmdrought.export")      # predict only: this week's forecast, never the scores
     if "--download-only" not in sys.argv:
         # The issues list reads live weather alerts and the rain forecast, so it is rebuilt on
         # every run, even on a day when no saved file changed.
