@@ -1,81 +1,43 @@
 <!doctype html>
 <!--
-  index.html - ONE page that holds both parts of the project, with a switch at the top:
-    "Demo"     = the demo page (demo/index.html, copied next to this file when the site is deployed)
-    "Full app" = the Streamlit app, hosted at APP_URL
+  index.html - shows the portal on our own domain, filling the whole window.
 
-  Why a wrapper: Streamlit Community Cloud does not allow our own domain, and the demo page
-  belongs to the pipeline side, so we do not edit it. This page simply shows each in a frame.
+  Why a wrapper: the portal is a Streamlit app, hosted at APP_URL. Streamlit Community Cloud does
+  not allow our own domain, so this one small page (hosted for free on Vercel under our domain)
+  simply shows the app in a full-window frame. There is ONE app and one set of pages.
 
-  Links:  /                    opens the Demo
-          /?tab=app            opens the Full app
-          /?fips=48215&view=Canal%20action   opens the Full app on that county and tab
-  Anything in the address that the app understands (river, fips, view) is passed on to it.
+  Links work as they do in the app itself: everything after the "?" is passed on, for example
+      /?view=Budget%20planner        or        /?fips=48215&view=Canal%20action
 
-  To deploy: copy demo/index.html and demo/data.js into a folder "demo" next to this file,
-  then upload the folder (see README). APP_URL below is the hosted app's address.
+  The folder "demo" next to this file holds the interactive map page (demo/index.html and
+  demo/data.js, copied in when the site is deployed). The portal shows it on its
+  "Interactive map" page, so it must be deployed here too.
 -->
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Rio Grande Farm Drought Outlook</title>
+  <title>Rio Grande Drought and Canal Portal</title>
   <style>
-    html, body { margin: 0; height: 100%; background: #f3f1ea; font-family: Georgia, serif; }
-    [hidden] { display: none !important; }       /* make the hidden flag win over the rules below */
-    body { display: flex; flex-direction: column; }
-    /* The bar at the top with the two buttons. */
-    nav { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; padding: 8px 16px;
-          background: #1f3a2d; color: #f3f1ea; }
-    nav .name { font-size: 16px; margin-right: auto; }
-    nav button { font: 14px Georgia, serif; padding: 6px 14px; border-radius: 999px; cursor: pointer;
-                 border: 1px solid #7a9e7e; background: transparent; color: #f3f1ea; }
-    nav button[aria-pressed="true"] { background: #f3f1ea; color: #1f3a2d; }
-    /* The frame fills the rest of the window. */
-    iframe { flex: 1 1 auto; border: 0; width: 100%; background: #f3f1ea; }
+    /* The app fills the whole window, with no margins or page scrollbar of our own. */
+    html, body { margin: 0; height: 100%; background: #ffffff; }
+    iframe { display: block; border: 0; width: 100%; height: 100%; }
   </style>
 </head>
 <body>
-  <nav>
-    <span class="name">Rio Grande Farm Drought Outlook</span>
-    <button id="b-demo" aria-pressed="true">Demo</button>
-    <button id="b-app" aria-pressed="false">Full app</button>
-  </nav>
-  <iframe id="demo" title="Demo" hidden></iframe>
-  <iframe id="app" title="Full app" allow="clipboard-write" hidden></iframe>
+  <iframe id="app" title="Rio Grande Drought and Canal Portal" allow="clipboard-write"></iframe>
 
   <script>
     // The hosted app's address (no "?" part).
     var APP_URL = "https://hackathon-drought.streamlit.app";
 
+    // Pass on whatever came after "?" (page, county, river) and add embed=true, which tells
+    // Streamlit to hide its own page chrome because it is shown inside a frame.
     var params = new URLSearchParams(window.location.search);
-    // Open the app when the link names a tab or county for it; otherwise open the demo.
-    var wantApp = params.get("tab") === "app" ||
-                  params.has("fips") || params.has("river") || params.has("view");
-    if (params.get("tab") === "demo") wantApp = false;
-
-    // The app gets everything after the "?" except our own "tab" word, plus embed=true,
-    // which tells Streamlit to hide its own page chrome because it is shown in a frame.
-    var appParams = new URLSearchParams(params);
-    appParams.delete("tab");
-    appParams.set("embed", "true");
-
-    function show(which) {
-      var demo = document.getElementById("demo"), app = document.getElementById("app");
-      // Load each frame only the first time it is shown (so the app is not woken up for nothing).
-      if (which === "demo" && !demo.src) demo.src = "demo/index.html";
-      if (which === "app" && !app.src) {
-        // URLSearchParams writes spaces as "+"; use %20 so the link matches the app's own links.
-        app.src = APP_URL + "/?" + appParams.toString().replace(/\+/g, "%20");
-      }
-      demo.hidden = which !== "demo";
-      app.hidden = which !== "app";
-      document.getElementById("b-demo").setAttribute("aria-pressed", which === "demo");
-      document.getElementById("b-app").setAttribute("aria-pressed", which === "app");
-    }
-    document.getElementById("b-demo").onclick = function () { show("demo"); };
-    document.getElementById("b-app").onclick = function () { show("app"); };
-    show(wantApp ? "app" : "demo");
+    params.delete("tab");                 // an older version of this page used "tab"; ignore it
+    params.set("embed", "true");
+    // URLSearchParams writes spaces as "+"; use %20 so the link matches the app's own links.
+    document.getElementById("app").src = APP_URL + "/?" + params.toString().replace(/\+/g, "%20");
   </script>
 </body>
 </html>

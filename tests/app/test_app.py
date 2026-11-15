@@ -221,3 +221,10 @@ def test_budget_slider_changes_the_allocation():
     slider.set_value(everything).run()                    # the largest budget: seal everything
     assert not at.exception
     assert f"{metrics['districts']['n_districts']} of {metrics['districts']['n_districts']}" in _all_text(at)
+
+
+def test_interactive_map_is_a_page_of_the_portal():
+    at = _run_with_link(view="Interactive map")
+    assert not at.exception
+    assert at.session_state["view"] == "Interactive map"
+    assert any("Interactive map of the Texas reach" in str(h.value) for h in at.subheader)

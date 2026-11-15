@@ -1,5 +1,5 @@
 """
-streamlit_app.py - the portal (five pages: problem, solution, budget planner, county detail, evidence).
+streamlit_app.py - the portal (six pages: problem, solution, budget planner, interactive map, county detail, evidence).
 
 How it works, in plain English:
   * It gets ALL its data from app/contract.py -> load(). Nothing else. No internet.
@@ -23,6 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import pandas as pd                      # noqa: E402
 import plotly.graph_objects as go        # noqa: E402
 import streamlit as st                   # noqa: E402
+import streamlit.components.v1 as components   # noqa: E402
 
 import importlib                         # noqa: E402
 
@@ -115,7 +116,8 @@ focus = metrics["focus_river"]
 others = sorted(r for r in latest["river"].unique() if r != focus)
 # Links can open the app on one river, county and tab (?river=Ohio&fips=39900&view=Replay).
 # We read the address ONCE per visit, validate it, and use it as the starting choice.
-TAB_NAMES = ["The problem", "The solution", "Budget planner", "County detail", "Evidence and limits"]
+TAB_NAMES = ["The problem", "The solution", "Budget planner", "Interactive map", "County detail",
+             "Evidence and limits"]
 DETAIL_VIEWS = ["This week", "Canal action", "Replay", "Outlook check", "Farm brief"]     # inside "County detail"
 EVIDENCE_VIEWS = ["How good is it", "Other rivers and misses"]                            # inside "Evidence and limits"
 if "url_read" not in st.session_state:
@@ -1098,8 +1100,23 @@ def tab_evidence():
     EVIDENCE_FUNCTIONS[choice]()
 
 
+# The interactive scan (canals, district outlines and the sealant plan on one moving map) is a
+# separate web page built by the pipeline side. We show it INSIDE the portal, as one more page,
+# so the viewer never leaves the app. It is served next to the portal's own page (see app/embed/).
+MAP_URL = "https://hackathon-drought.vercel.app/demo/index.html"
+
+
+def tab_map():
+    st.subheader("Interactive map of the Texas reach")
+    st.caption("Canals, irrigation district outlines and the sealant plan on one map. Press 'Run scan' to "
+               "walk through it step by step, or hover and click the map yourself. "
+               "Every number comes from saved pipeline output; no model runs in the page.")
+    components.iframe(MAP_URL, height=900, scrolling=True)
+    st.caption(f"If the map does not load, open it directly: {MAP_URL}")
+
+
 TAB_FUNCTIONS = {"The problem": tab_problem, "The solution": tab_solution, "Budget planner": tab_budget,
-                 "County detail": tab_detail, "Evidence and limits": tab_evidence}
+                 "Interactive map": tab_map, "County detail": tab_detail, "Evidence and limits": tab_evidence}
 tabs = st.tabs(TAB_NAMES, key="view", on_change="rerun", default=st.session_state["start_tab"])
 for tab, name in zip(tabs, TAB_NAMES):
     with tab:
