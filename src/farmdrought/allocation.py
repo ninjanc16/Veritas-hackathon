@@ -40,24 +40,23 @@ NEEDED = ["p_season", "cls", "d2_streak", "mean12", "fips", "y_season"]
 def model_minus_rule(model, rule, draws=10000, seed=0):
     """Interval for (model share minus rule share), resampling whole years.
 
-    SIGN: a higher share is better here, but year_block_bootstrap is written for quantities
-    where LOWER is better (its "A better" means "A strictly lower"). So the shares are passed
-    NEGATED (a higher share becomes a lower number), and the result is turned back round:
-    "diff", "lo" and "hi" below are model minus rule in plain shares, so ABOVE zero means the
-    model funded more counties that went on to a drought season. The two "better" counts are
-    renamed so nobody has to remember which way they point.
+    SIGN: a higher share is better here, so the plain shares are passed to
+    year_block_bootstrap with lower_is_better=False. "diff", "lo" and "hi" below are model minus
+    rule in plain shares, so ABOVE zero means the model funded more counties that went on to a
+    drought season. The two "better" counts are renamed so nobody has to remember which way
+    they point. "caveat" must be printed wherever the interval is.
 
     Every year counts the same (weighted-mean mode with weight 1 per year), so "diff" is the
     difference of the two means over years.
     """
     weights = pd.Series(1.0, index=model.index)
-    raw = year_block_bootstrap(-model, -rule, weights=weights, draws=draws, seed=seed)
+    raw = year_block_bootstrap(model, rule, weights=weights, draws=draws, seed=seed, lower_is_better=False)
     return {
-        "diff": 0.0 - raw["diff"], "lo": 0.0 - raw["hi"], "hi": 0.0 - raw["lo"],   # 0.0 - x: no "-0.0"
+        "diff": raw["diff"], "lo": raw["lo"], "hi": raw["hi"],
         "share_draws_model_better": raw["share_draws_a_better"],
         "years_model_better": raw["years_a_better"],
         "n_years": raw["n_years"], "draws": raw["draws"], "block": raw["block"], "seed": raw["seed"],
-        "higher_is_better": True,
+        "higher_is_better": True, "caveat": raw["caveat"],
     }
 
 

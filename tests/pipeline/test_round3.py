@@ -12,7 +12,7 @@ from farmdrought.allocation import model_minus_rule, run_allocation
 from farmdrought.config import COUNTY_RESERVOIR
 from farmdrought.prob_calibration import brier, calibrate_by_past, class_frequency_by_past, reliability
 from farmdrought.trigger import run_trigger, run_trigger_annual
-from farmdrought.uncertainty import excludes_zero, resample_years, year_block_bootstrap
+from farmdrought.uncertainty import direction, excludes_zero, resample_years, year_block_bootstrap
 
 YEARS = list(range(2008, 2020))
 # Twelve made-up yearly costs. A is sometimes lower and sometimes higher than B.
@@ -24,9 +24,9 @@ def test_bootstrap_is_seeded_and_resamples_years():
     # Arrange: the same inputs, run twice with seed 0 and once with seed 1
 
     # Act
-    first = year_block_bootstrap(COST_A, COST_B, draws=2000, seed=0)
-    again = year_block_bootstrap(COST_A, COST_B, draws=2000, seed=0)
-    other = year_block_bootstrap(COST_A, COST_B, draws=2000, seed=1)
+    first = year_block_bootstrap(COST_A, COST_B, draws=2000, seed=0, lower_is_better=True)
+    again = year_block_bootstrap(COST_A, COST_B, draws=2000, seed=0, lower_is_better=True)
+    other = year_block_bootstrap(COST_A, COST_B, draws=2000, seed=1, lower_is_better=True)
 
     # Assert: same seed, same answer; another seed, another interval; the unit is the year
     assert first == again
@@ -44,7 +44,7 @@ def test_one_extreme_year_is_included_or_left_out_as_a_whole():
     b = {2001: 5.0, 2002: 5.0, 2003: 1000.0, 2004: 5.0}
 
     # Act
-    result = year_block_bootstrap(a, b, draws=10000, seed=0)
+    result = year_block_bootstrap(a, b, draws=10000, seed=0, lower_is_better=True)
 
     # Assert
     assert result["n_years"] == 4 and result["years_a_better"] == 1
@@ -69,7 +69,7 @@ def test_every_resample_holds_as_many_years_as_the_original():
 
 def test_identical_policies_give_a_zero_interval_that_is_not_a_win():
     # Arrange / Act
-    result = year_block_bootstrap(COST_A, COST_A.copy(), draws=1000, seed=0)
+    result = year_block_bootstrap(COST_A, COST_A.copy(), draws=1000, seed=0, lower_is_better=True)
 
     # Assert
     assert (result["diff"], result["lo"], result["hi"]) == (0.0, 0.0, 0.0)
@@ -82,14 +82,14 @@ def test_a_policy_that_is_lower_every_year_has_an_interval_below_zero():
     lower = COST_B - 2
 
     # Act
-    result = year_block_bootstrap(lower, COST_B, draws=1000, seed=0)
+    result = year_block_bootstrap(lower, COST_B, draws=1000, seed=0, lower_is_better=True)
 
     # Assert
     assert result["lo"] < 0 and result["hi"] < 0
     assert result["share_draws_a_better"] == 1.0 and result["years_a_better"] == 12
     assert excludes_zero(result) is True
     # and the mirror image, B against A, is a clear loss, which also excludes zero
-    assert excludes_zero(year_block_bootstrap(COST_B, lower, draws=1000, seed=0)) is True
+    assert excludes_zero(year_block_bootstrap(COST_B, lower, draws=1000, seed=0, lower_is_better=True)) is True
 
 
 def test_an_interval_that_touches_or_straddles_zero_is_not_a_win():
@@ -107,8 +107,8 @@ def test_weighted_mode_gives_the_hand_computed_weighted_mean():
     # By hand: A = (10 + 20 + 2 x 30) / 4 = 22.5 and B = (12 + 18 + 2 x 33) / 4 = 24.0
 
     # Act
-    weighted = year_block_bootstrap(a, b, weights=rows, draws=500, seed=0)
-    totals = year_block_bootstrap(a, b, draws=500, seed=0)
+    weighted = year_block_bootstrap(a, b, weights=rows, draws=500, seed=0, lower_is_better=True)
+    totals = year_block_bootstrap(a, b, draws=500, seed=0, lower_is_better=True)
 
     # Assert: -1.5 with weights (a plain mean would give -1.0), and -3.0 as a sum
     assert weighted["diff"] == pytest.approx(22.5 - 24.0)
@@ -124,27 +124,143 @@ def test_block_of_two_keeps_adjacent_years_together():
     b = {2001: 0.0, 2002: 1.0, 2003: 0.0, 2004: 1.0}
 
     # Act
-    paired = year_block_bootstrap(a, b, draws=2000, seed=0, block=2)
-    single = year_block_bootstrap(a, b, draws=2000, seed=0, block=1)
+    paired = year_block_bootstrap(a, b, draws=2000, seed=0, block=2, lower_is_better=True)
+    single = year_block_bootstrap(a, b, draws=2000, seed=0, block=1, lower_is_better=True)
 
     # Assert
     assert (paired["lo"], paired["hi"]) == (0.0, 0.0) and paired["block"] == 2
     assert single["lo"] < 0 < single["hi"]                    # single years do not cancel
 
 
-def test_block_of_two_with_an_odd_count_still_draws_the_original_number_of_years():
+def test_block_of_two_draws_whole_pairs_and_refuses_an_odd_number_of_years():
     # Arrange
     rng = np.random.default_rng(0)
 
-    # Act: five years make the blocks (0, 1), (2, 3) and (4) alone
-    picked = resample_years(5, 300, rng, block=2)
+    # Act: six years make the pairs (0, 1), (2, 3) and (4, 5)
+    picked = resample_years(6, 300, rng, block=2)
 
-    # Assert: always five years, and a pair is never entered in the middle
-    assert picked.shape == (300, 5)
-    for row in picked:
-        for position, year in enumerate(row):
-            if year in (1, 3):                                # the second year of a pair
-                assert position > 0 and row[position - 1] == year - 1
+    # Assert: always six years, made of whole pairs in order; five years are refused, because
+    # cutting the last pair would keep first years more often than second years
+    assert picked.shape == (300, 6)
+    assert (picked[:, 0::2] % 2 == 0).all() and (picked[:, 1::2] == picked[:, 0::2] + 1).all()
+    assert len({tuple(row) for row in picked}) > 1
+    with pytest.raises(ValueError, match="even"):
+        resample_years(5, 300, rng, block=2)
+    with pytest.raises(ValueError, match="even"):
+        year_block_bootstrap(COST_A[:5], COST_B[:5], block=2, lower_is_better=True)
+
+
+def test_a_single_year_or_a_single_pair_is_refused_not_reported_as_certain():
+    # Arrange: one year has nothing to resample, and two years are one pair under block=2
+    one_a, one_b = {2010: 5.0}, {2010: 9.0}
+    two_a, two_b = {2010: 5.0, 2011: 4.0}, {2010: 9.0, 2011: 8.0}
+
+    # Act / Assert
+    with pytest.raises(ValueError, match="at least two"):
+        year_block_bootstrap(one_a, one_b, lower_is_better=True)
+    with pytest.raises(ValueError, match="at least two"):
+        year_block_bootstrap(two_a, two_b, block=2, lower_is_better=True)
+    assert year_block_bootstrap(two_a, two_b, draws=50, lower_is_better=True)["n_years"] == 2
+
+
+def test_missing_or_infinite_values_are_refused():
+    # Arrange
+    a_with_hole = COST_A.copy()
+    a_with_hole[2011] = np.nan
+    b_with_infinity = COST_B.copy()
+    b_with_infinity[2015] = np.inf
+    rows = pd.Series(10.0, index=YEARS)
+    rows_with_hole = rows.copy()
+    rows_with_hole[2019] = np.nan
+
+    # Act / Assert: the message names the input and the year
+    with pytest.raises(ValueError, match="per_year_a.*2011"):
+        year_block_bootstrap(a_with_hole, COST_B, lower_is_better=True)
+    with pytest.raises(ValueError, match="per_year_b.*2015"):
+        year_block_bootstrap(COST_A, b_with_infinity, lower_is_better=True)
+    with pytest.raises(ValueError, match="weights.*2019"):
+        year_block_bootstrap(COST_A, COST_B, weights=rows_with_hole, lower_is_better=True)
+
+
+def test_the_direction_must_be_stated_and_decides_what_better_means():
+    # Arrange: A is lower than B in 8 of the 12 years
+    # Act
+    as_cost = year_block_bootstrap(COST_A, COST_B, draws=500, seed=0, lower_is_better=True)
+    as_share = year_block_bootstrap(COST_A, COST_B, draws=500, seed=0, lower_is_better=False)
+
+    # Assert: the interval is the same either way; only the "better" counts turn round
+    with pytest.raises(TypeError):
+        year_block_bootstrap(COST_A, COST_B)
+    assert (as_cost["diff"], as_cost["lo"], as_cost["hi"]) == (as_share["diff"], as_share["lo"], as_share["hi"])
+    assert as_cost["years_a_better"] == 8 and as_share["years_a_better"] == 4
+    assert as_cost["share_draws_a_better"] + as_share["share_draws_a_better"] == pytest.approx(1.0, abs=0.02)
+    assert as_cost["lower_is_better"] is True and as_share["lower_is_better"] is False
+
+
+def test_direction_names_the_winner_for_both_meanings_of_better():
+    # Arrange: A minus B wholly below zero, wholly above zero, and across zero
+    below, above, across = {"lo": -5.0, "hi": -1.0}, {"lo": 1.0, "hi": 5.0}, {"lo": -1.0, "hi": 5.0}
+    touching = {"lo": 0.0, "hi": 5.0}
+
+    # Act / Assert: lower is better (a cost): A below B is a win for A
+    assert direction({**below, "lower_is_better": True}) == "a better"
+    assert direction({**above, "lower_is_better": True}) == "b better"
+    assert direction({**across, "lower_is_better": True}) == "not separated"
+    # higher is better (a share): A above B is a win for A
+    assert direction({**below, "lower_is_better": False}) == "b better"
+    assert direction({**above, "lower_is_better": False}) == "a better"
+    assert direction({**across, "lower_is_better": False}) == "not separated"
+    assert direction({**touching, "lower_is_better": False}) == "not separated"
+    # and on a real result: A is 2 lower every year, which is a win only if lower is better
+    lower = COST_B - 2
+    assert direction(year_block_bootstrap(lower, COST_B, draws=200, lower_is_better=True)) == "a better"
+    assert direction(year_block_bootstrap(lower, COST_B, draws=200, lower_is_better=False)) == "b better"
+
+
+def test_weighted_interval_equals_a_hand_loop_over_the_same_resampled_years():
+    # Arrange: yearly mean errors and row counts; redo the resampling by hand, one draw at a time
+    a = COST_A / 10
+    b = COST_B / 10
+    rows = pd.Series([31, 31, 30, 29, 31, 28, 31, 31, 27, 31, 30, 31], index=YEARS, dtype=float)
+    picked = resample_years(len(YEARS), 400, np.random.default_rng(7), block=1)
+    by_hand = []
+    for draw in picked:
+        total = sum(rows.iloc[i] for i in draw)
+        mean_a = sum(a.iloc[i] * rows.iloc[i] for i in draw) / total
+        mean_b = sum(b.iloc[i] * rows.iloc[i] for i in draw) / total
+        by_hand.append(mean_a - mean_b)
+
+    # Act
+    result = year_block_bootstrap(a, b, weights=rows, draws=400, seed=7, lower_is_better=True)
+
+    # Assert
+    assert result["lo"] == pytest.approx(np.percentile(by_hand, 2.5))
+    assert result["hi"] == pytest.approx(np.percentile(by_hand, 97.5))
+    assert result["share_draws_a_better"] == pytest.approx(np.mean([d < 0 for d in by_hand]))
+
+
+def test_interval_ends_are_the_2_5_and_97_5_percentiles():
+    # Arrange: the same draws by hand, in sum mode
+    picked = resample_years(len(YEARS), 1000, np.random.default_rng(3), block=1)
+    sums = (COST_A.to_numpy() - COST_B.to_numpy())[picked].sum(axis=1)
+
+    # Act
+    result = year_block_bootstrap(COST_A, COST_B, draws=1000, seed=3, lower_is_better=True)
+
+    # Assert: a 90% interval (5 and 95) would be narrower at both ends, and is not what we return
+    assert (result["lo"], result["hi"]) == (np.percentile(sums, 2.5), np.percentile(sums, 97.5))
+    assert result["lo"] < np.percentile(sums, 5) and result["hi"] > np.percentile(sums, 95)
+
+
+def test_every_result_carries_the_caveat_with_its_own_numbers():
+    # Arrange / Act
+    eight = year_block_bootstrap(COST_A[:8], COST_B[:8], draws=100, block=2, lower_is_better=True)
+    twelve = year_block_bootstrap(COST_A, COST_B, draws=100, lower_is_better=True)
+
+    # Assert
+    assert eight["caveat"].startswith("Percentile interval from 8 resampled years (block 2). With this few")
+    assert twelve["caveat"].startswith("Percentile interval from 12 resampled years (block 1).")
+    assert "88% of the time with 8 years and 92% with 18 (80% and 90% with two-year blocks)" in twelve["caveat"]
 
 
 def test_mismatched_years_raise_an_error_that_names_them():
@@ -154,10 +270,10 @@ def test_mismatched_years_raise_an_error_that_names_them():
 
     # Act / Assert
     with pytest.raises(ValueError, match="2002") as error:
-        year_block_bootstrap(a, b)
+        year_block_bootstrap(a, b, lower_is_better=True)
     assert "2003" in str(error.value)
     with pytest.raises(ValueError, match="weights"):
-        year_block_bootstrap(a, a, weights={2001: 5})
+        year_block_bootstrap(a, a, weights={2001: 5}, lower_is_better=True)
 
 
 # ---------------------------------------------------------------------------------------------
