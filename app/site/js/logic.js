@@ -4,7 +4,7 @@
 
   TWO KINDS OF FUNCTION
     Plain ones need nothing but their arguments: esc, usd, num, pct, niceDate, workTime, gal,
-    money, usesElephantButte.
+    money, usesElephantButte, and the guards safeUrl, cssClass, finiteOrNull, csvText, csvNumber.
 
     Bound ones read the generated data (window.HG and window.HG_SIM in the browser). They come
     from makeLogic(data), so a test can hand in a small made-up data object instead:
@@ -33,9 +33,32 @@
     : Number(x).toLocaleString("en-US", { maximumFractionDigits: digits || 0, minimumFractionDigits: digits || 0 });
   const pct = (p) => (p == null ? "n/a" : Math.round(p * 100) + "%");
   const niceDate = (iso) => new Date(iso + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-  /* Makes text safe to put inside HTML and inside a double-quoted attribute. It does NOT escape
-     the single quote, so it is not safe inside a single-quoted attribute. */
-  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  /* Makes text safe to put inside HTML and inside a quoted attribute: & < > and both quotes. */
+  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+  /* ---------- Guards for values that come from data and end up in the page or in a file ---------- */
+  /* A web address is used as a link only if it is a string starting with https:// or http://.
+     Anything else (javascript:, data:, a relative path, not a string) gives null: show no link. */
+  const safeUrl = (url) => (typeof url === "string" && /^https?:\/\//.test(url) ? url : null);
+  /* A value used as a CSS class must be one of the names we know. Anything else gives "". */
+  const cssClass = (value, allowed) => (typeof value === "string" && allowed.indexOf(value) >= 0 ? value : "");
+  const TIER_CLASSES = ["Low", "Watch", "Warning"];                 // .chip.Low, .chip.Watch, .chip.Warning in css/site.css
+  const SEVERITY_CLASSES = ["Critical", "Important", "Context"];    // the issue list's severities
+  /* A reading that should be a number: the number itself, or null if it is anything else. */
+  const finiteOrNull = (x) => (typeof x === "number" && isFinite(x) ? x : null);
+  /*
+    One field of a CSV file.
+    csvText: always in double quotes, with any double quote inside doubled. A field that starts
+    with = + - @, a tab or a carriage return gets a single quote in front, so a spreadsheet shows
+    it as text and does not run it as a formula.
+    csvNumber: a real, finite number written bare (with a fixed number of decimals if asked);
+    anything else is left empty.
+  */
+  const csvText = (value) => {
+    const text = String(value == null ? "" : value);
+    return '"' + (/^[=+\-@\t\r]/.test(text) ? "'" : "") + text.replace(/"/g, '""') + '"';
+  };
+  const csvNumber = (value, digits) => (typeof value === "number" && isFinite(value) ? (digits == null ? String(value) : value.toFixed(digits)) : "");
 
   /* "3 hours", "2 days", "6 weeks": a length of working time (8-hour days, 5-day weeks) in plain words. */
   function workTime(days) {
@@ -176,5 +199,6 @@
     return { actionFor, tierFor, planFor, canalNumbers, USD_PER_AF, scopeP, simScope, hitRates };
   }
 
-  return { usd, num, pct, niceDate, esc, workTime, gal, money, usesElephantButte, makeLogic };
+  return { usd, num, pct, niceDate, esc, safeUrl, cssClass, TIER_CLASSES, SEVERITY_CLASSES, finiteOrNull, csvText, csvNumber,
+           workTime, gal, money, usesElephantButte, makeLogic };
 });

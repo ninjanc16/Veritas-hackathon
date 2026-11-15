@@ -49,17 +49,20 @@ const logic = (data) => L.makeLogic(data || fake());
 const names = (list) => list.map((c) => c.name);
 
 /* ---------- esc ---------- */
-test("esc escapes & < > and the double quote, in text and inside a double-quoted attribute", () => {
-  assert.strictEqual(L.esc('<a href="x">Tom & Jerry</a>'), "&lt;a href=&quot;x&quot;&gt;Tom &amp; Jerry&lt;/a&gt;");
+test("esc escapes all five characters that matter in HTML text and attributes: & < > and both quotes", () => {
   assert.strictEqual(L.esc("&"), "&amp;");
   assert.strictEqual(L.esc("<"), "&lt;");
   assert.strictEqual(L.esc(">"), "&gt;");
   assert.strictEqual(L.esc('"'), "&quot;");
+  assert.strictEqual(L.esc("'"), "&#39;");
+  assert.strictEqual(L.esc('<a href="x">Tom & Jerry</a>'), "&lt;a href=&quot;x&quot;&gt;Tom &amp; Jerry&lt;/a&gt;");
+  assert.strictEqual(L.esc("O'Brien"), "O&#39;Brien");
   assert.strictEqual(L.esc("&amp;"), "&amp;amp;");                        // escaping twice shows the first escape as text
 });
 
-test("esc leaves the single quote as it is (today's behaviour: never use it inside a single-quoted attribute)", () => {
-  assert.strictEqual(L.esc("O'Brien"), "O'Brien");
+test("esc leaves nothing that can open a tag or close an attribute, with either kind of quote", () => {
+  const hostile = ['"><script>alert(1)</script>', "' onmouseover='alert(1)", "<img src=x onerror=alert(1)>", '</td><td class="x">', "a\" b' c<d>e&f"];
+  for (const text of hostile) assert.ok(!/[<>"']/.test(L.esc(text)), text);
 });
 
 test("esc turns null and undefined into an empty string and other values into text", () => {
@@ -68,6 +71,83 @@ test("esc turns null and undefined into an empty string and other values into te
   assert.strictEqual(L.esc(0), "0");
   assert.strictEqual(L.esc(12.5), "12.5");
   assert.strictEqual(L.esc("plain text"), "plain text");
+});
+
+/* ---------- safeUrl, cssClass, finiteOrNull ---------- */
+test("safeUrl keeps an address that starts with https:// or http:// exactly as it is", () => {
+  assert.strictEqual(L.safeUrl("https://example.org/a?b=1&c=2"), "https://example.org/a?b=1&c=2");
+  assert.strictEqual(L.safeUrl("http://example.org"), "http://example.org");
+});
+
+test("safeUrl gives null for anything that is not a plain web address", () => {
+  const hostile = ["javascript:alert(1)", "JAVASCRIPT:alert(1)", " javascript:alert(1)", "java\tscript:alert(1)", "data:text/html,<script>alert(1)</script>",
+    "vbscript:x", "//example.org", "/relative/path", "example.org", "ftp://example.org", " https://example.org", "HTTPS://example.org", "https:/example.org", "https:example.org", "",
+    null, undefined, 0, 12, {}, ["https://example.org"], { toString: () => "https://example.org" }];
+  for (const url of hostile) assert.strictEqual(L.safeUrl(url), null, String(url));
+});
+
+test("safeUrl does not escape: a kept address with a quote or a tag in it still needs esc before it goes in an attribute", () => {
+  const url = 'https://example.org/"><script>alert(1)</script>';
+  assert.strictEqual(L.safeUrl(url), url);
+  assert.ok(!/[<>"']/.test(L.esc(L.safeUrl(url))));
+});
+
+test("cssClass keeps a known class name and gives an empty string for anything else", () => {
+  for (const tier of ["Low", "Watch", "Warning"]) assert.strictEqual(L.cssClass(tier, L.TIER_CLASSES), tier);
+  for (const sev of ["Critical", "Important", "Context"]) assert.strictEqual(L.cssClass(sev, L.SEVERITY_CLASSES), sev);
+  const hostile = ['Warning" onmouseover="alert(1)', "Warning x", "warning", " Warning", "Low'><script>", "<b>", "", null, undefined, 0, {}, ["Low"], "constructor", "length", "0"];
+  for (const value of hostile) assert.strictEqual(L.cssClass(value, L.TIER_CLASSES), "", String(value));
+  assert.strictEqual(L.cssClass("Critical", L.TIER_CLASSES), "");          // a severity is not a tier
+});
+
+test("finiteOrNull keeps a real number and gives null for everything else", () => {
+  for (const x of [0, -0.5, 41.3, 100, 1e9]) assert.strictEqual(L.finiteOrNull(x), x);
+  for (const x of [NaN, Infinity, -Infinity, null, undefined, "", "41.3", "<script>alert(1)</script>", true, {}, [41.3]]) assert.strictEqual(L.finiteOrNull(x), null, String(x));
+});
+
+/* ---------- csvText, csvNumber ---------- */
+test("csvText puts every text field in double quotes and doubles a double quote inside it", () => {
+  assert.strictEqual(L.csvText("Main Canal"), '"Main Canal"');
+  assert.strictEqual(L.csvText('The "Big" Ditch'), '"The ""Big"" Ditch"');
+  assert.strictEqual(L.csvText("a,b"), '"a,b"');
+  assert.strictEqual(L.csvText("two\nlines"), '"two\nlines"');
+  assert.strictEqual(L.csvText("O'Brien Lateral"), '"O\'Brien Lateral"');
+  assert.strictEqual(L.csvText("48061"), '"48061"');
+  assert.strictEqual(L.csvText(""), '""');
+  assert.strictEqual(L.csvText(null), '""');
+  assert.strictEqual(L.csvText(undefined), '""');
+  assert.strictEqual(L.csvText('","x'), '""",""x"');                        // cannot break out into a new field
+});
+
+test("csvText puts a single quote before a field that a spreadsheet would read as a formula", () => {
+  assert.strictEqual(L.csvText("=SUM(A1:A9)"), '"\'=SUM(A1:A9)"');
+  assert.strictEqual(L.csvText('=HYPERLINK("http://evil","x")'), '"\'=HYPERLINK(""http://evil"",""x"")"');
+  assert.strictEqual(L.csvText("+1+1"), '"\'+1+1"');
+  assert.strictEqual(L.csvText("-2+3"), '"\'-2+3"');
+  assert.strictEqual(L.csvText("@SUM(1)"), '"\'@SUM(1)"');
+  assert.strictEqual(L.csvText("\t=1+1"), '"\'\t=1+1"');
+  assert.strictEqual(L.csvText("\r=1+1"), '"\'\r=1+1"');
+  assert.strictEqual(L.csvText(-5), '"\'-5"');                              // a number passed as text is treated as text
+});
+
+test("csvText leaves a field alone when the risky character is not the first one", () => {
+  assert.strictEqual(L.csvText("A=B"), '"A=B"');
+  assert.strictEqual(L.csvText("Canal - East"), '"Canal - East"');
+  assert.strictEqual(L.csvText("name@example"), '"name@example"');
+  assert.strictEqual(L.csvText(" =1+1"), '" =1+1"');
+});
+
+test("csvNumber writes a real number bare, with fixed decimals if asked, and leaves anything else empty", () => {
+  assert.strictEqual(L.csvNumber(9.35), "9.35");
+  assert.strictEqual(L.csvNumber(0), "0");
+  assert.strictEqual(L.csvNumber(-1.5), "-1.5");
+  assert.strictEqual(L.csvNumber(288.984, 2), "288.98");
+  assert.strictEqual(L.csvNumber(1225.2, 2), "1225.20");
+  assert.strictEqual(L.csvNumber(0, 2), "0.00");
+  for (const x of [NaN, Infinity, -Infinity, null, undefined, "", "12", "=1+1", "<b>", {}, [1]]) {
+    assert.strictEqual(L.csvNumber(x), "", String(x));
+    assert.strictEqual(L.csvNumber(x, 2), "", String(x));
+  }
 });
 
 /* ---------- usd, num, pct, niceDate ---------- */

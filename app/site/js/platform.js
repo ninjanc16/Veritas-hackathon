@@ -18,7 +18,7 @@
   "use strict";
   const HG = window.HG, SIM = window.HG_SIM, U = window.HGU, E = window.HGEngine;
   const L = U.logic;                                    // the rules with no page code (js/logic.js), bound to the data
-  const { gal, money, usesElephantButte } = window.HGLogic, hitRates = L.hitRates;
+  const { gal, money, usesElephantButte, safeUrl, cssClass, finiteOrNull } = window.HGLogic, hitRates = L.hitRates;
   const $ = (id) => document.getElementById(id);
   const STATE = -1;
   const FROZEN = SIM.pre2020;                           // the forecast model trained only on data before 2020
@@ -50,16 +50,20 @@
   function reservoirFor(d) {
     const name = d && usesElephantButte(d) ? "Elephant Butte" : "Amistad-Falcon";
     const county = HG.river.find((c) => c.reservoir === name);
-    let pct = county ? county.reservoirPct : null, date = HG.week, live = false;
-    if (state.live && state.live.systems && state.live.systems[name]) {
-      pct = state.live.systems[name].pct; date = state.live.systems[name].date; live = true;
-    }
+    let pct = county ? finiteOrNull(county.reservoirPct) : null, date = HG.week, live = false;
+    // A live reading is used only if its figure is a real number; otherwise the saved one stays.
+    const reading = state.live && state.live.systems && state.live.systems[name];
+    if (reading && finiteOrNull(reading.pct) != null) { pct = reading.pct; date = reading.date; live = true; }
     return { name, pct, date, live };
   }
 
   /* ---------- Small HTML pieces ---------- */
   const kpi = (label, value, small) => '<div class="kpi"><span>' + label + "</span><b>" + value + "</b>" + (small ? "<small>" + small + "</small>" : "") + "</div>";
-  const chip = (tier, text) => '<span class="chip ' + tier + '"><i></i>' + (text || tier) + "</span>";
+  const chip = (tier, text) => '<span class="chip ' + cssClass(tier, window.HGLogic.TIER_CLASSES) + '"><i></i>' + U.esc(text || tier) + "</span>";
+  /* A link that opens in a new tab. The address must start with https:// or http://; if it does
+     not, only the text is shown. hrefFirst only sets the order of the attributes. */
+  const anchor = (text, url, hrefFirst) => (safeUrl(url) == null ? U.esc(text)
+    : (hrefFirst ? '<a href="' + U.esc(url) + '" target="_blank" rel="noopener">' : '<a target="_blank" rel="noopener" href="' + U.esc(url) + '">') + U.esc(text) + "</a>");
   /* Water is shown in gallons, which people can picture: gal() in js/logic.js converts from acre-feet. */
   const af = (n) => gal(n.afLow).replace(/ (million|billion) gal$/, (m, w) => (gal(n.afHigh).indexOf(w) > 0 ? "" : " " + w)) + " to " + gal(n.afHigh);   // a range, e.g. "20 to 63 billion gal"
   const afMid = (n) => gal((n.afLow + n.afHigh) / 2);
@@ -95,10 +99,11 @@
   function countyCard(fips, closable) {
     const c = U.countyByFips[fips], river = U.riverByFips[fips];
     const captions = { county: "Aerial view", drought: "Driest area, close-up", ground: "On the ground" };
-    const photos = c.photos.map((kind) => '<figure><img loading="lazy" src="' + U.photo(fips, kind) + '" alt="' + captions[kind] + " of " + U.esc(c.name) + ' County"><figcaption>' + captions[kind] + "</figcaption></figure>").join("");
+    const caption = (kind) => (Object.prototype.hasOwnProperty.call(captions, kind) ? captions[kind] : "Photo");
+    const photos = c.photos.map((kind) => '<figure><img loading="lazy" src="' + U.esc(U.photo(fips, kind)) + '" alt="' + caption(kind) + " of " + U.esc(c.name) + ' County"><figcaption>' + caption(kind) + "</figcaption></figure>").join("");
     let credit = "Aerial images: USGS The National Map (public domain), from past flights.";
     if (c.credit && c.photos.indexOf("ground") >= 0) {
-      credit += ' Ground photo: <a href="' + U.esc(c.credit.source) + '" target="_blank" rel="noopener">' + U.esc(c.credit.what || "photo") + "</a> by " + U.esc(c.credit.by) + ", " + U.esc(c.credit.licence) + ".";
+      credit += " Ground photo: " + anchor(c.credit.what || "photo", c.credit.source, true) + " by " + U.esc(c.credit.by) + ", " + U.esc(c.credit.licence) + ".";
     }
     return '<div class="card">' +
       (closable ? '<button class="back" data-act="closeCounty">&times; Close county</button>' : "") +
@@ -106,9 +111,9 @@
       (river ? chip(river.tier, river.tier + " · " + U.pct(river.pSeason)) : "") + "</div>" +
       '<div class="small muted" style="margin:2px 0 8px">Drought now: ' + (c.dm == null ? "no data" : U.DM_TEXT[c.dm]) +
       (c.pop ? " · Population (2020): " + U.num(c.pop) : "") +
-      (river ? " · Expected drought weeks in the next year: " + river.weeksLow + " to " + river.weeksHigh : " · Not a river county, so no forecast") + "</div>" +
+      (river ? " · Expected drought weeks in the next year: " + U.esc(river.weeksLow) + " to " + U.esc(river.weeksHigh) : " · Not a river county, so no forecast") + "</div>" +
       (photos ? '<div class="photos">' + photos + "</div>" : "") +
-      (c.about ? '<p class="small" style="margin:0 0 4px">' + U.esc(c.about) + ' <a href="' + U.esc(c.page) + '" target="_blank" rel="noopener">Wikipedia</a></p>' : "") +
+      (c.about ? '<p class="small" style="margin:0 0 4px">' + U.esc(c.about) + (safeUrl(c.page) == null ? "" : " " + anchor("Wikipedia", c.page, true)) + "</p>" : "") +
       '<div class="credit">' + credit + "</div></div>";
   }
   function issuesFor(d) {
@@ -116,15 +121,15 @@
     const list = HG.issues.issues.filter((x) => (d ? x.district === d.name || (x.where || []).some((f) => d.fips.indexOf(f) >= 0) : true)).slice(0, d ? 6 : 8);
     if (!list.length) return "";
     return "<h3>Open issues from live data</h3><div class=\"card\">" + list.map((x) =>
-      '<div class="issue"><span class="sev ' + x.severity + '"></span><div><b>' + U.esc(x.title) + "</b><br><span class=\"muted\">" + U.esc(x.detail) + "</span><br><span class=\"credit\">Source: " + U.esc(x.source) + " · as of " + U.esc(x.as_of) + "</span></div></div>").join("") +
+      '<div class="issue"><span class="sev ' + cssClass(x.severity, window.HGLogic.SEVERITY_CLASSES) + '"></span><div><b>' + U.esc(x.title) + "</b><br><span class=\"muted\">" + U.esc(x.detail) + "</span><br><span class=\"credit\">Source: " + U.esc(x.source) + " · as of " + U.esc(x.as_of) + "</span></div></div>").join("") +
       '</div><p class="credit">' + U.esc(HG.issues.note) + "</p>";
   }
   function mixBar(list, keyOf, colorOf) {
     const total = {}, km = list.reduce((s, c) => s + c.km, 0) || 1;
     list.forEach((c) => { total[keyOf(c)] = (total[keyOf(c)] || 0) + c.km; });
     const keys = Object.keys(total).sort((a, b) => total[b] - total[a]);
-    return '<div class="stack">' + keys.map((k) => '<i title="' + U.esc(k) + '" style="width:' + (100 * total[k] / km) + "%;background:" + colorOf(k) + '"></i>').join("") + "</div>" +
-      '<div class="legend">' + keys.slice(0, 6).map((k) => '<span><i style="background:' + colorOf(k) + '"></i>' + U.esc(k) + " " + U.num(total[k]) + " km</span>").join("") + "</div>";
+    return '<div class="stack">' + keys.map((k) => '<i title="' + U.esc(k) + '" style="width:' + (100 * total[k] / km) + "%;background:" + U.esc(colorOf(k)) + '"></i>').join("") + "</div>" +
+      '<div class="legend">' + keys.slice(0, 6).map((k) => '<span><i style="background:' + U.esc(colorOf(k)) + '"></i>' + U.esc(k) + " " + U.num(total[k]) + " km</span>").join("") + "</div>";
   }
   /* One line that says how many canals there are and where the list came from. */
   function canalCount(list) {
@@ -168,10 +173,10 @@
           "<dt>Length</dt><dd>" + U.num(c.km, 2) + " km</dd><dt>Soil</dt><dd>" + U.esc(c.soil || "not looked up") + "</dd><dt>Class</dt><dd>" + U.esc(c.level) + "</dd></dl>" +
           "<small>" + U.esc((c.kind || "Canal or ditch") + (c.piped ? ", mapped as piped" : "") + ". Click for the full card.") + "</small>";
       }
-      if (hit.district != null) { const d = HG.districts[hit.district]; return "<b>" + U.esc(d.name) + "</b><dl><dt>Risk</dt><dd>" + d.risk + ", " + U.pct(d.pSeason) + "</dd><dt>Canals</dt><dd>" + U.num(d.canalKm) + " km</dd></dl><small>" + (picking() ? "Tap to select it for the simulation." : "Click to open this district.") + "</small>"; }
+      if (hit.district != null) { const d = HG.districts[hit.district]; return "<b>" + U.esc(d.name) + "</b><dl><dt>Risk</dt><dd>" + U.esc(d.risk) + ", " + U.pct(d.pSeason) + "</dd><dt>Canals</dt><dd>" + U.num(d.canalKm) + " km</dd></dl><small>" + (picking() ? "Tap to select it for the simulation." : "Click to open this district.") + "</small>"; }
       const c = U.countyByFips[hit.county], river = U.riverByFips[hit.county];
       return "<b>" + U.esc(c.name) + " County</b><dl><dt>Drought now</dt><dd>" + (c.dm == null ? "no data" : U.DM_TEXT[c.dm]) + "</dd>" +
-        (river ? "<dt>6-month chance</dt><dd>" + U.pct(river.pSeason) + ", " + river.tier + "</dd>" : "") + "</dl><small>Click for photos and a profile.</small>";
+        (river ? "<dt>6-month chance</dt><dd>" + U.pct(river.pSeason) + ", " + U.esc(river.tier) + "</dd>" : "") + "</dl><small>Click for photos and a profile.</small>";
     },
   });
   function legend() {
@@ -180,9 +185,9 @@
     $("legend").innerHTML =
       '<div class="modes"><button data-mode="now" class="' + (forecast ? "" : "on") + '">Drought now</button><button data-mode="forecast" class="' + (forecast ? "on" : "") + '">6-month forecast</button></div>' +
       (forecast ? "<h4>River counties: chance of a drought season</h4><div class=\"keys\">" + ["Low", "Watch", "Warning"].map((t) => key(U.TIER_COLOR[t], t)).join("") + "</div>"
-                : "<h4>Drought Monitor, week of " + U.niceDate(HG.week) + '</h4><div class="ramp">' + HG.dmLabels.map((l, i) => '<span><i style="background:' + U.DM_COLOR[i] + '"></i>' + l + "</span>").join("") + "</div>") +
+                : "<h4>Drought Monitor, week of " + U.niceDate(HG.week) + '</h4><div class="ramp">' + HG.dmLabels.map((l, i) => '<span><i style="background:' + U.esc(U.DM_COLOR[i]) + '"></i>' + U.esc(l) + "</span>").join("") + "</div>") +
       "<h4>Canals (" + U.num(scopeCanals().length) + " segments here)</h4><div class=\"keys\">" +
-      (plan ? key("var(--fund)", "Sealed by this budget") + key("var(--muted)", "Not funded") : HG.levels.map((l) => key(U.LEVEL_COLOR[l], l)).join("")) + "</div>";
+      (plan ? key("var(--fund)", "Sealed by this budget") + key("var(--muted)", "Not funded") : HG.levels.map((l) => key(U.esc(U.LEVEL_COLOR[l]), U.esc(l))).join("")) + "</div>";
   }
   $("legend").addEventListener("click", (e) => { const mode = e.target.dataset.mode; if (mode) { state.mapMode = mode; syncMap(); } });
   $("views").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; if (b.dataset.view === "scope") map.fitScope(); else map.flyTo(b.dataset.view); });
@@ -190,7 +195,8 @@
   $("replay").onclick = () => map.runScan(); $("skip").onclick = () => map.skip();
   function syncMap() {
     const lakes = {};
-    if (state.live && state.live.systems && state.live.systems["Elephant Butte"]) lakes["Elephant Butte"] = state.live.systems["Elephant Butte"].pct;
+    const butte = state.live && state.live.systems && state.live.systems["Elephant Butte"];
+    if (butte && finiteOrNull(butte.pct) != null) lakes["Elephant Butte"] = butte.pct;
     map.set({ pick: picking(), mode: state.mapMode, scope: state.scope, county: state.county, canal: state.canal,
               funded: state.step === "budget" ? currentPlan().fundedIds : null, lakes });
     legend();
@@ -232,9 +238,9 @@
       const treatable = list.filter((c) => c.rank != null), all = U.canalNumbers(treatable, params());
       const named = namedCanals(list);
       html += '<button class="back" data-act="state">&larr; All districts</button>' +
-        "<h2>" + U.esc(d.name) + "</h2><div class=\"sub\">" + U.esc(d.kind) + " · " + d.counties.join(", ") + " · week of " + U.niceDate(HG.week) + "</div>" +
+        "<h2>" + U.esc(d.name) + "</h2><div class=\"sub\">" + U.esc(d.kind) + " · " + U.esc(d.counties.join(", ")) + " · week of " + U.niceDate(HG.week) + "</div>" +
         stats([
-          ["Drought season, next 6 months", U.pct(d.pSeason), d.risk + "; warning line " + U.pct(HG.threshold)],
+          ["Drought season, next 6 months", U.pct(d.pSeason), U.esc(d.risk) + "; warning line " + U.pct(HG.threshold)],
           ["Drought now", worst ? "D" + (worst - 1) : "None", U.DM_TEXT[worst].replace(/^D\d /, "")],
           resStat,
           ["Canals", U.num(d.canalKm) + " km", U.num(list.length) + " segments, " + U.num(treatable.length) + " rankable"],
@@ -245,7 +251,7 @@
         "<h3>Canal length by leak class</h3>" + mixBar(list, (c) => c.level, (k) => U.LEVEL_COLOR[k]) +
         "<h3>Canal length by soil</h3>" + mixBar(list, (c) => c.soil || "Not looked up", (k) => { const r = HG.seepage[k]; return r == null ? U.LEVEL_COLOR["Unknown soil"] : r >= 7.48 ? U.TIER_COLOR.Warning : r >= 2.9 ? U.TIER_COLOR.Watch : U.TIER_COLOR.Low; }) +
         (named.length ? "<h3>Named canals (" + named.length + ")</h3><div class=\"scroll\"><table class=\"t\"><tr><th>Canal</th><th class=\"r\">km</th><th class=\"r\">Cost</th><th class=\"r\">Time</th><th class=\"r\">Water kept</th></tr>" +
-          named.slice(0, 80).map((g) => '<tr class="click" data-act="canal" data-id="' + g.segs[0].id + '"><td>' + U.esc(g.name) + ' <span class="muted">(' + g.segs.length + ")</span></td><td class=\"r\">" + U.num(g.km, 1) + "</td>" +
+          named.slice(0, 80).map((g) => '<tr class="click" data-act="canal" data-id="' + U.esc(g.segs[0].id) + '"><td>' + U.esc(g.name) + ' <span class="muted">(' + g.segs.length + ")</span></td><td class=\"r\">" + U.num(g.km, 1) + "</td>" +
             (g.n.km > 0 ? '<td class="r">' + U.usd(g.n.usd) + '</td><td class="r">' + U.workTime(g.n.crewDays) + '</td><td class="r">' + af(g.n) + "</td>" : '<td class="r muted" colspan="3">not rankable</td>') + "</tr>").join("") +
           '</table></div><p class="fn">One crew, one application. Segment count in brackets. Select a row to find it on the map.</p>' : "") +
         more("Open issues from live data", issuesFor(d)) +
@@ -266,7 +272,7 @@
         '<div class="rowBtns"><button class="btn" data-act="go" data-step="budget">Budget plan &rarr;</button><button class="btn ghost" data-act="go" data-step="sim">Simulation &rarr;</button></div>' +
         "<h3>Districts by 6-month drought chance</h3><div class=\"scroll\" style=\"max-height:440px\"><table class=\"t\"><tr><th>District</th><th>Tier</th><th class=\"r\">Chance</th><th class=\"r\">Canal km</th></tr>" +
         HG.districts.map((x, i) => ({ x, i })).sort((a, b) => b.x.pSeason - a.x.pSeason).map(({ x, i }) =>
-          '<tr class="click" data-act="district" data-i="' + i + '"><td>' + U.esc(x.name) + ' <span class="muted">' + x.counties.join(", ") + "</span></td><td>" + chip(x.risk) + '</td><td class="r">' + U.pct(x.pSeason) + '</td><td class="r">' + U.num(x.canalKm) + "</td></tr>").join("") +
+          '<tr class="click" data-act="district" data-i="' + U.esc(i) + '"><td>' + U.esc(x.name) + ' <span class="muted">' + U.esc(x.counties.join(", ")) + "</span></td><td>" + chip(x.risk) + '</td><td class="r">' + U.pct(x.pSeason) + '</td><td class="r">' + U.num(x.canalKm) + "</td></tr>").join("") +
         '</table></div><p class="fn">Select a district to open it. Select a county on the map for its profile.</p>' +
         more("Open issues from live data", issuesFor(null));
     }
@@ -300,14 +306,14 @@
     let rows;
     if (d) {
       rows = "<h3>Canals in sealing order</h3><div class=\"scroll\"><table class=\"t\"><tr><th>#</th><th>Canal</th><th class=\"r\">km</th><th class=\"r\">Cost</th><th class=\"r\">Time</th><th class=\"r\">Water kept</th></tr>" +
-        plan.ordered.slice(0, 250).map((c, i) => { const n = U.canalNumbers([c], P), on = plan.fundedIds.has(c.id); return '<tr class="click ' + (on ? "" : "off") + '" data-act="canal" data-id="' + c.id + '"><td>' + (i + 1) + "</td><td>" + U.esc(c.name) + (c.piped ? '<span class="flag">piped?</span>' : "") + ' <span class="muted">' + U.esc(c.soil) + '</span></td><td class="r">' + U.num(c.km, 2) + '</td><td class="r">' + U.usd(n.usd) + '</td><td class="r">' + U.workTime(n.crewDays) + '</td><td class="r">' + afMid(n) + "</td></tr>"; }).join("") +
+        plan.ordered.slice(0, 250).map((c, i) => { const n = U.canalNumbers([c], P), on = plan.fundedIds.has(c.id); return '<tr class="click ' + (on ? "" : "off") + '" data-act="canal" data-id="' + U.esc(c.id) + '"><td>' + (i + 1) + "</td><td>" + U.esc(c.name) + (c.piped ? '<span class="flag">piped?</span>' : "") + ' <span class="muted">' + U.esc(c.soil) + '</span></td><td class="r">' + U.num(c.km, 2) + '</td><td class="r">' + U.usd(n.usd) + '</td><td class="r">' + U.workTime(n.crewDays) + '</td><td class="r">' + afMid(n) + "</td></tr>"; }).join("") +
         "</table></div><p class=\"fn\">Greyed rows are not funded. One crew; water kept is the middle of the tested range." + (plan.ordered.length > 250 ? " First 250 of " + plan.ordered.length + " shown; the CSV has every funded canal." : "") + "</p>";
     } else {
       const by = {};
       plan.funded.forEach((c) => { (by[c.district] = by[c.district] || []).push(c); });
       const order = Object.keys(by).map((i) => ({ i, n: U.canalNumbers(by[i], P), count: by[i].length })).sort((x, y) => y.n.usd - x.n.usd);
       rows = "<h3>Allocation by district</h3><div class=\"scroll\"><table class=\"t\"><tr><th>District</th><th class=\"r\">Segments</th><th class=\"r\">km</th><th class=\"r\">Cost</th><th class=\"r\">Time</th><th class=\"r\">Water kept</th></tr>" +
-        order.map((r) => '<tr class="click" data-act="district" data-i="' + r.i + '"><td>' + U.esc(HG.districts[r.i].name) + '</td><td class="r">' + r.count + '</td><td class="r">' + U.num(r.n.km, 1) + '</td><td class="r">' + U.usd(r.n.usd) + '</td><td class="r">' + U.workTime(r.n.crewDays) + '</td><td class="r">' + afMid(r.n) + "</td></tr>").join("") +
+        order.map((r) => '<tr class="click" data-act="district" data-i="' + U.esc(r.i) + '"><td>' + U.esc(HG.districts[r.i].name) + '</td><td class="r">' + r.count + '</td><td class="r">' + U.num(r.n.km, 1) + '</td><td class="r">' + U.usd(r.n.usd) + '</td><td class="r">' + U.workTime(r.n.crewDays) + '</td><td class="r">' + afMid(r.n) + "</td></tr>").join("") +
         "</table></div><p class=\"fn\">" + order.length + " of " + HG.districts.length + " districts funded. One crew per district. Select a district for its canal list.</p>";
     }
     $("budgetResult").innerHTML =
@@ -322,16 +328,18 @@
     $("budgetExtra").innerHTML =
       more("Field checklist", "<ol class=\"todo\">" +
         "<li><b>Walk the " + plan.funded.length + " funded segments (" + U.num(plan.km, 1) + " km).</b> Strike any that are lined or piped.</li>" +
-        "<li><b>Order sealant for " + U.num(plan.sqft) + " sq ft</b> (" + a.wetted_width_ft + " ft wetted width assumed): " + U.usd(plan.spent) + ". Labour and equipment are extra.</li>" +
+        "<li><b>Order sealant for " + U.num(plan.sqft) + " sq ft</b> (" + U.esc(a.wetted_width_ft) + " ft wetted width assumed): " + U.usd(plan.spent) + ". Labour and equipment are extra.</li>" +
         "<li><b>" + P.crews + (P.crews === 1 ? " crew" : " crews") + ", about " + U.workTime(total.days) + ",</b> done before first irrigation (early March).</li>" +
-        "<li><b>Measure flow in and out</b> of a sealed stretch before paying for the next application (" + a.days_one_application_lasts + " days each).</li></ol>") +
+        "<li><b>Measure flow in and out</b> of a sealed stretch before paying for the next application (" + U.esc(a.days_one_application_lasts) + " days each).</li></ol>") +
       '<p class="fn">An estimate from published figures, not a field result. Crew speed is our assumption. ' + U.esc(HG.plan.note) + "</p>";
     syncMap();
   }
   function downloadCsv() {
     const plan = currentPlan(), P = params();
     const lines = [["order", "canal", "kind", "mapped_as_piped", "district", "county_fips", "soil", "seepage_gal_sqft_day", "km", "sealant_usd", "one_crew_days", "saved_acre_feet_low", "saved_acre_feet_high"].join(",")];
-    plan.funded.forEach((c, i) => { const n = U.canalNumbers([c], P); lines.push([i + 1, '"' + c.name.replace(/"/g, '""') + '"', '"' + (c.kind || "") + '"', c.piped ? "yes" : "no", '"' + (c.district >= 0 ? HG.districts[c.district].name : "") + '"', c.fips, '"' + c.soil + '"', c.rate, c.km, n.usd.toFixed(2), n.crewDays.toFixed(2), n.afLow.toFixed(2), n.afHigh.toFixed(2)].join(",")); });
+    // Text fields are quoted and kept from being read as formulas; numbers stay numbers (js/logic.js).
+    const T = window.HGLogic.csvText, N = window.HGLogic.csvNumber;
+    plan.funded.forEach((c, i) => { const n = U.canalNumbers([c], P); lines.push([i + 1, T(c.name), T(c.kind || ""), c.piped ? "yes" : "no", T(c.district >= 0 ? HG.districts[c.district].name : ""), T(c.fips), T(c.soil), N(c.rate), N(c.km), N(n.usd, 2), N(n.crewDays, 2), N(n.afLow, 2), N(n.afHigh, 2)].join(",")); });
     const link = U.el("a", { href: URL.createObjectURL(new Blob([lines.join("\n")], { type: "text/csv" })), download: "canal-sealing-plan.csv" });
     document.body.appendChild(link); link.click(); link.remove();
   }
@@ -485,8 +493,8 @@
       '<div class="pickBar"><input id="simSearch" type="search" placeholder="Search for a district or county" value="' + U.esc(state.simQuery || "") + '"><button class="btn ghost small" data-act="simAll">Tick all</button><button class="btn ghost small" data-act="simNone">Clear</button></div>' +
       "<div class=\"scroll\" style=\"max-height:330px\"><table class=\"t\"><tr><th></th><th>District</th><th class=\"r\">Crops lost if nothing is done</th><th class=\"r\">Saved by sealing early</th></tr>" +
       rows.map((r) => r.alone
-        ? '<tr class="go" data-act="district" data-i="' + r.i + '"><td>&rarr;</td><td>' + U.esc(r.d.name) + ' <span class="muted">opens on its own (different reservoir)</span></td><td class="r">' + money(r.loss) + '</td><td class="r save">' + money(r.saved) + "</td></tr>"
-        : '<tr class="go" data-act="simPick" data-i="' + r.i + '"><td><input type="checkbox" tabindex="-1"' + (state.simSel.has(r.i) ? " checked" : "") + "></td><td>" + U.esc(r.d.name) + ' <span class="muted">' + r.d.counties.join(", ") + '</span></td><td class="r">' + money(r.loss) + '</td><td class="r save">' + money(r.saved) + "</td></tr>").join("") +
+        ? '<tr class="go" data-act="district" data-i="' + U.esc(r.i) + '"><td>&rarr;</td><td>' + U.esc(r.d.name) + ' <span class="muted">opens on its own (different reservoir)</span></td><td class="r">' + money(r.loss) + '</td><td class="r save">' + money(r.saved) + "</td></tr>"
+        : '<tr class="go" data-act="simPick" data-i="' + U.esc(r.i) + '"><td><input type="checkbox" tabindex="-1"' + (state.simSel.has(r.i) ? " checked" : "") + "></td><td>" + U.esc(r.d.name) + ' <span class="muted">' + U.esc(r.d.counties.join(", ")) + '</span></td><td class="r">' + money(r.loss) + '</td><td class="r save">' + money(r.saved) + "</td></tr>").join("") +
       (rows.length ? "" : '<tr><td colspan="4" class="muted">No district matches.</td></tr>') +
       '</table></div><p class="fn">Five years, typical future, each district on its own. Ticked districts run together.</p>';
   }
@@ -577,9 +585,9 @@
         lineChart(POLICIES.slice(1).map((pol, i) => { let sum = 0; return { name: pol.name, color: i ? U.LEVEL_COLOR.Low : U.TIER_COLOR.Watch, values: runs[i + 1].years.map((y, k) => (sum += nothing.years[k].loss - y.loss - y.spend)) }; }), years, money) +
         '</div>' +
         (t ? "<h3>Forecast accuracy, January to March warnings</h3><div class=\"scroll\" style=\"max-height:none\"><table class=\"t\"><tr><th>Rule</th><th class=\"r\">Drought seasons caught</th><th class=\"r\">Warnings that were right</th></tr>" +
-          "<tr><td><b>Our forecast</b> (trained before 2020)</td><td class=\"r\">" + t.forecast.caught + " of " + t.forecast.droughtSeasons + " (" + Math.round(t.forecast.recall * 100) + "%)</td><td class=\"r\">" + Math.round(t.forecast.precision * 100) + "%</td></tr>" +
-          "<tr><td>Simple rule: already in moderate drought</td><td class=\"r\">" + t.d1Rule.caught + " of " + t.d1Rule.droughtSeasons + " (" + Math.round(t.d1Rule.recall * 100) + "%)</td><td class=\"r\">" + Math.round(t.d1Rule.precision * 100) + "%</td></tr></table></div>" +
-          '<p class="fn">' + t.forecast.rows + " county-months, 14 Texas river counties, " + U.niceDate(FROZEN.test.from) + " to " + U.niceDate(FROZEN.test.to) + ". The two are close.</p>" : "") +
+          "<tr><td><b>Our forecast</b> (trained before 2020)</td><td class=\"r\">" + U.esc(t.forecast.caught) + " of " + U.esc(t.forecast.droughtSeasons) + " (" + Math.round(t.forecast.recall * 100) + "%)</td><td class=\"r\">" + Math.round(t.forecast.precision * 100) + "%</td></tr>" +
+          "<tr><td>Simple rule: already in moderate drought</td><td class=\"r\">" + U.esc(t.d1Rule.caught) + " of " + U.esc(t.d1Rule.droughtSeasons) + " (" + Math.round(t.d1Rule.recall * 100) + "%)</td><td class=\"r\">" + Math.round(t.d1Rule.precision * 100) + "%</td></tr></table></div>" +
+          '<p class="fn">' + U.esc(t.forecast.rows) + " county-months, 14 Texas river counties, " + U.niceDate(FROZEN.test.from) + " to " + U.niceDate(FROZEN.test.to) + ". The two are close.</p>" : "") +
         "<h3>Result</h3><ul class=\"plain\">" +
         li(diff(nothing, act) >= 0 ? "for" : "against", "<b>Acting on the forecast " + better(diff(nothing, act), "doing nothing") + ".</b> It sealed in " + act.totals.yearsActed + " of " + years.length + " years.", "assumption") +
         li(diff(react, act) > 0 ? "for" : "against", "<b>Acting on the forecast " + better(diff(react, act), "waiting for a declaration") + ".</b> Waiting sealed in " + react.totals.yearsActed + " years.", "assumption") +
@@ -627,7 +635,7 @@
   function renderSources() {
     renderSim();                                           // runs the simulation once so its inputs can be listed
     const F = simFacts || {}, a = HG.plan.assumptions, t = FROZEN && FROZEN.test.preSeason, P = params();
-    const link = (text, url) => '<a target="_blank" rel="noopener" href="' + url + '">' + text + "</a>";
+    const link = (text, url) => anchor(text, url, false);            // text and address are both escaped; a bad address shows text only
     const table = (rows) => '<table class="t src"><tr><th>Used for</th><th>Data</th><th>Source</th></tr>' + rows.map((r) => "<tr><td>" + r[0] + "</td><td>" + r[1] + "</td><td>" + r[2] + "</td></tr>").join("") + "</table>";
     const tag = (k) => ' <span class="tag ' + k + '">' + k + "</span>";
     $("view").innerHTML =
@@ -639,8 +647,8 @@
         ["Frozen copy used by the simulation", FROZEN ? U.num(FROZEN.trainedOn.rows) + " county-months, " + U.niceDate(FROZEN.trainedOn.from) + " to " + U.niceDate(FROZEN.trainedOn.to) + ". Nothing after 2019 is learned from." : "n/a", "Our pipeline" + tag("pipeline")],
       ]) +
       (t ? '<table class="t"><tr><th>Test, ' + U.niceDate(FROZEN.test.from) + " to " + U.niceDate(FROZEN.test.to) + '</th><th class="r">Seasons caught</th><th class="r">Warnings right</th><th class="r">False alarms</th></tr>' +
-        [["Forecast", t.forecast], ["Rule: already in D1", t.d1Rule]].map(([n, x]) => "<tr><td>" + n + '</td><td class="r">' + x.caught + " / " + x.droughtSeasons + " (" + Math.round(x.recall * 100) + '%)</td><td class="r">' + Math.round(x.precision * 100) + '%</td><td class="r">' + x.falseAlarms + "</td></tr>").join("") +
-        '</table><p class="fn">January to March warnings, ' + t.forecast.rows + " county-months in the 14 Texas river counties. The forecast matches the simple rule; it does not clearly beat it.</p>" : "") +
+        [["Forecast", t.forecast], ["Rule: already in D1", t.d1Rule]].map(([n, x]) => "<tr><td>" + n + '</td><td class="r">' + U.esc(x.caught) + " / " + U.esc(x.droughtSeasons) + " (" + Math.round(x.recall * 100) + '%)</td><td class="r">' + Math.round(x.precision * 100) + '%</td><td class="r">' + U.esc(x.falseAlarms) + "</td></tr>").join("") +
+        '</table><p class="fn">January to March warnings, ' + U.esc(t.forecast.rows) + " county-months in the 14 Texas river counties. The forecast matches the simple rule; it does not clearly beat it.</p>" : "") +
       "<h3>2. Canals, soils and districts</h3>" + table([
         ["Canal lines", "National Hydrography Dataset, Canal/Ditch features", link("U.S. Geological Survey", "https://hydro.nationalmap.gov/arcgis/rest/services/nhd/MapServer/6")],
         ["Extra canals, names, piped stretches", HG.osm ? U.num(HG.osm.added) + " segments, " + U.num(HG.osm.addedKm) + " km" : "n/a", link("OpenStreetMap contributors (ODbL)", "https://www.openstreetmap.org/copyright")],
@@ -648,20 +656,20 @@
         ["District boundaries", HG.districts.length + " active districts", link("TCEQ Water Districts", "https://gisweb.tceq.texas.gov/arcgis/rest/services/iwud/WaterDistricts_PRD/MapServer")],
       ]) +
       "<h3>3. Water leaking from canals</h3>" + table([
-        ["Leak rate by soil, unlined canals", Object.keys(HG.seepage).filter((k) => !/sand$/i.test(k) || k === "Sand").map((k) => k + " " + HG.seepage[k]).join(" · ") + " gallons per sq ft per day", link("Fipps, Texas A&amp;M, 1998, Tables 6 to 8", "https://gfipps.tamu.edu/files/2019/12/RGV-Potential-Water-Savings.pdf") + " (Table 7 quotes the Texas Board of Water Engineers, 1946)"],
-        ["Canal size", a.wetted_width_ft + " ft wetted width for every canal", "Ours" + tag("assumption")],
+        ["Leak rate by soil, unlined canals", Object.keys(HG.seepage).filter((k) => !/sand$/i.test(k) || k === "Sand").map((k) => U.esc(k + " " + HG.seepage[k])).join(" · ") + " gallons per sq ft per day", link("Fipps, Texas A&M, 1998, Tables 6 to 8", "https://gfipps.tamu.edu/files/2019/12/RGV-Potential-Water-Savings.pdf") + " (Table 7 quotes the Texas Board of Water Engineers, 1946)"],
+        ["Canal size", U.esc(a.wetted_width_ft) + " ft wetted width for every canal", "Ours" + tag("assumption")],
         ["Units", "Water agencies count in acre-feet. One acre-foot is 325,851 gallons, about half an Olympic pool. The platform shows gallons.", "Conversion"],
         ["Scale check", "Published potential saving in 28 Valley districts: 54,000 to 223,000 acre-feet a year." + (F.keptYear ? " This simulation keeps " + U.num(F.keptYear) + " in a year it acts, for " + F.who + "." : ""), link("Fipps, 1998", "https://gfipps.tamu.edu/files/2019/12/RGV-Potential-Water-Savings.pdf")],
       ]) +
       '<p class="fn">Leakage counts only weeks when water is released, and never more than was released. It assumes every ranked canal is unlined, because no source records lining. Treat it as an upper estimate.</p>' +
       "<h3>4. Sealant</h3>" + table([
-        ["Price", "$" + a.sealant_usd_per_sqft + " per sq ft, materials only", link("U.S. Bureau of Reclamation", "https://www.usbr.gov/research/projects/detail.cfm?id=845")],
+        ["Price", "$" + U.esc(a.sealant_usd_per_sqft) + " per sq ft, materials only", link("U.S. Bureau of Reclamation", "https://www.usbr.gov/research/projects/detail.cfm?id=845")],
         ["Share of leakage stopped", Math.round(a.sealant_cut_low * 100) + "% to " + Math.round(a.sealant_cut_high * 100) + "% in field trials; the simulation uses " + Math.round(P.cut * 100) + "%", "Desert Research Institute field trials"],
-        ["How long it lasts", "About " + a.days_one_application_lasts + " days; " + P.applications + " applications cover a season", "Lund et al., 2021"],
+        ["How long it lasts", "About " + U.esc(a.days_one_application_lasts) + " days; " + P.applications + " applications cover a season", "Lund et al., 2021"],
         ["Crew speed", P.kmPerCrewDay + " km per crew per day, " + P.crews + " crews", "Ours" + tag("assumption")],
       ]) +
       "<h3>5. Money</h3>" + table([
-        ["Crop revenue lost in a year with no irrigation water", U.usd(U.PUBLISHED.worstCaseRevenue) + "; total output " + U.usd(U.PUBLISHED.worstCaseOutput) + "; " + U.num(U.PUBLISHED.worstCaseJobs) + " jobs", link("Texas A&amp;M AgriLife, 2023", U.PUBLISHED.worstCaseUrl)],
+        ["Crop revenue lost in a year with no irrigation water", U.usd(U.PUBLISHED.worstCaseRevenue) + "; total output " + U.usd(U.PUBLISHED.worstCaseOutput) + "; " + U.num(U.PUBLISHED.worstCaseJobs) + " jobs", link("Texas A&M AgriLife, 2023", U.PUBLISHED.worstCaseUrl)],
         ["Full irrigation demand", U.num(U.PUBLISHED.valleyIrrigationAf) + " acre-feet a year (2011 use)", link("Region M Water Plan, Table 2-8", U.PUBLISHED.valleyIrrigationUrl)],
         ["Value of an acre-foot in a shortage", "$" + U.num(U.USD_PER_AF) + ": the two figures above, divided", "Ours" + tag("assumption")],
         ["A district's share", "By canal length" + (F.share ? "; " + F.who + " holds " + Math.round(F.share * 100) + "% of Valley canal length" : ""), "Ours" + tag("assumption")],
@@ -672,7 +680,7 @@
         ["Drought declaration", "8 straight weeks at D2", link(U.PUBLISHED.disasterRule.text, U.PUBLISHED.disasterRule.url)],
       ]) +
       "<h3>7. This simulation run</h3>" + (F.start ? table([
-        ["Start", F.start + "; " + F.system + " at " + (F.pct == null ? "n/a" : F.pct + "%") + " (" + (F.live ? "live" : "saved") + " reading)", "Texas Water Development Board"],
+        ["Start", F.start + "; " + F.system + " at " + (finiteOrNull(F.pct) == null ? "n/a" : F.pct + "%") + " (" + (F.live ? "live" : "saved") + " reading)", "Texas Water Development Board"],
         ["Chance the first season is dry", U.pct(F.pNow), "Frozen forecast model, this week's data"],
         ["Weather the futures are built from", F.library.length + " real years, " + F.library[0] + " to " + F.library[F.library.length - 1] + "; " + F.dry.length + " had a drought season (" + F.dry.join(", ") + ")", "U.S. Drought Monitor, Texas Water Development Board"],
         ["Forecast accuracy inside the simulation", "Warns before " + Math.round(F.recall * 100) + "% of dry seasons and " + Math.round(F.falseAlarm * 100) + "% of wet ones. A wrong warning costs " + U.usd(F.wrongWarning) + ".", "Test above"],
@@ -776,7 +784,7 @@
     const q = (query || "").toLowerCase();
     $("pickList").innerHTML = HG.districts.map((d, i) => ({ d, i }))
       .filter(({ d }) => !q || d.name.toLowerCase().indexOf(q) >= 0 || d.counties.join(" ").toLowerCase().indexOf(q) >= 0)
-      .map(({ d, i }) => '<button data-i="' + i + '"><span><b>' + U.esc(d.name) + "</b><small>" + d.counties.join(", ") + " · " + U.num(d.canalKm) + " km of canals</small></span>" + chip(d.risk) + "</button>").join("") ||
+      .map(({ d, i }) => '<button data-i="' + U.esc(i) + '"><span><b>' + U.esc(d.name) + "</b><small>" + U.esc(d.counties.join(", ")) + " · " + U.num(d.canalKm) + " km of canals</small></span>" + chip(d.risk) + "</button>").join("") ||
       '<p style="color:#c9d8e8">No district matches. The portal covers the ' + HG.districts.length + " Texas districts on the Rio Grande.</p>";
   }
   function openChooser() { fillPick(""); $("pickSearch").value = ""; $("pick").classList.add("open"); $("onboard").classList.add("open"); }
