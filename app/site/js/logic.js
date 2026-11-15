@@ -8,7 +8,7 @@
 
     Bound ones read the generated data (window.HG and window.HG_SIM in the browser). They come
     from makeLogic(data), so a test can hand in a small made-up data object instead:
-      tierFor, actionFor, planFor, canalNumbers, scopeP, simScope, hitRates, USD_PER_AF.
+      tierFor, actionFor, planFor, canalNumbers, scopeP, simScope, replayScope, hitRates, USD_PER_AF.
 
   WHO USES IT
     js/common.js calls makeLogic once with the real data and republishes the functions under
@@ -78,6 +78,65 @@
 
   const ELEPHANT_BUTTE = ["48141", "48229"];           // El Paso and Hudspeth draw on Elephant Butte
   const usesElephantButte = (d) => d.fips.length > 0 && d.fips.every((f) => ELEPHANT_BUTTE.indexOf(f) >= 0);
+
+  /* ---------- The replay: real years, five policies ---------- */
+  const MIN_WEEKS_IN_A_YEAR = 50;
+  /* The five policies of the replay, in the order the table shows them. The engine (sim/engine.js)
+     holds what each trigger does; nothing about them is decided here. */
+  const REPLAY_POLICIES = [
+    { trigger: "never", name: "Do nothing" },
+    { trigger: "declared", name: "Wait for an official drought declaration" },
+    { trigger: "d1", name: "Seal if already in moderate drought (D1)" },
+    { trigger: "forecast", name: "Seal when the forecast warns" },
+    { trigger: "always", name: "Seal every year" },
+  ];
+  /*
+    Run a scope's weeks through the five policies. scope comes from replayScope(); overrides are
+    the simulation's assumptions (budget, sealant effect, ...). Every figure is the engine's own:
+    a row's totals are the sums of the engine's per-year results, which are kept in perYear.
+    saving = what doing nothing costs in all (lost crops) minus what this policy costs in all
+    (lost crops plus sealant). It is a modelled figure and can be negative.
+  */
+  function replay(scope, overrides) {
+    const runs = REPLAY_POLICIES.map((pol) => ENGINE.simulate(scope, { trigger: pol.trigger }, overrides));
+    const nothing = runs[0].totals;
+    return {
+      firstYear: scope.firstYear, lastYear: scope.lastYear, years: runs[0].years.map((y) => y.year),
+      rows: runs.map((run, i) => ({
+        trigger: REPLAY_POLICIES[i].trigger, name: REPLAY_POLICIES[i].name,
+        yearsSealed: run.totals.yearsActed, sealedYears: run.years.filter((y) => y.acted).map((y) => y.year),
+        spend: run.totals.spend, keptAf: run.totals.savedAf, usedAf: run.totals.recoveredAf,
+        loss: run.totals.loss, cost: run.totals.cost, saving: nothing.cost - run.totals.cost,
+        perYear: run.years.map((y) => ({ year: y.year, sealed: y.acted, spend: y.spend, keptAf: y.savedAf, usedAf: y.recoveredAf, loss: y.loss })),
+      })),
+    };
+  }
+  /* Two totals count as level when they differ by less than this share of the larger one. */
+  const REPLAY_LEVEL_SHARE = 0.002;
+  /*
+    One plain sentence set on how acting on the forecast compared, in this replay, with the D1
+    rule and with sealing every year. It is written from the numbers, whichever way they fall:
+    "better" means a lower modelled total cost (lost crops plus sealant).
+    Returns { text, vsD1, vsAlways }, each verdict "better", "same" or "worse".
+  */
+  function replaySentence(result) {
+    const row = (trigger) => result.rows.find((r) => r.trigger === trigger);
+    const forecast = row("forecast"), years = result.years.length;
+    const yearWord = (n) => n + (n === 1 ? " year" : " years");
+    const against = (other, label) => {
+      const gap = other.cost - forecast.cost;                                // above zero: the forecast cost less
+      const sameYears = forecast.sealedYears.join() === other.sealedYears.join();
+      if (sameYears && gap === 0) return { verdict: "same", text: "The forecast and " + label + " sealed in the same " + yearWord(forecast.yearsSealed) + " and gave the same modelled result." };
+      if (Math.abs(gap) <= REPLAY_LEVEL_SHARE * Math.max(forecast.cost, other.cost)) {
+        return { verdict: "same", text: "The forecast ended about level with " + label + " (" + yearWord(other.yearsSealed) + " sealed): the modelled totals differ by " + money(Math.abs(gap)) + "." };
+      }
+      return { verdict: gap > 0 ? "better" : "worse",
+               text: "The forecast ended " + money(Math.abs(gap)) + (gap > 0 ? " ahead of " : " behind ") + label + " (" + yearWord(other.yearsSealed) + " sealed) in modelled total cost." };
+    };
+    const d1 = against(row("d1"), "the D1 rule"), always = against(row("always"), "sealing every year");
+    return { vsD1: d1.verdict, vsAlways: always.verdict,
+             text: "In this replay, acting on the forecast sealed in " + forecast.yearsSealed + " of " + yearWord(years) + ". " + d1.text + " " + always.text };
+  }
 
   /*
     The functions that read the data.
@@ -160,16 +219,17 @@
     }
 
     /* What the engine needs for a list of districts (members): its weekly record, its canals and
-       the money at stake. */
-    function simScope(members) {
+       the money at stake. rowsOf(fips) gives that county's forecasts as [[date made, chance], ...],
+       oldest first; simScope and replayScope differ only in which forecasts they hand in. */
+    function buildScope(members, rowsOf) {
       const system = members.length && usesElephantButte(members[0]) ? "Elephant Butte" : "Amistad-Falcon";
       const fips = Array.from(new Set([].concat.apply([], members.map((x) => x.fips))));
       const ids = new Set(members.map((x) => HG.districts.indexOf(x)));
       const list = canals.filter((c) => ids.has(c.district) && c.rank != null);
       const valleyKm = HG.districts.filter((x) => x.fips.some((f) => SIM.valley.indexOf(f) >= 0)).reduce((s, x) => s + x.canalKm, 0);
       const kmHere = members.reduce((s, x) => s + x.canalKm, 0), share = kmHere / valleyKm;
-      // The frozen model's monthly forecasts, per county. A week uses the newest one made on or before it.
-      const frozen = fips.map((f) => (FROZEN && FROZEN.monthly[f]) || []), cursor = fips.map(() => -1);
+      // The monthly forecasts, per county. A week uses the newest one made on or before it.
+      const frozen = fips.map(rowsOf), cursor = fips.map(() => -1);
       const start = new Date(SIM.week0 + "T12:00:00Z").getTime(), weeks = [];
       for (let i = 0; i < SIM.nWeeks; i++) {
         const date = new Date(start + i * 7 * 864e5), iso = date.toISOString().slice(0, 10);
@@ -190,15 +250,51 @@
                share, system, pNow, ids: Array.from(ids), outsideValley: members.some((x) => !x.fips.some((f) => SIM.valley.indexOf(f) >= 0)), members: members.length };
     }
 
+    /* The scope the simulation's futures are built from: forecasts from the frozen model (trained
+       only on data before 2020), which exist from 2020 on. */
+    function simScope(members) {
+      return buildScope(members, (f) => (FROZEN && FROZEN.monthly[f]) || []);
+    }
+
+    /*
+      The scope for the REPLAY of the real record. Its forecasts are the pipeline's forward-chained
+      ones (SIM.forecast): one a month for each river county from 2008, each made by a model
+      trained only on years before the year it forecasts. Drought classes and reservoir levels
+      are the real weekly record. Only whole years that have forecasts are kept, so the year
+      still running is left out. Returns the scope with firstYear and lastYear, or null if the
+      data holds no such year.
+    */
+    function replayScope(members) {
+      const chained = (SIM && SIM.forecast) || {};
+      const start = new Date(SIM.week0 + "T12:00:00Z").getTime();
+      const scope = buildScope(members, (f) => {
+        const rows = [];
+        (chained[f] || []).forEach((p, i) => { if (p != null) rows.push([new Date(start + i * 7 * 864e5).toISOString().slice(0, 10), p]); });
+        return rows;
+      });
+      // A year counts if the record covers it (50 weeks or more) and a forecast was made in it.
+      const weeksIn = {}, forecastIn = {};
+      scope.weeks.forEach((w) => { weeksIn[w.year] = (weeksIn[w.year] || 0) + 1; });
+      const fips = Array.from(new Set([].concat.apply([], members.map((x) => x.fips))));
+      fips.forEach((f) => (chained[f] || []).forEach((p, i) => { if (p != null) forecastIn[new Date(start + i * 7 * 864e5).getUTCFullYear()] = true; }));
+      const years = Object.keys(weeksIn).map(Number).filter((y) => weeksIn[y] >= MIN_WEEKS_IN_A_YEAR && forecastIn[y]).sort((a, b) => a - b);
+      if (!years.length) return null;
+      // Keep one unbroken run of years, the latest one, so a drought streak never jumps a gap.
+      let first = years[years.length - 1];
+      while (years.indexOf(first - 1) >= 0) first--;
+      const last = years[years.length - 1];
+      return Object.assign({}, scope, { weeks: scope.weeks.filter((w) => w.year >= first && w.year <= last), firstYear: first, lastYear: last });
+    }
+
     /* The frozen model's hit rates on 2020 to 2025, used to decide how often a simulated warning is right. */
     function hitRates() {
       const t = FROZEN ? FROZEN.test.preSeason.forecast : { recall: HG.trigger.rules[0].recall, falseAlarms: HG.trigger.rules[0].false_alarms, rows: HG.trigger.rows, droughtSeasons: HG.trigger.drought_seasons };
       return { recall: t.recall, falseAlarm: t.falseAlarms / Math.max(1, t.rows - t.droughtSeasons) };
     }
 
-    return { actionFor, tierFor, planFor, canalNumbers, USD_PER_AF, scopeP, simScope, hitRates };
+    return { actionFor, tierFor, planFor, canalNumbers, USD_PER_AF, scopeP, simScope, replayScope, hitRates };
   }
 
   return { usd, num, pct, niceDate, esc, safeUrl, cssClass, TIER_CLASSES, SEVERITY_CLASSES, finiteOrNull, csvText, csvNumber,
-           workTime, gal, money, usesElephantButte, makeLogic };
+           workTime, gal, money, usesElephantButte, REPLAY_POLICIES, replay, replaySentence, makeLogic };
 });

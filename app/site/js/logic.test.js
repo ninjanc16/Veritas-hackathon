@@ -527,3 +527,212 @@ test("real data: simScope lines every district's weeks up with the weekly record
     for (let i = 1; i < s.weeks.length; i++) assert.strictEqual(Date.parse(s.weeks[i].date) - Date.parse(s.weeks[i - 1].date), 7 * 864e5);
   }
 });
+
+/* ---------- The replay of real years ---------- */
+// Weekly data from Tuesday 2007-01-02: 2007, 2008 and 2009 whole, 2010 cut off after 30 weeks.
+// County A has a forecast on the first week of each month from January 2008 to December 2009.
+function replayFake(change) {
+  const data = fake(), nWeeks = 52 * 3 + 30, start = Date.parse("2007-01-02T12:00:00Z");
+  const dateOf = (i) => new Date(start + i * 7 * 864e5);
+  const forecastA = [], seen = {};
+  for (let i = 0; i < nWeeks; i++) {
+    const d = dateOf(i), key = d.getUTCFullYear() + "-" + d.getUTCMonth(), year = d.getUTCFullYear();
+    const first = !seen[key]; seen[key] = true;
+    // 2008: a warning from March on. 2009: no warning all year.
+    forecastA.push(first && (year === 2008 || year === 2009) ? (year === 2008 && d.getUTCMonth() >= 2 ? 0.6 : 0.1) : null);
+  }
+  data.SIM = {
+    week0: "2007-01-02", nWeeks, valley: ["A"],
+    cls: { A: "0".repeat(nWeeks), B: "0".repeat(nWeeks), C: "0".repeat(nWeeks), "48141": "0".repeat(nWeeks) },
+    reservoirs: { "Amistad-Falcon": Array.from({ length: nWeeks }, () => 30), "Elephant Butte": Array.from({ length: nWeeks }, () => 30) },
+    forecast: { A: forecastA },
+    pre2020: null,
+  };
+  data.published = { worstCaseRevenue: 1e6, valleyIrrigationAf: 10 };      // $100,000 an acre-foot, so sealing can pay
+  data.dateOf = dateOf;
+  if (change) change(data);
+  return data;
+}
+
+test("replayScope keeps only whole years that have forecasts, and says which", () => {
+  const data = replayFake(), s = logic(data).replayScope([data.X]);
+  assert.strictEqual(s.firstYear, 2008);                                   // 2007 has no forecast
+  assert.strictEqual(s.lastYear, 2009);                                    // 2010 stops after 30 weeks
+  assert.deepStrictEqual(Array.from(new Set(s.weeks.map((w) => w.year))), [2008, 2009]);
+  assert.strictEqual(s.weeks.length, 53 + 52);                              // 2008 has 53 Tuesdays
+  assert.strictEqual(s.weeks[0].date, "2008-01-01");
+  assert.deepStrictEqual(names(s.canals), ["A", "B"]);                     // the same canals as the simulation's scope
+});
+
+test("replayScope gives each week the newest forward-chained forecast made on or before it", () => {
+  const data = replayFake(), s = logic(data).replayScope([data.X]);
+  const on = (date) => s.weeks.find((w) => w.date === date).forecast;
+  assert.strictEqual(on("2008-01-01"), 0.1);                               // made that day
+  assert.strictEqual(on("2008-02-26"), 0.1);                               // still February's
+  assert.strictEqual(on("2008-03-04"), 0.6);                               // March's, the day it was made
+  assert.strictEqual(on("2008-03-25"), 0.6);
+  assert.strictEqual(on("2008-12-30"), 0.6);
+  assert.strictEqual(on("2009-01-06"), 0.1);                               // a new year's forecast replaces it
+  // The value never comes from a later week: every week's forecast was already made by then.
+  s.weeks.forEach((w) => {
+    let latest = null;
+    data.SIM.forecast.A.forEach((p, i) => { if (p != null && data.dateOf(i).toISOString().slice(0, 10) <= w.date) latest = p; });
+    assert.strictEqual(w.forecast, latest, w.date);
+  });
+});
+
+test("replayScope uses the forward-chained forecasts, not the frozen model's", () => {
+  const data = replayFake((d) => { d.SIM.pre2020 = { monthly: { A: [["2008-01-01", 0.99, 1]] }, live: {} }; });
+  const lg = logic(data);
+  assert.ok(lg.replayScope([data.X]).weeks.every((w) => w.forecast !== 0.99));
+  assert.ok(lg.simScope([data.X]).weeks.some((w) => w.forecast === 0.99));
+});
+
+test("replayScope gives null when the data holds no year with forecasts", () => {
+  const none = replayFake((d) => { delete d.SIM.forecast; });
+  assert.strictEqual(logic(none).replayScope([none.X]), null);
+  const data = replayFake();
+  assert.strictEqual(logic(data).replayScope([data.Y]), null);             // county C has no forecast
+});
+
+test("replay: five rows in the table's order, each from the engine's own run of that policy", () => {
+  const data = replayFake(), scope = logic(data).replayScope([data.X]), over = { budget: 1e6 };
+  const result = L.replay(scope, over);
+  assert.deepStrictEqual(result.rows.map((r) => r.trigger), ["never", "declared", "d1", "forecast", "always"]);
+  assert.deepStrictEqual(result.years, [2008, 2009]);
+  assert.deepStrictEqual([result.firstYear, result.lastYear], [2008, 2009]);
+  result.rows.forEach((row) => {
+    const run = E.simulate(scope, { trigger: row.trigger }, over);
+    assert.strictEqual(row.spend, run.totals.spend);
+    assert.strictEqual(row.loss, run.totals.loss);
+    assert.strictEqual(row.keptAf, run.totals.savedAf);
+    assert.strictEqual(row.yearsSealed, run.totals.yearsActed);
+  });
+});
+
+test("replay: each policy seals in the years its rule says, on a record made up to tell them apart", () => {
+  // No drought class at all (so no declaration and no D1), a forecast warning in 2008 only, and
+  // reservoirs at 30% throughout (a shortage every season).
+  const data = replayFake(), result = L.replay(logic(data).replayScope([data.X]), { budget: 1e6 });
+  const sealed = {}; result.rows.forEach((r) => { sealed[r.trigger] = r.sealedYears; });
+  assert.deepStrictEqual(sealed, { never: [], declared: [], d1: [], forecast: [2008], always: [2008, 2009] });
+  const by = {}; result.rows.forEach((r) => { by[r.trigger] = r; });
+  assert.strictEqual(by.never.spend, 0);
+  assert.strictEqual(by.never.saving, 0);
+  assert.strictEqual(by.d1.loss, by.never.loss);
+  close(by.always.spend, 2 * by.forecast.spend);
+  assert.ok(by.forecast.loss < by.never.loss && by.always.loss < by.forecast.loss);
+  // Saving is crop loss avoided minus sealant spent.
+  close(by.forecast.saving, by.never.loss - by.forecast.loss - by.forecast.spend);
+});
+
+test("replay: a row's totals are the sums of its per-year results", () => {
+  const data = replayFake(), result = L.replay(logic(data).replayScope([data.X]), { budget: 1e6 });
+  result.rows.forEach((row) => {
+    const sum = (key) => row.perYear.reduce((s, y) => s + y[key], 0);
+    assert.deepStrictEqual(row.perYear.map((y) => y.year), [2008, 2009]);
+    close(row.spend, sum("spend")); close(row.loss, sum("loss")); close(row.keptAf, sum("keptAf")); close(row.usedAf, sum("usedAf"));
+    assert.strictEqual(row.yearsSealed, row.perYear.filter((y) => y.sealed).length);
+  });
+});
+
+/* A replay result written by hand, to test the sentence on its own. cost = loss + spend. */
+function handResult(d1, forecast, always) {
+  const row = (trigger, r) => Object.assign({ trigger, yearsSealed: r.sealedYears.length }, r);
+  return { years: [2008, 2009, 2010, 2011], rows: [
+    row("never", { sealedYears: [], cost: 1000000 }), row("declared", { sealedYears: [2009], cost: 950000 }),
+    row("d1", d1), row("forecast", forecast), row("always", always)] };
+}
+
+test("replaySentence says the forecast came out ahead only when its modelled total cost is lower", () => {
+  const s = L.replaySentence(handResult({ sealedYears: [2008, 2009, 2010], cost: 800000 }, { sealedYears: [2008, 2009], cost: 600000 }, { sealedYears: [2008, 2009, 2010, 2011], cost: 700000 }));
+  assert.strictEqual(s.vsD1, "better");
+  assert.strictEqual(s.vsAlways, "better");
+  assert.strictEqual(s.text, "In this replay, acting on the forecast sealed in 2 of 4 years. The forecast ended $200k ahead of the D1 rule (3 years sealed) in modelled total cost. " +
+    "The forecast ended $100k ahead of sealing every year (4 years sealed) in modelled total cost.");
+});
+
+test("replaySentence says the forecast came out behind when its modelled total cost is higher", () => {
+  const s = L.replaySentence(handResult({ sealedYears: [2008], cost: 500000 }, { sealedYears: [2008, 2009], cost: 600000 }, { sealedYears: [2008, 2009, 2010, 2011], cost: 450000 }));
+  assert.strictEqual(s.vsD1, "worse");
+  assert.strictEqual(s.vsAlways, "worse");
+  assert.ok(s.text.indexOf("The forecast ended $100k behind the D1 rule (1 year sealed) in modelled total cost.") > 0, s.text);
+  assert.ok(s.text.indexOf("The forecast ended $150k behind sealing every year (4 years sealed) in modelled total cost.") > 0, s.text);
+  assert.ok(s.text.indexOf("ahead") < 0);
+});
+
+test("replaySentence says the two gave the same result when they sealed in the same years at the same cost", () => {
+  const s = L.replaySentence(handResult({ sealedYears: [2008, 2010], cost: 600000 }, { sealedYears: [2008, 2010], cost: 600000 }, { sealedYears: [2008, 2009, 2010, 2011], cost: 550000 }));
+  assert.strictEqual(s.vsD1, "same");
+  assert.strictEqual(s.vsAlways, "worse");
+  assert.ok(s.text.indexOf("The forecast and the D1 rule sealed in the same 2 years and gave the same modelled result.") > 0, s.text);
+});
+
+test("replaySentence calls a gap under 0.2% of the total level, and gives the gap", () => {
+  const s = L.replaySentence(handResult({ sealedYears: [2008], cost: 600900 }, { sealedYears: [2008, 2009], cost: 600000 }, { sealedYears: [2008, 2009, 2010, 2011], cost: 598900 }));
+  assert.strictEqual(s.vsD1, "same");
+  assert.strictEqual(s.vsAlways, "same");
+  assert.ok(s.text.indexOf("The forecast ended about level with the D1 rule (1 year sealed): the modelled totals differ by $900.") > 0, s.text);
+  // Just over the line it is no longer level.
+  assert.strictEqual(L.replaySentence(handResult({ sealedYears: [2008], cost: 601300 }, { sealedYears: [2008, 2009], cost: 600000 }, { sealedYears: [], cost: 600000 })).vsD1, "better");
+});
+
+test("replaySentence can go each way for the two comparisons at once, and mixes them correctly", () => {
+  const s = L.replaySentence(handResult({ sealedYears: [2008, 2009, 2010], cost: 800000 }, { sealedYears: [2008, 2009], cost: 600000 }, { sealedYears: [2008, 2009, 2010, 2011], cost: 500000 }));
+  assert.deepStrictEqual([s.vsD1, s.vsAlways], ["better", "worse"]);
+});
+
+test("replaySentence built from the engine: a forecast that warns in the dry year beats a rule that never fires", () => {
+  const data = replayFake(), s = L.replaySentence(L.replay(logic(data).replayScope([data.X]), { budget: 1e6 }));
+  assert.strictEqual(s.vsD1, "better");                                    // D1 never sealed; the forecast sealed in 2008 and it paid
+  assert.strictEqual(s.vsAlways, "worse");                                 // sealing in 2009 too would also have paid
+});
+
+test("real data: the replay holds its invariants for one district and for the whole state view", () => {
+  const data = realData(), lg = L.makeLogic(data);
+  const hasCanals = (d) => data.canals.some((c) => c.district === data.HG.districts.indexOf(d) && c.rank != null);
+  const stateView = data.HG.districts.filter((d) => hasCanals(d) && !L.usesElephantButte(d));
+  const oneDistrict = [data.HG.districts.find(hasCanals)];
+  for (const members of [oneDistrict, stateView]) {
+    const scope = lg.replayScope(members), over = { budget: scope.canals.reduce((s, c) => s + c.usd, 0) + 1 };
+    const result = L.replay(scope, over), by = {};
+    result.rows.forEach((r) => { by[r.trigger] = r; });
+    // The years: from the first forward-chained forecast to the last whole year, with none missing.
+    assert.strictEqual(result.firstYear, 2008);
+    assert.ok(result.lastYear >= 2025);
+    assert.deepStrictEqual(result.years, Array.from({ length: result.lastYear - 2007 }, (x, i) => 2008 + i));
+    assert.ok(scope.weeks.every((w) => w.pct != null && w.cls != null), "real reservoir levels and drought classes for every week");
+    assert.ok(scope.weeks.every((w) => w.forecast != null), "a forecast for every week");
+    // Doing nothing spends nothing and keeps nothing.
+    assert.deepStrictEqual([by.never.spend, by.never.keptAf, by.never.yearsSealed, by.never.saving], [0, 0, 0, 0]);
+    // Sealing every year seals in every year, and no other policy seals in more.
+    assert.strictEqual(by.always.yearsSealed, result.years.length);
+    for (const t of ["declared", "d1", "forecast"]) {
+      assert.ok(by[t].yearsSealed <= by.always.yearsSealed);
+      assert.ok(by[t].spend <= by.always.spend);
+      assert.ok(by[t].sealedYears.every((y) => by.always.sealedYears.indexOf(y) >= 0));
+    }
+    // Totals are the sums of the engine's per-year results.
+    result.rows.forEach((row) => {
+      const run = E.simulate(scope, { trigger: row.trigger }, over), sum = (key) => run.years.reduce((s, y) => s + y[key], 0);
+      close(row.spend, sum("spend")); close(row.loss, sum("loss")); close(row.keptAf, sum("savedAf"));
+      assert.strictEqual(row.yearsSealed, run.years.filter((y) => y.acted).length);
+      close(row.saving, by.never.loss - row.loss - row.spend);
+      assert.ok(row.loss <= by.never.loss + 1e-6);                         // sealing never adds to crop loss
+      assert.ok(row.usedAf <= row.keptAf + 1e-9);
+    });
+    // The same inputs give the same result.
+    assert.deepStrictEqual(L.replay(lg.replayScope(members), over), result);
+    const sentence = L.replaySentence(result);
+    assert.ok(["better", "same", "worse"].indexOf(sentence.vsD1) >= 0 && ["better", "same", "worse"].indexOf(sentence.vsAlways) >= 0);
+    assert.strictEqual(sentence.vsD1 === "better", by.forecast.cost < by.d1.cost && sentence.vsD1 !== "same");
+  }
+});
+
+test("the simulation's own scope is unchanged by the replay: it still reads the frozen model's forecasts", () => {
+  const data = realData(), lg = L.makeLogic(data), d = data.HG.districts[0];
+  const sim = lg.simScope([d]);
+  assert.deepStrictEqual(Object.keys(sim), ["weeks", "canals", "canalsUnranked", "demandAf", "revenueAtStake", "share", "system", "pNow", "ids", "outsideValley", "members"]);
+  assert.ok(sim.weeks.filter((w) => w.year < 2020).every((w) => w.forecast === null));   // the frozen model starts in 2020
+  assert.ok(lg.replayScope([d]).weeks.filter((w) => w.year < 2020).every((w) => w.forecast !== null));
+});

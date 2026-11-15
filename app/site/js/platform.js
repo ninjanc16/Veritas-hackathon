@@ -499,6 +499,29 @@
       '</table></div><p class="fn">Five years, typical future, each district on its own. Ticked districts run together.</p>';
   }
 
+  /*
+    The replay that leads the Simulation step: the real years that have forward-chained forecasts,
+    run through five policies (js/logic.js does the sums with the engine). Everything in it is
+    modelled, not measured, and the page says so beside the table.
+  */
+  function replayHtml(over) {
+    const scope = L.replayScope(simMembers());
+    if (!scope) return "";                                   // the data holds no year with forecasts
+    const result = window.HGLogic.replay(scope, over), P = E.makeParams(over);
+    const rows = result.rows.map((r) => "<tr><td>" + U.esc(r.name) + '</td><td class="r">' + (r.trigger === "never" ? "0" : U.esc(r.yearsSealed) + " of " + U.esc(result.years.length)) +
+      '</td><td class="r">' + money(r.spend) + '</td><td class="r">' + U.num(r.keptAf) + '</td><td class="r">' + money(r.loss) +
+      '</td><td class="r' + (r.saving > 0 ? " save" : "") + '">' + (r.trigger === "never" ? "" : money(r.saving)) + "</td></tr>").join("");
+    return '<section class="replay"><h3>Replay of the real record, ' + U.esc(result.firstYear) + " to " + U.esc(result.lastYear) + ' <span class="tag assumption">modelled, not measured</span></h3>' +
+      '<p class="fn">What each policy would have done in the years that really happened: the real weekly drought record, the real reservoir levels, and each year\'s forecast as it was really made, by a model trained only on earlier years. ' +
+      "Canal seepage and the sealant's effect are assumptions, shown here as single values until the uncertainty bands are switched on.</p>" +
+      '<div class="scroll" style="max-height:none"><table class="t"><tr><th>Policy</th><th class="r">Years sealed</th><th class="r">Sealant spent</th><th class="r">Modelled water kept, acre-feet</th><th class="r">Modelled crop loss</th><th class="r">Modelled saving against doing nothing</th></tr>' +
+      rows + "</table></div>" +
+      '<p class="rec">' + U.esc(window.HGLogic.replaySentence(result).text) + "</p>" +
+      '<p class="fn">Modelled, not measured: none of these savings happened. Modelled saving is the crop loss avoided minus the sealant spent, against doing nothing. ' +
+      "Water kept counts every week the sealant was working; it lowers the crop loss only in weeks with a shortage. " +
+      "Sealant budget " + U.usd(over.budget) + " each round, up to " + U.esc(P.applications) + (P.applications === 1 ? " round" : " rounds") + " in a year a policy seals.</p></section>";
+  }
+
   function renderSimResult() {
     if (!simMembers().length) {                                // nothing ticked: show the list only
       $("simLead").innerHTML = districtTable(state.overrides, hitRates(), []); $("simResult").innerHTML = ""; $("simNotes").innerHTML = ""; $("shockRow").innerHTML = "";
@@ -621,9 +644,13 @@
           "<dt>Red and white lines</dt><dd>Canals. Red canals are unsealed and leak into the soil. White canals have been sealed.</dd>" +
           "<dt>Scenario</dt><dd>" + which.name + ": " + which.note + ".</dd></dl>");
     }
-    $("simLead").innerHTML = lead;
+    // The replay of real years leads the results. The random futures follow as a stress test; on
+    // the picture step, the figures for the future being watched sit under that heading.
+    const watching = state.simStep === 3 ? lead : "";
+    $("simLead").innerHTML = state.simStep === 3 ? "" : lead;
     $("shockRow").innerHTML = showCheck ? "" : '<div class="shocks"><span>What if things get worse or better? (our assumptions)</span>' + SHOCKS.map((s) => '<button class="sbtn ' + (state.shocks[s.key] ? "on" : "") + '" data-shock="' + s.key + '" title="' + s.note + '">' + s.label + "</button>").join("") + "</div>";
-    $("simResult").innerHTML = html;
+    $("simResult").innerHTML = replayHtml(over) +
+      (showCheck ? "<h3>" + U.esc(which.name) + ", 2020 to 2025</h3>" : "<h3>Stress test: random futures</h3>") + watching + html;
 
     $("simNotes").innerHTML = '<div class="rowBtns"><button class="btn ghost" data-act="go" data-step="sources">Data and sources &rarr;</button></div>';
   }
