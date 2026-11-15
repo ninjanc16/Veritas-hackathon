@@ -36,7 +36,7 @@ jobs:
         run: |
           git config user.name "Sam"
           git config user.email "samr.ramos1316@gmail.com"
-          git add data/raw data/processed reports notebooks/oni.txt demo/data.js
+          git add data/raw data/processed reports notebooks/oni.txt
           # commit only if a data file changed (refresh.json alone changes on every run)
           if git diff --cached --quiet -- data notebooks demo; then
             echo "No new data today."

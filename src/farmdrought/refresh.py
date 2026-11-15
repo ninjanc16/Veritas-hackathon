@@ -16,8 +16,8 @@ WHAT IT DOES:
      even when only a reservoir changed, so that its report and the export's columns always
      come from the same computer. (A forest retrained on a different computer can differ by
      a few cost points, because of rounding. See reports/decision.md.)
-  3. Rebuild the issues list (reports/issues.json, see issues.py) and the demo's data file.
-     These two are rebuilt on every run, because weather alerts change by the hour.
+  3. Rebuild the issues list (reports/issues.json, see issues.py).
+     It is rebuilt on every run, because weather alerts change by the hour.
   4. Write reports/refresh.json: what was fetched, how new it is, and what failed.
 
 HONEST NOTE: each new week also gives a few more weeks their real answer, so the test
@@ -170,10 +170,8 @@ def main():
         run("-m", "farmdrought.export")
     if "--download-only" not in sys.argv:
         # The issues list reads live weather alerts and the rain forecast, so it is rebuilt on
-        # every run, even on a day when no saved file changed. Then the demo's data file.
+        # every run, even on a day when no saved file changed.
         run("-m", "farmdrought.issues")
-        if (ROOT / "demo" / "build_data.py").exists():
-            run("demo/build_data.py")
     REFRESH_JSON.write_text(json.dumps(report, indent=2) + "\n")
     print("wrote", REFRESH_JSON.name, "| outputs rebuilt:", report["outputs_rebuilt"])
 
