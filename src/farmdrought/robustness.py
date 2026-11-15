@@ -20,6 +20,7 @@ import pandas as pd
 from farmdrought.alert import fit_alert, make_forest, run_alert, split_masks
 from farmdrought.config import (D2_CLASS, FOCUS_RIVER, METRICS, OUTLOOK, REPORTS, SEASON_THRESHOLD, SEASON_WEEKS,
                                 YEAR_WEEKS)
+from farmdrought.config import SCORE_THROUGH
 from farmdrought.drought import build_panel
 from farmdrought.evaluate import tally
 from farmdrought.features import FEATURES_H
@@ -77,7 +78,7 @@ def seed_check(panel, baselines):
 
 def buffer_check(buffer_km=100):
     """Rebuild everything with a wider county rule and report the Rio Grande headline numbers."""
-    panel, alert = run_alert(buffer_km)
+    panel, alert = run_alert(buffer_km, score_through=SCORE_THROUGH)  # same cut-off as the frozen results
     _, season, year = run_outlook(panel)
     s, y = season["focus"], year["focus"]
     return {
@@ -128,7 +129,9 @@ def extra_rules_check(panel):
 if __name__ == "__main__":
     with open(METRICS) as f:
         baselines = best_baselines(json.load(f))
-    panel = build_panel()
+    # Weeks after the scoring cut-off are left out, so a rerun after new data arrives scores the
+    # same weeks as the frozen results (ARCHITECTURE.md section 3.0).
+    panel = build_panel(score_through=SCORE_THROUGH)
     result = {"seed_check": seed_check(panel, baselines), "buffer_check": buffer_check(),
               "extra_rules_check": extra_rules_check(panel)}
     with open(ROBUSTNESS, "w") as f:

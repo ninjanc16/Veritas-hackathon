@@ -27,6 +27,31 @@ def _past_of(table, horizon, year):
     return window_end < pd.Timestamp(f"{year}-01-01")
 
 
+def _usable_past(table, p_column, label, horizon, year):
+    """Mask of the rows a calibration for `year` may learn from: forecast and answer both
+    present, and the answer window ended before 1 January of that year."""
+    return table[p_column].notna() & table[label].notna() & _past_of(table, horizon, year)
+
+
+def calibration_coverage(table, p_column, label, horizon, min_years=3):
+    """Which years calibrate_by_past really adjusted, and what each fit had to learn from.
+
+    A year with fewer than `min_years` past calendar years is returned RAW by calibrate_by_past.
+    That is easy to miss, so every report that prints a calibrated number must print this too.
+    Returns {"min_years", "years": [{"year", "calibrated", "past_years", "past_rows"}, ...],
+    "years_left_raw": [...]}, with the same arguments as calibrate_by_past.
+    """
+    year_of = table["date"].dt.year
+    years = []
+    for year in sorted(int(y) for y in year_of.unique()):
+        past = _usable_past(table, p_column, label, horizon, year)
+        past_years = int(year_of[past].nunique())
+        years.append({"year": year, "calibrated": past_years >= min_years,
+                      "past_years": past_years, "past_rows": int(past.sum())})
+    return {"min_years": int(min_years), "years": years,
+            "years_left_raw": [entry["year"] for entry in years if not entry["calibrated"]]}
+
+
 def calibrate_by_past(table, p_column, label, horizon, min_years=3):
     """
     Adjust the probabilities in `p_column`, one calendar year at a time, using only the past.
@@ -38,14 +63,14 @@ def calibrate_by_past(table, p_column, label, horizon, min_years=3):
     kept (some may become equal), so a ranking is not changed by this.
 
     If those past rows cover fewer than `min_years` different calendar years (of issue date),
-    year Y's forecasts are returned unchanged. A missing forecast stays missing.
-    Returns a Series with the same index as `table`.
+    year Y's forecasts are returned unchanged (RAW). calibration_coverage, called with the same
+    arguments, says which years those are; print it beside any calibrated number.
+    A missing forecast stays missing. Returns a Series with the same index as `table`.
     """
     out = table[p_column].astype(float).copy()
-    usable = table[p_column].notna() & table[label].notna()
     years = table["date"].dt.year
     for year in sorted(years.unique()):
-        past = usable & _past_of(table, horizon, year)
+        past = _usable_past(table, p_column, label, horizon, year)
         if years[past].nunique() < min_years:
             continue
         curve = IsotonicRegression(y_min=0.0, y_max=1.0, out_of_bounds="clip")

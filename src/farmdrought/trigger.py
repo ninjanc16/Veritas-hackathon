@@ -127,8 +127,14 @@ def run_trigger_annual(scored, month=3, history=None):
     history : the rows the class frequency may learn from (it keeps the Rio Grande ones and
               uses only those whose answer was known before each New Year). When None, the
               scored rows themselves are used. Those start in the first test year, so its rows
-              have no past and the rule cannot fire there; "class_frequency_rows_without_past"
-              counts them. Pass the full table of issue rows to give the rule the earlier years.
+              have no past and the rule cannot fire there. Pass the full table of issue rows to
+              give the rule the earlier years.
+
+    Two counts say where the class-frequency rule could not fire for lack of a number:
+      class_frequency_rows_without_past        the row is in the history, but no earlier answer
+                                               was known yet at its New Year
+      class_frequency_rows_absent_from_history the row's county and date are not in `history`
+                                               at all (a sign the wrong table was passed)
     """
     focus = scored[scored["river"] == FOCUS_RIVER]
     rows = focus[focus["date"].dt.month == month]
@@ -139,7 +145,9 @@ def run_trigger_annual(scored, month=3, history=None):
     keys = pd.MultiIndex.from_arrays([past["fips"], past["date"]])
     assert keys.is_unique, "the history holds a county and date twice"
     frequency_all = pd.Series(class_frequency_by_past(past, "y_season", SEASON_WEEKS).to_numpy(), index=keys)
-    frequency = frequency_all.reindex(pd.MultiIndex.from_arrays([rows["fips"], rows["date"]])).to_numpy()
+    row_keys = pd.MultiIndex.from_arrays([rows["fips"], rows["date"]])
+    frequency = frequency_all.reindex(row_keys).to_numpy()
+    in_history = row_keys.isin(keys)
     # A missing frequency (no past rows) compares as False, so the rule does not fire there.
 
     y = rows["y_season"]
@@ -163,7 +171,8 @@ def run_trigger_annual(scored, month=3, history=None):
         "rules": rules,
         "value_sweep": sweep,
         "added_sweep_keys": ["d0_rule", "class_frequency"],
-        "class_frequency_rows_without_past": int(np.isnan(frequency).sum()),
+        "class_frequency_rows_without_past": int((np.isnan(frequency) & in_history).sum()),
+        "class_frequency_rows_absent_from_history": int((~in_history).sum()),
         "forecast_beats_d1_rule": bool(at_threshold["forecast"] > at_threshold["d1_rule"]),
         "reservoir_forecast_beats_d1_rule": bool(at_threshold["forecast_reservoir"] > at_threshold["d1_rule"]),
     }

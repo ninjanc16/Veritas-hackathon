@@ -15,7 +15,8 @@ from farmdrought.config import (ALERT_WEEKS, COUNTY_RESERVOIR, FROZEN, METRICS, 
                                 SEASON_WEEKS, YEAR_WEEKS)
 from farmdrought.drought import build_panel
 from farmdrought.manifest import build_manifest, check_manifest, sha256_of
-from farmdrought.prob_calibration import brier, calibrate_by_past, class_frequency_by_past, reliability
+from farmdrought.prob_calibration import (brier, calibrate_by_past, calibration_coverage, class_frequency_by_past,
+                                          reliability)
 from farmdrought.trigger import run_trigger, run_trigger_annual
 from farmdrought.uncertainty import direction, excludes_zero, resample_years, year_block_bootstrap
 
@@ -675,6 +676,183 @@ def test_model_minus_rule_interval_is_in_plain_shares_with_low_below_high():
 def test_allocation_refuses_a_budget_larger_than_the_number_of_counties():
     with pytest.raises(ValueError, match="cannot fund"):
         run_allocation(march_table(FIVE_COUNTIES), ks=(6,), draws=10)
+
+
+# ---------------------------------------------------------------------------------------------
+# Reporting gaps found in review (package F, step 1)
+# ---------------------------------------------------------------------------------------------
+def tiny_calibration_table():
+    """Eight past forecasts in January 2001, 2002 and 2003, then six forecasts in 2005.
+    Pooled past: 0.1 -> answers 1, 0;  0.3 -> 0, 0;  0.7 -> 1, 1, 0, 1."""
+    past = [("2001-01-02", 0.1, 1), ("2001-01-02", 0.3, 0), ("2001-01-02", 0.7, 1),
+            ("2002-01-01", 0.1, 0), ("2002-01-01", 0.3, 0), ("2002-01-01", 0.7, 1),
+            ("2003-01-07", 0.7, 0), ("2003-01-07", 0.7, 1)]
+    new = [("2005-03-01", p, 0) for p in (0.05, 0.1, 0.3, 0.5, 0.7, 0.95)]
+    return pd.DataFrame([{"date": pd.Timestamp(d), "p": p, "y": float(y)} for d, p, y in past + new])
+
+
+def test_calibration_gives_the_hand_computed_values_on_a_tiny_example():
+    # Arrange: by hand, the yes-rate is 1/2 at 0.1, 0/2 at 0.3 and 3/4 at 0.7. A curve that may
+    # only go up cannot drop from 1/2 to 0, so 0.1 and 0.3 are pooled: 1 yes in 4 = 0.25.
+    # So the curve is 0.25 up to 0.3, 0.75 from 0.7, and a straight line between them.
+    table = tiny_calibration_table()
+
+    # Act
+    calibrated = calibrate_by_past(table, "p", "y", horizon=26)
+
+    # Assert: 0.05 and 0.95 lie outside the past forecasts and take the nearest end value;
+    # 0.5 is halfway between 0.3 and 0.7, so halfway between 0.25 and 0.75
+    in_2005 = table["date"].dt.year == 2005
+    assert calibrated[in_2005].tolist() == pytest.approx([0.25, 0.25, 0.25, 0.5, 0.75, 0.75])
+    assert calibrated[~in_2005].equals(table.loc[~in_2005, "p"])        # too little past: left raw
+
+
+def test_calibration_coverage_names_the_years_left_raw():
+    # Arrange
+    table = tiny_calibration_table()
+
+    # Act
+    coverage = calibration_coverage(table, "p", "y", horizon=26)
+
+    # Assert: 2001 has no past, 2002 one year (3 rows), 2003 two years (6 rows), 2005 three (8 rows)
+    assert coverage["years"] == [
+        {"year": 2001, "calibrated": False, "past_years": 0, "past_rows": 0},
+        {"year": 2002, "calibrated": False, "past_years": 1, "past_rows": 3},
+        {"year": 2003, "calibrated": False, "past_years": 2, "past_rows": 6},
+        {"year": 2005, "calibrated": True, "past_years": 3, "past_rows": 8}]
+    assert coverage["years_left_raw"] == [2001, 2002, 2003] and coverage["min_years"] == 3
+    # with a lower bar, 2003 is calibrated too, and the Series agrees with the coverage
+    assert calibration_coverage(table, "p", "y", horizon=26, min_years=2)["years_left_raw"] == [2001, 2002]
+    lower_bar = calibrate_by_past(table, "p", "y", horizon=26, min_years=2)
+    in_2003 = table["date"].dt.year == 2003
+    assert not lower_bar[in_2003].equals(table.loc[in_2003, "p"])
+    assert json.loads(json.dumps(coverage)) == coverage
+
+
+def tiny_trigger_tables():
+    """Three Rio Grande counties scored in March 2008 (classes 0, 2 and 4), and a history that
+    also holds March 2005 and 2006: class 0 twice (no drought season), class 2 five times (one
+    drought season) and class 4 twice (both drought seasons)."""
+    def row(date, fips, cls, y, p=0.5):
+        return {"date": pd.Timestamp(date), "fips": fips, "river": "Rio Grande", "cls": cls,
+                "y_season": float(y), "p_season": p, "p_season_res": p}
+    earlier = [row("2005-03-01", "99001", 0, 0), row("2005-03-01", "99002", 2, 0), row("2005-03-01", "99003", 2, 1),
+               row("2005-03-01", "99004", 2, 0), row("2005-03-01", "99005", 4, 1),
+               row("2006-03-07", "99001", 0, 0), row("2006-03-07", "99002", 2, 0), row("2006-03-07", "99003", 2, 0),
+               row("2006-03-07", "99005", 4, 1)]
+    scored = [row("2008-03-04", "99001", 0, 0), row("2008-03-04", "99002", 2, 1), row("2008-03-04", "99005", 4, 1)]
+    return pd.DataFrame(scored), pd.DataFrame(earlier + scored)
+
+
+def test_class_frequency_rule_fires_and_sweeps_as_worked_out_by_hand():
+    # Arrange: from the history, P(drought season | class) is 0/2 = 0 for class 0,
+    # 1/5 = 0.2 for class 2 and 2/2 = 1 for class 4. Two of the three scored counties had one.
+    scored, history = tiny_trigger_tables()
+
+    # Act
+    result = run_trigger_annual(scored, history=history)
+    rule = result["rules"][-1]
+    sweep = {line["cost_ratio"]: line["class_frequency"] for line in result["value_sweep"]}
+
+    # Assert: at the 0.25 threshold only class 4 fires (0.2 is below it): 1 fired, 1 caught, 1 missed
+    assert rule["name"] == "Class-conditional frequency" and rule["added"] is True
+    assert (rule["fires"], rule["caught"], rule["missed"], rule["false_alarms"]) == (1, 1, 1, 0)
+    # In the sweep it fires when the frequency is at least the cost ratio. Up to 0.18 classes 2
+    # and 4 fire (2 caught, 2 firings); at 0.25 and 0.5 only class 4 (1 caught, 1 firing).
+    # value = (caught - ratio x firings) / 3 rows
+    assert sweep == {0.02: round((2 - 0.02 * 2) / 3, 4), 0.05: round((2 - 0.05 * 2) / 3, 4),
+                     0.10: round((2 - 0.10 * 2) / 3, 4), 0.18: round((2 - 0.18 * 2) / 3, 4),
+                     0.25: round((1 - 0.25) / 3, 4), 0.50: round((1 - 0.50) / 3, 4)}
+    assert result["class_frequency_rows_without_past"] == 0
+    assert result["class_frequency_rows_absent_from_history"] == 0
+
+
+def test_trigger_annual_tells_no_past_apart_from_rows_missing_in_the_history():
+    # Arrange
+    scored, history = tiny_trigger_tables()
+    earlier_only = history[history["date"] < "2008-01-01"]            # the scored rows are not in it
+
+    # Act
+    alone = run_trigger_annual(scored)                                 # the scored rows are their own history
+    wrong_table = run_trigger_annual(scored, history=earlier_only)
+
+    # Assert
+    assert (alone["class_frequency_rows_without_past"], alone["class_frequency_rows_absent_from_history"]) == (3, 0)
+    assert (wrong_table["class_frequency_rows_without_past"],
+            wrong_table["class_frequency_rows_absent_from_history"]) == (0, 3)
+    assert alone["rules"][-1]["fires"] == wrong_table["rules"][-1]["fires"] == 0
+
+
+def test_trigger_annual_history_never_uses_an_answer_whose_window_was_still_open():
+    # Arrange: a history from 2005 on. Rewrite, in the HISTORY only, every answer of 2013 (the
+    # last scored year) and every answer of 2012 issued late enough that its 26-week window was
+    # still open on 1 January 2013. The scored table keeps the true answers.
+    scored = scored_table()
+    history = scored_table(years=range(2005, 2014), months=(1, 2, 3, 8, 11))
+    still_open = history["date"] + pd.Timedelta(weeks=26) >= pd.Timestamp("2013-01-01")
+    rewritten = history.copy()
+    rewritten.loc[still_open, "y_season"] = 1 - rewritten.loc[still_open, "y_season"]
+    closed_in_2012 = (history["date"].dt.year == 2012) & ~still_open
+    control = history.copy()
+    control.loc[closed_in_2012, "y_season"] = 1 - control.loc[closed_in_2012, "y_season"]
+
+    # Act
+    original = run_trigger_annual(scored, history=history)
+    with_open_answers_rewritten = run_trigger_annual(scored, history=rewritten)
+    with_closed_answers_rewritten = run_trigger_annual(scored, history=control)
+
+    # Assert: answers not yet known change nothing; answers that were known do
+    assert int(still_open.sum()) > 31 * 3                             # 2013, and late 2012
+    assert with_open_answers_rewritten == original
+    assert with_closed_answers_rewritten["value_sweep"] != original["value_sweep"]
+
+
+THREE_YEARS = {**FIVE_COUNTIES,
+               2012: [("00001", 0.9, 4, 3, 2.0, 0), ("00002", 0.8, 3, 0, 1.0, 0), ("00003", 0.1, 0, 0, 0.0, 0),
+                      ("00004", 0.2, 1, 0, 0.5, 0), ("00005", 0.3, 2, 0, 0.7, 0)]}   # no county had a drought season
+
+
+def test_allocation_reports_the_model_against_each_rule_and_flags_the_better_rule_pick():
+    # Arrange: the five-county example. For k = 1 the shares are model 0, 1; rule A 1, 0; rule B 1, 1.
+    table = march_table(FIVE_COUNTIES)
+
+    # Act
+    result = run_allocation(table, ks=(1, 2, 3), draws=200)
+    k1, average = result["per_k"][0], result["average_over_k"]
+
+    # Assert: both rules get their own comparison, each with an interval
+    assert k1["model_minus_rule_a"]["per_year"] == [-1.0, 1.0] and k1["model_minus_rule_a"]["mean"] == 0.0
+    assert k1["model_minus_rule_b"]["per_year"] == [-1.0, 0.0] and k1["model_minus_rule_b"]["mean"] == -0.5
+    for block in (k1, average):
+        for name in ("model_minus_rule_a", "model_minus_rule_b", "model_minus_better_rule"):
+            interval = block[name]["interval"]
+            assert interval["lo"] <= interval["diff"] <= interval["hi"] and interval["n_years"] == 2
+            assert interval["diff"] == pytest.approx(block[name]["mean"]) and "caveat" in interval
+    # the better rule's comparison is the same numbers as that rule's own, plus the warning
+    assert k1["better_rule"] == "rule_b"
+    assert k1["model_minus_better_rule"]["interval"] == k1["model_minus_rule_b"]["interval"]
+    note = k1["model_minus_better_rule"]["note"]
+    assert "picked AFTER seeing both" in note and "7.7%" in note and "1.3%" in note
+    assert "400 repetitions, k = 15, 18 years" in note and "not this project's data" in note
+    assert "note" not in k1["model_minus_rule_a"] and "note" in average["model_minus_better_rule"]
+
+
+def test_allocation_counts_the_years_where_the_choice_could_matter():
+    # Arrange: a third year, 2012, in which no county had a drought season: every ranking scores 0
+    table = march_table(THREE_YEARS)
+
+    # Act
+    result = run_allocation(table, ks=(1, 5), draws=200)
+    k1, k5 = [entry["years_where_choice_mattered"] for entry in result["per_k"]]
+
+    # Assert: with k = 1, random (0.6, 0.4, 0) and oracle (1, 1, 0) differ in 2010 and 2011 only.
+    # Over those two years the model is level with rule A (-1, +1) and behind rule B (-1, 0).
+    assert (k1["n"], k1["years"]) == (2, [2010, 2011])
+    assert k1["model_minus_rule_a_mean"] == 0.0 and k1["model_minus_rule_b_mean"] == -0.5
+    assert result["per_k"][0]["model_minus_rule_b"]["mean"] == pytest.approx(-1 / 3)   # all three years
+    assert k1["label"].startswith("Descriptive only")
+    # with k = 5 every county is funded, so no year can matter and there is no mean to give
+    assert (k5["n"], k5["years"], k5["model_minus_rule_a_mean"], k5["model_minus_rule_b_mean"]) == (0, [], None, None)
 
 
 # ---------------------------------------------------------------------------------------------

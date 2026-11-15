@@ -482,9 +482,9 @@ def frozen_block(season_cost, all_rivers_alert_cost):
     }
     for key, path in (("robustness_json_sha256", ROBUSTNESS), ("v2_json_sha256", V2_JSON)):
         block[key] = sha256_of(path) if path.exists() else None
-    block["note"] = ("reports/robustness.json and reports/v2.json were produced by earlier runs and were read "
-                     "as they are. evaluate() did not rerun the robustness checks or version 2's candidate "
-                     "search, so their numbers may come from a different computer than the rest of this file.")
+    block["note"] = ("The robustness checks and version 2's candidate search are not rerun by evaluate(). Their "
+                     "numbers are read from reports/robustness.json and reports/v2.json as those files stood, and "
+                     "the sha256 of each file as read is recorded above.")
     block["machine_note"] = (
         "Random forests in this project are not identical across computers. Same code and data: the 6-month "
         f"system cost was {season_cost} here and {RUNNER_SEASON_COST} on the GitHub runner; a comparison model "

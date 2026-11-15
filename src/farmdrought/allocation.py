@@ -36,6 +36,17 @@ RANKINGS = {
 RULES = ["rule_a", "rule_b"]
 NEEDED = ["p_season", "cls", "d2_streak", "mean12", "fips", "y_season"]
 
+# Printed with every "model minus the better rule" comparison.
+BETTER_RULE_NOTE = (
+    "The better rule was picked AFTER seeing both rules' results on these same years. That makes this comparison "
+    "harder for the model than a comparison with one rule named in advance, and it makes a 'clear loss' look more "
+    "certain than it is. In a review simulation (400 repetitions, k = 15, 18 years, three rankings with no skill; "
+    "not this project's data) a no-skill model was called a clear loss against the better of two no-skill rules "
+    "about 7.7% of the time, against a nominal 2.5%, and a clear win about 1.3% of the time. The comparisons with "
+    "rule A and with rule B, each named in advance, are reported beside this one.")
+CHOICE_MATTERED_LABEL = ("Descriptive only, with no interval: the means over the years in which a random pick and "
+                         "the best possible pick differ. In every other year all rankings score the same.")
+
 
 def model_minus_rule(model, rule, draws=10000, seed=0):
     """Interval for (model share minus rule share), resampling whole years.
@@ -63,22 +74,45 @@ def model_minus_rule(model, rule, draws=10000, seed=0):
 
 
 def _block(shares, draws, seed):
-    """Means over years, which rule is the better one, and the model-minus-that-rule interval.
+    """Means over years, the model against EACH rule with an interval, and against the better rule.
 
     shares : one column per ranking (and random, oracle), one row per year.
     The better rule is decided ONCE, by its mean over all years, never year by year. On an
-    exact tie it is rule A.
+    exact tie it is rule A. Because it is picked after both are seen, that comparison carries
+    BETTER_RULE_NOTE; the two comparisons with a rule named in advance do not need it.
     """
     means = {name: float(shares[name].mean()) for name in shares}
     better = max(RULES, key=lambda name: means[name])          # max() keeps the first on a tie
-    difference = shares["model"] - shares[better]
+
+    def gap(rule):
+        difference = shares["model"] - shares[rule]
+        return {"per_year": [float(v) for v in difference], "mean": float(difference.mean()),
+                "interval": model_minus_rule(shares["model"], shares[rule], draws, seed)}
+
     return {
         "per_year": {name: [float(v) for v in shares[name]] for name in shares},
         "mean": means,
+        "model_minus_rule_a": gap("rule_a"),
+        "model_minus_rule_b": gap("rule_b"),
         "better_rule": better,
-        "model_minus_better_rule": {"per_year": [float(v) for v in difference],
-                                    "mean": float(difference.mean()),
-                                    "interval": model_minus_rule(shares["model"], shares[better], draws, seed)},
+        "model_minus_better_rule": {**gap(better), "note": BETTER_RULE_NOTE},
+    }
+
+
+def _where_choice_mattered(shares):
+    """The years in which who is funded can change the score at all: random and oracle differ.
+
+    (If no county, or every county, had a drought season, every ranking gets the same share.)
+    Returns how many such years, which ones, and the model-minus-rule means over those years only.
+    """
+    mattered = shares["random"] != shares["oracle"]
+    some = bool(mattered.any())
+    return {
+        "n": int(mattered.sum()),
+        "years": [int(year) for year in shares.index[mattered]],
+        "model_minus_rule_a_mean": float((shares["model"] - shares["rule_a"])[mattered].mean()) if some else None,
+        "model_minus_rule_b_mean": float((shares["model"] - shares["rule_b"])[mattered].mean()) if some else None,
+        "label": CHOICE_MATTERED_LABEL,
     }
 
 
@@ -92,7 +126,11 @@ def run_allocation(scored, ks=(3, 5, 8, 10, 15), month=3, draws=10000, seed=0):
                           per_year  the share for model, rule_a, rule_b, random and oracle
                           mean      each of those averaged over years
                           funded    the FIPS codes each ranking funded, year by year
-                          better_rule and model_minus_better_rule (see _block)
+                          model_minus_rule_a, model_minus_rule_b   per year, the mean, and an interval
+                          better_rule and model_minus_better_rule  the same against the rule with the
+                                    higher mean, with a note on why that comparison is harder (see _block)
+                          years_where_choice_mattered  the years in which random and oracle differ,
+                                    and the model-minus-rule means over those years (descriptive)
       average_over_k  : the same, after first averaging each year's shares over the ks
                         (no "funded" list)
     A share is between 0 and 1 and HIGHER IS BETTER. See model_minus_rule for how the interval's
@@ -130,7 +168,8 @@ def run_allocation(scored, ks=(3, 5, 8, 10, 15), month=3, draws=10000, seed=0):
                 funded[name].append(top["fips"].tolist())
             shares.loc[year, "random"] = float((answers == 1).mean())
             shares.loc[year, "oracle"] = min(k, int((answers == 1).sum())) / k
-        per_k.append({"k": int(k), **_block(shares, draws, seed), "funded": funded})
+        per_k.append({"k": int(k), **_block(shares, draws, seed),
+                      "years_where_choice_mattered": _where_choice_mattered(shares), "funded": funded})
         all_shares.append(shares)
 
     average = sum(all_shares) / len(all_shares)                # each year's shares, averaged over k
