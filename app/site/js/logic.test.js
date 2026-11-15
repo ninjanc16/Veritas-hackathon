@@ -571,7 +571,7 @@ function replayFake(change) {
     forecast: { A: forecastA },
     pre2020: null,
   };
-  data.published = { worstCaseRevenue: 1e6, valleyIrrigationAf: 10 };      // $100,000 an acre-foot, so sealing can pay
+  data.published = { worstCaseRevenue: 1e9, valleyIrrigationAf: 1e4 };     // $100,000 an acre-foot, so sealing can pay; 10,000 acre-feet wanted a year
   data.dateOf = dateOf;
   if (change) change(data);
   return data;
@@ -659,56 +659,289 @@ test("replay: a row's totals are the sums of its per-year results", () => {
   });
 });
 
-/* A replay result written by hand, to test the sentence on its own. cost = loss + spend. */
-function handResult(d1, forecast, always) {
-  const row = (trigger, r) => Object.assign({ trigger, yearsSealed: r.sealedYears.length }, r);
-  return { years: [2008, 2009, 2010, 2011], rows: [
-    row("never", { sealedYears: [], cost: 1000000 }), row("declared", { sealedYears: [2009], cost: 950000 }),
-    row("d1", d1), row("forecast", forecast), row("always", always)] };
-}
-
-test("replaySentence says the forecast came out ahead only when its modelled total cost is lower", () => {
-  const s = L.replaySentence(handResult({ sealedYears: [2008, 2009, 2010], cost: 800000 }, { sealedYears: [2008, 2009], cost: 600000 }, { sealedYears: [2008, 2009, 2010, 2011], cost: 700000 }));
-  assert.strictEqual(s.vsD1, "better");
-  assert.strictEqual(s.vsAlways, "better");
-  assert.strictEqual(s.text, "In this replay, acting on the forecast sealed in 2 of 4 years. The forecast ended $200k ahead of the D1 rule (3 years sealed) in modelled total cost. " +
-    "The forecast ended $100k ahead of sealing every year (4 years sealed) in modelled total cost.");
+/* ---------- Ranges, and the replay across draws of the canal unknowns ---------- */
+test("band gives the 10th, 50th and 90th percentile of a list, whatever its order", () => {
+  const list = []; for (let i = 100; i >= 1; i--) list.push(i);            // 100 down to 1
+  assert.deepStrictEqual(L.band(list), { low: 11, mid: 51, high: 91 });
+  assert.deepStrictEqual(L.band([7]), { low: 7, mid: 7, high: 7 });
+  assert.deepStrictEqual(L.band([3, 1, 2]), { low: 1, mid: 2, high: 3 });
+  assert.deepStrictEqual(list[0], 100);                                    // the list is left as it was
 });
 
-test("replaySentence says the forecast came out behind when its modelled total cost is higher", () => {
-  const s = L.replaySentence(handResult({ sealedYears: [2008], cost: 500000 }, { sealedYears: [2008, 2009], cost: 600000 }, { sealedYears: [2008, 2009, 2010, 2011], cost: 450000 }));
-  assert.strictEqual(s.vsD1, "worse");
-  assert.strictEqual(s.vsAlways, "worse");
-  assert.ok(s.text.indexOf("The forecast ended $100k behind the D1 rule (1 year sealed) in modelled total cost.") > 0, s.text);
-  assert.ok(s.text.indexOf("The forecast ended $150k behind sealing every year (4 years sealed) in modelled total cost.") > 0, s.text);
+test("rangeText writes the middle with its low and high, and says so when there is no spread", () => {
+  assert.strictEqual(L.rangeText({ low: 2e6, mid: 4e6, high: 6e6 }, L.money), "$4.0M ($2.0M to $6.0M)");
+  assert.strictEqual(L.rangeText({ low: -73000, mid: 7.4e6, high: 18.7e6 }, L.money), "$7.4M (-$73k to $18.7M)");
+  assert.strictEqual(L.rangeText({ low: 5, mid: 5, high: 5 }, L.money), "$5 (the same in every draw)");
+  assert.strictEqual(L.rangeText({ low: 5, mid: 5, high: 5 }, L.money, "future"), "$5 (the same in every future)");
+  // Two ends that print the same are treated as no spread, so a range never reads "$1.0M to $1.0M".
+  assert.strictEqual(L.rangeText({ low: 1000001, mid: 1000002, high: 1000003 }, L.money), "$1.0M (the same in every draw)");
+});
+
+test("rangeCell puts the middle and the range in separate elements and escapes what the formatter returns", () => {
+  assert.strictEqual(L.rangeCell({ low: 2e6, mid: 4e6, high: 6e6 }, L.money), '<span class="rmid">$4.0M</span><small class="rng">$2.0M to $6.0M</small>');
+  assert.strictEqual(L.rangeCell({ low: 9, mid: 9, high: 9 }, L.money, "future"), '<span class="rmid">$9</span><small class="rng">same in every future</small>');
+  assert.ok(L.rangeCell({ low: 1, mid: 2, high: 3 }, (v) => "<b>" + v + "</b>").indexOf("<b>") < 0);
+});
+
+test("thousandAf writes acre-feet in thousands with fewer decimals as the figure grows", () => {
+  assert.strictEqual(L.thousandAf(3349696), "3,350");
+  assert.strictEqual(L.thousandAf(48769), "48.8");
+  assert.strictEqual(L.thousandAf(4370), "4.37");
+  assert.strictEqual(L.thousandAf(0), "0.00");
+});
+
+test("replayBands: years sealed do not depend on the canals, and each range is the 10th, 50th and 90th percentile across the draws", () => {
+  const data = replayFake(), scope = logic(data).replayScope([data.X]), over = { budget: 1e6 };
+  const result = L.replayBands(scope, over, { draws: 60, seed: 4 });
+  assert.strictEqual(result.draws, 60);
+  assert.deepStrictEqual([result.regime, result.calibrated], ["uncalibrated", false]);
+  const plain = L.replay(scope, over);
+  result.rows.forEach((row, i) => {
+    assert.deepStrictEqual(row.sealedYears, plain.rows[i].sealedYears);     // the same decisions as with no draw at all
+    assert.strictEqual(row.cost.length, 60);
+    assert.ok(row.spend.low <= row.spend.mid && row.spend.mid <= row.spend.high);
+  });
+  // Rebuild the forecast policy's figures draw by draw with the engine and compare.
+  const rng = E.makeRng(4), nothing = E.simulate(scope, { trigger: "never" }, over).totals, spend = [], kept = [], loss = [], saving = [];
+  for (let k = 0; k < 60; k++) {
+    const t = E.simulate(Object.assign({}, scope, { physics: E.samplePhysics(rng) }), { trigger: "forecast" }, over).totals;
+    spend.push(t.spend); kept.push(t.savedAf); loss.push(t.loss); saving.push(nothing.cost - t.cost);
+  }
+  const forecast = result.rows[3];
+  assert.deepStrictEqual(forecast.spend, L.band(spend));
+  assert.deepStrictEqual(forecast.keptAf, L.band(kept));
+  assert.deepStrictEqual(forecast.loss, L.band(loss));
+  assert.deepStrictEqual(forecast.saving, L.band(saving));
+  assert.ok(forecast.spend.high > forecast.spend.low && forecast.keptAf.high > forecast.keptAf.low, "the canal unknowns spread the figures");
+});
+
+test("replayBands: doing nothing is the same in every draw, and the same seed gives the same result", () => {
+  const data = replayFake(), scope = logic(data).replayScope([data.X]);
+  const a = L.replayBands(scope, { budget: 1e6 }, { draws: 40 }), never = a.rows[0];
+  assert.deepStrictEqual([never.spend, never.keptAf, never.saving], [{ low: 0, mid: 0, high: 0 }, { low: 0, mid: 0, high: 0 }, { low: 0, mid: 0, high: 0 }]);
+  assert.strictEqual(never.loss.low, never.loss.high);
+  assert.deepStrictEqual([never.losesToNothing, never.overBudget], [0, 0]);
+  assert.deepStrictEqual(L.replayBands(scope, { budget: 1e6 }, { draws: 40 }), a);
+  assert.notDeepStrictEqual(L.replayBands(scope, { budget: 1e6 }, { draws: 40, seed: 12 }).rows[4].spend, a.rows[4].spend);
+});
+
+test("replayBands counts the draws where a round cost more than the budget and where a policy lost to doing nothing", () => {
+  const data = replayFake(), scope = logic(data).replayScope([data.X]);
+  // A budget that is exactly the plan's cost: any draw with wider canals goes over it. About half do.
+  const exact = E.fundCanals(scope.canals, Infinity, E.makeParams()).spent;
+  const tight = L.replayBands(scope, { budget: exact }, { draws: 200 });
+  const rng = E.makeRng(11); let wider = 0;
+  for (let k = 0; k < 200; k++) if (E.samplePhysics(rng).widthMult > 1) wider++;
+  assert.strictEqual(tight.rows[4].overBudget, wider);                      // "always" sealed in every draw
+  assert.ok(wider > 70 && wider < 130, String(wider));
+  assert.strictEqual(tight.rows[2].overBudget, 0);                          // the D1 rule never sealed here, so it never paid a bill
+  assert.strictEqual(L.replayBands(scope, { budget: exact * 1.5 + 1 }, { draws: 200 }).rows[4].overBudget, 0);
+  // When water is worth next to nothing, sealing costs more than it keeps: every sealing draw loses.
+  const cheap = replayFake((d) => { d.published = { worstCaseRevenue: 10, valleyIrrigationAf: 1e4 }; });
+  const lost = L.replayBands(logic(cheap).replayScope([cheap.X]), { budget: 1e6 }, { draws: 50 });
+  assert.strictEqual(lost.rows[4].losesToNothing, 50);
+  assert.strictEqual(lost.rows[3].losesToNothing, 50);
+  assert.strictEqual(lost.rows[2].losesToNothing, 0);                       // never sealed: level with doing nothing, not worse
+  assert.strictEqual(tight.rows[4].losesToNothing, 0);
+});
+
+test("replayBands passes a calibration spread through to the engine and reports the calibrated regime", () => {
+  const data = replayFake(), scope = logic(data).replayScope([data.X]);
+  const cal = L.replayBands(scope, { budget: 1e6 }, { draws: 30, physicsOptions: { seepSd: 0.4 } });
+  assert.deepStrictEqual([cal.regime, cal.calibrated], ["calibrated", true]);
+  assert.notDeepStrictEqual(cal.rows[4].keptAf, L.replayBands(scope, { budget: 1e6 }, { draws: 30 }).rows[4].keptAf);
+});
+
+test("physicsOptions is empty today and carries a calibration spread once the data has one", () => {
+  const data = fake();
+  assert.deepStrictEqual(logic(data).physicsOptions(), {});
+  data.HG.calibration = { seepSd: 0.35 };
+  assert.deepStrictEqual(logic(data).physicsOptions(), { seepSd: 0.35 });
+  for (const bad of [null, "0.3", NaN, -1, Infinity]) { data.HG.calibration = { seepSd: bad }; assert.deepStrictEqual(logic(data).physicsOptions(), {}, String(bad)); }
+});
+
+test("replay lists the years two policies decided differently and what each of those years adds to the gap", () => {
+  // The made-up record: the forecast seals in 2008 only, sealing every year seals in 2008 and 2009,
+  // and the D1 rule never seals. Every season is short of water, so sealing pays each time.
+  const data = replayFake(), result = L.replay(logic(data).replayScope([data.X]), { budget: 1e6 });
+  const by = {}; result.rows.forEach((r) => { by[r.trigger] = r; });
+  const pair = (a, b) => result.pairs.find((p) => p.a === a && p.b === b);
+  const yearCost = (row, year) => { const y = row.perYear.find((x) => x.year === year); return y.loss + y.spend; };
+  assert.deepStrictEqual(result.pairs.map((p) => p.a + "/" + p.b), ["forecast/d1", "forecast/always", "d1/always"]);
+  // Forecast against D1: they part in 2008 only, and that year is the whole gap.
+  const fd = pair("forecast", "d1");
+  assert.deepStrictEqual(fd.differ.map((d) => [d.year, d.sealedA, d.sealedB]), [[2008, true, false]]);
+  close(fd.differ[0].gap, yearCost(by.d1, 2008) - yearCost(by.forecast, 2008));
+  close(fd.gap, by.d1.cost - by.forecast.cost);
+  close(fd.gap, fd.differ[0].gap);
+  assert.ok(fd.gap > 0);                                                   // the forecast cost less
+  // Forecast against sealing every year: they part in 2009 only, and there the forecast cost more.
+  const fa = pair("forecast", "always");
+  assert.deepStrictEqual(fa.differ.map((d) => [d.year, d.sealedA, d.sealedB]), [[2009, false, true]]);
+  close(fa.gap, by.always.cost - by.forecast.cost);
+  assert.ok(fa.gap < 0);
+  // D1 against sealing every year: both years, and the two years' parts add up to the whole gap.
+  const da = pair("d1", "always");
+  assert.deepStrictEqual(da.differ.map((d) => d.year), [2008, 2009]);
+  close(da.differ[0].gap + da.differ[1].gap, da.gap);
+  close(da.gap, by.always.cost - by.d1.cost);
+});
+
+test("replayBands gives the same differing years as the plain replay, with a range for each year's part of the gap", () => {
+  const data = replayFake(), scope = logic(data).replayScope([data.X]), plain = L.replay(scope, { budget: 1e6 });
+  const bands = L.replayBands(scope, { budget: 1e6 }, { draws: 50 });
+  bands.pairs.forEach((p, j) => {
+    assert.deepStrictEqual(p.differ.map((d) => [d.year, d.sealedA, d.sealedB]), plain.pairs[j].differ.map((d) => [d.year, d.sealedA, d.sealedB]));
+    p.differ.forEach((d) => assert.ok(d.gap.low <= d.gap.mid && d.gap.mid <= d.gap.high && d.gap.high > d.gap.low));
+  });
+  // Draw by draw, the differing years' parts add up to the gap between the two totals.
+  const fd = bands.pairs[0], forecast = bands.rows[3], d1 = bands.rows[2];
+  const whole = L.band(d1.cost.map((c, k) => c - forecast.cost[k]));       // one differing year: it is the whole gap
+  for (const key of ["low", "mid", "high"]) close(fd.differ[0].gap[key], whole[key]);
+  assert.deepStrictEqual([bands.districts, bands.counties], [1, 2]);       // district X sits in counties A and B
+});
+
+/*
+  A replay-bands result written by hand, to test the sentence on its own. Ten draws; the forecast's
+  total is 600 in each. apart = the years the forecast and the other policy decided differently,
+  as [year, that year's part of the gap].
+*/
+function handBands(d1Costs, d1Apart, alwaysCosts, alwaysApart) {
+  const n = 10, row = (trigger, cost, sealed, extra) => Object.assign({ trigger, cost, yearsSealed: sealed, losesToNothing: 0, overBudget: 0 }, extra || {});
+  const differ = (list) => list.map(([year, gap]) => ({ year, sealedA: gap > 0, sealedB: gap <= 0, gap: { low: gap, mid: gap, high: gap } }));
+  return { draws: n, years: [2008, 2009, 2010, 2011, 2012, 2013], districts: 1, counties: 1,
+    pairs: [{ a: "forecast", b: "d1", differ: differ(d1Apart) }, { a: "forecast", b: "always", differ: differ(alwaysApart) }],
+    rows: [row("never", Array(n).fill(1000)), row("declared", Array(n).fill(950), 1, { losesToNothing: 2 }),
+      row("d1", d1Costs, 3, { losesToNothing: 1 }), row("forecast", Array(n).fill(600), 2), row("always", alwaysCosts, 6, { overBudget: 4 })] };
+}
+const costs = (lowerCount, low, high) => Array.from({ length: 10 }, (x, k) => (k < lowerCount ? low : high));
+const SPREAD = [[2008, 70], [2010, 60], [2012, 70]];                       // three years, none more than half of the 200
+const ONE_YEAR = [[2008, 10], [2010, 10], [2012, 180]];                    // three years, 2012 is 90% of the 200
+
+test("replayBandsSentence: the same decisions in every year are reported as the same, with no ahead or behind", () => {
+  const s = L.replayBandsSentence(handBands(Array(10).fill(600), [], Array(10).fill(600), []));
+  assert.deepStrictEqual([s.vsD1, s.vsAlways], ["same", "same"]);
+  assert.strictEqual(s.text, "In this replay, acting on the forecast sealed in 2 of 6 years. " +
+    "Against the D1 rule (3 years sealed): the two made the same decision in all 6 years, so their modelled results are the same. " +
+    "Against sealing every year (6 years sealed): the two made the same decision in all 6 years, so their modelled results are the same.");
+});
+
+test("replayBandsSentence says ahead only with 9 draws in 10, three or more differing years and no year over half the gap", () => {
+  const s = L.replayBandsSentence(handBands(costs(9, 800, 500), SPREAD, Array(10).fill(700), SPREAD));
+  assert.deepStrictEqual([s.vsD1, s.vsAlways], ["better", "better"]);
+  assert.ok(s.text.indexOf("Against the D1 rule (3 years sealed): the two decided differently in 3 of 6 years (2008, 2010, 2012). " +
+    "The forecast had the lower modelled total cost in 9 of 10 draws (90%): in this replay it ended ahead.") > 0, s.text);
+  assert.ok(s.text.indexOf("in 10 of 10 draws (100%): in this replay it ended ahead.") > 0, s.text);
+});
+
+test("replayBandsSentence: one year supplying more than half the gap is named, and the result is not called ahead (the real case)", () => {
+  const s = L.replayBandsSentence(handBands(Array(10).fill(800), ONE_YEAR, Array(10).fill(700), SPREAD));
+  assert.strictEqual(s.vsD1, "indistinct");
+  assert.strictEqual(s.vsAlways, "better");
+  assert.ok(s.text.indexOf("Against the D1 rule (3 years sealed): the two decided differently in 3 of 6 years (2008, 2010, 2012). " +
+    "The forecast had the lower modelled total cost in 10 of 10 draws (100%), but 2012 alone supplies more than half of the gap, " +
+    "and one year is not evidence that the forecast is better: not distinguishable in this replay.") > 0, s.text);
+  const d1Part = s.text.slice(0, s.text.indexOf("Against sealing every year"));
+  assert.ok(d1Part.indexOf("ahead") < 0 && d1Part.indexOf("behind") < 0, d1Part);
+  // Exactly half is not "more than half": two equal years out of... four equal years, one of them a quarter.
+  assert.strictEqual(L.replayBandsSentence(handBands(Array(10).fill(800), [[2008, 100], [2010, 50], [2012, 50]], Array(10).fill(700), SPREAD)).vsD1, "better");
+});
+
+test("replayBandsSentence says behind when the forecast's total is higher in 9 draws in 10 over several years, and names a dominant year instead when there is one", () => {
+  const behind = [[2008, -70], [2010, -60], [2012, -70]];
+  const s = L.replayBandsSentence(handBands(costs(9, 500, 800), behind, Array(10).fill(550), [[2008, -10], [2010, -10], [2012, -180]]));
+  assert.deepStrictEqual([s.vsD1, s.vsAlways], ["worse", "indistinct"]);
+  assert.ok(s.text.indexOf("The forecast had the higher modelled total cost in 9 of 10 draws (90%): in this replay it ended behind.") > 0, s.text);
+  assert.ok(s.text.indexOf("The forecast had the higher modelled total cost in 10 of 10 draws (100%), but 2012 alone supplies more than half of the gap, " +
+    "and one year is not evidence that sealing every year is better: not distinguishable in this replay.") > 0, s.text);
   assert.ok(s.text.indexOf("ahead") < 0);
 });
 
-test("replaySentence says the two gave the same result when they sealed in the same years at the same cost", () => {
-  const s = L.replaySentence(handResult({ sealedYears: [2008, 2010], cost: 600000 }, { sealedYears: [2008, 2010], cost: 600000 }, { sealedYears: [2008, 2009, 2010, 2011], cost: 550000 }));
-  assert.strictEqual(s.vsD1, "same");
-  assert.strictEqual(s.vsAlways, "worse");
-  assert.ok(s.text.indexOf("The forecast and the D1 rule sealed in the same 2 years and gave the same modelled result.") > 0, s.text);
+test("replayBandsSentence: fewer than three differing years is not enough to call it, even with every draw one way", () => {
+  const s = L.replayBandsSentence(handBands(Array(10).fill(800), [[2008, 100], [2010, 100]], Array(10).fill(700), [[2009, 50], [2011, 50]]));
+  assert.deepStrictEqual([s.vsD1, s.vsAlways], ["indistinct", "indistinct"]);
+  assert.ok(s.text.indexOf("the two decided differently in 2 of 6 years (2008, 2010). The forecast had the lower modelled total cost in 10 of 10 draws (100%), " +
+    "but 2 years of difference are too few to tell two policies apart: not distinguishable in this replay.") > 0, s.text);
+  // A single differing year is always more than half of its own gap, so the year is named.
+  const one = L.replayBandsSentence(handBands(Array(10).fill(800), [[2011, 200]], Array(10).fill(700), SPREAD));
+  assert.ok(one.text.indexOf("the two decided differently in 1 of 6 years (2011).") > 0 && one.text.indexOf("but 2011 alone supplies more than half of the gap") > 0, one.text);
 });
 
-test("replaySentence calls a gap under 0.2% of the total level, and gives the gap", () => {
-  const s = L.replaySentence(handResult({ sealedYears: [2008], cost: 600900 }, { sealedYears: [2008, 2009], cost: 600000 }, { sealedYears: [2008, 2009, 2010, 2011], cost: 598900 }));
-  assert.strictEqual(s.vsD1, "same");
-  assert.strictEqual(s.vsAlways, "same");
-  assert.ok(s.text.indexOf("The forecast ended about level with the D1 rule (1 year sealed): the modelled totals differ by $900.") > 0, s.text);
-  // Just over the line it is no longer level.
-  assert.strictEqual(L.replaySentence(handResult({ sealedYears: [2008], cost: 601300 }, { sealedYears: [2008, 2009], cost: 600000 }, { sealedYears: [], cost: 600000 })).vsD1, "better");
+test("replayBandsSentence: short of 9 draws in 10 it is not distinguishable, and the share is still stated", () => {
+  // The forecast is lower in 8 of 10 against D1, and in 3 of 10 against sealing every year.
+  const s = L.replayBandsSentence(handBands(costs(8, 800, 500), SPREAD, costs(3, 700, 550), SPREAD));
+  assert.deepStrictEqual([s.vsD1, s.vsAlways], ["indistinct", "indistinct"]);
+  assert.ok(s.text.indexOf("The forecast had the lower modelled total cost in 8 of 10 draws (80%), short of the 9 in 10 needed to call it either way: not distinguishable in this replay.") > 0, s.text);
+  assert.ok(s.text.indexOf("in 3 of 10 draws (30%), short of the 9 in 10") > 0, s.text);
 });
 
-test("replaySentence can go each way for the two comparisons at once, and mixes them correctly", () => {
-  const s = L.replaySentence(handResult({ sealedYears: [2008, 2009, 2010], cost: 800000 }, { sealedYears: [2008, 2009], cost: 600000 }, { sealedYears: [2008, 2009, 2010, 2011], cost: 500000 }));
-  assert.deepStrictEqual([s.vsD1, s.vsAlways], ["better", "worse"]);
+test("the sentence about the scored test is fixed wording, with only the numbers the team reported", () => {
+  assert.strictEqual(L.SCORED_TEST_SENTENCE, "In the scored test on all 31 Rio Grande counties (558 county-years), the forecast and the 'already in moderate drought' rule could not be told apart.");
+  assert.deepStrictEqual(L.SCORED_TEST_SENTENCE.match(/\d+/g), ["31", "558"]);
 });
 
-test("replaySentence built from the engine: a forecast that warns in the dry year beats a rule that never fires", () => {
-  const data = replayFake(), s = L.replaySentence(L.replay(logic(data).replayScope([data.X]), { budget: 1e6 }));
-  assert.strictEqual(s.vsD1, "better");                                    // D1 never sealed; the forecast sealed in 2008 and it paid
-  assert.strictEqual(s.vsAlways, "worse");                                 // sealing in 2009 too would also have paid
+test("sharedForecastSentence counts the counties a view of several districts draws on, and says nothing for one district", () => {
+  assert.strictEqual(L.sharedForecastSentence({ districts: 1, counties: 2 }), "");
+  assert.strictEqual(L.sharedForecastSentence({ districts: 25, counties: 4 }),
+    "The 25 districts in this view draw on the forecasts of 4 counties. Districts in the same county share one forecast, so they are not 25 separate tests of it.");
+  assert.strictEqual(L.sharedForecastSentence({ districts: 3, counties: 1 }),
+    "The 3 districts in this view draw on the forecasts of 1 county. Districts in the same county share one forecast, so they are not 3 separate tests of it.");
+  // Counted from the data: X is in counties A and B, Y in C.
+  const data = fake(), lg = logic(data);
+  assert.strictEqual(lg.simScope([data.X]).counties, 2);
+  assert.strictEqual(lg.simScope([data.X, data.Y]).counties, 3);
+  assert.strictEqual(lg.simScope([data.X, data.X]).counties, 2);
+});
+
+test("replayBandsLines state the counts as they are, including zero", () => {
+  const lines = L.replayBandsLines(handBands(Array(10).fill(700), SPREAD, Array(10).fill(650), SPREAD));
+  assert.strictEqual(lines.worse, "Ended worse than doing nothing (a higher modelled total cost), out of 10 draws: waiting for a declaration in 2, the D1 rule in 1, the forecast in 0, sealing every year in 0.");
+  assert.strictEqual(lines.overBudget, "A sealing round cost more than the budget in 4 of 10 draws: the plan is made at the assumed canal width, and in those draws the canals were wider.");
+  const none = handBands(Array(10).fill(700), SPREAD, Array(10).fill(650), SPREAD); none.rows[4].overBudget = 0;
+  assert.strictEqual(L.replayBandsLines(none).overBudget, "In none of the 10 draws did a sealing round cost more than the budget.");
+});
+
+/*
+  "No bare dollar": on the simulation step every dollar figure must be part of a range, or be the
+  sealant budget, which is an input and is labelled as one. This strips the allowed forms out of
+  a piece of HTML or text and returns whatever dollar figures are left.
+*/
+function bareDollars(html) {
+  const left = html
+    .replace(/<span class="rmid">[^<]*<\/span><small class="rng">[^<]*<\/small>/g, "")                      // a range in a table cell
+    .replace(/-?\$[\d.,]+[kMB]? \((?:-?\$[\d.,]+[kMB]? to -?\$[\d.,]+[kMB]?|the same in every (?:draw|future))\)/g, "")   // a range in a sentence
+    .replace(/Sealant budget \(an input\) \$[\d.,]+(?: (?:million|billion))?/g, "");                         // the budget, labelled as an input
+  return left.match(/-?\$[\d.,]+\s?(?:[kMB]|million|billion)?/g) || [];
+}
+
+test("no bare dollar: the checker itself catches a lone figure and passes the allowed forms", () => {
+  assert.deepStrictEqual(bareDollars("<td>$4.0M</td>"), ["$4.0M"]);
+  assert.deepStrictEqual(bareDollars("saved $169M in a typical future"), ["$169M"]);
+  assert.deepStrictEqual(bareDollars('<span class="rmid">$4.0M</span> and then $2.0M'), ["$4.0M", "$2.0M"]);   // a middle with no range under it
+  assert.deepStrictEqual(bareDollars("spent $1.3 million"), ["$1.3 million"]);
+  assert.deepStrictEqual(bareDollars(L.rangeCell({ low: 2e6, mid: 4e6, high: 6e6 }, L.money)), []);
+  assert.deepStrictEqual(bareDollars(L.rangeCell({ low: 5, mid: 5, high: 5 }, L.money)), []);
+  assert.deepStrictEqual(bareDollars(L.rangeText({ low: -73000, mid: 7.4e6, high: 18.7e6 }, L.money) + "."), []);
+  assert.deepStrictEqual(bareDollars(L.rangeText({ low: 5, mid: 5, high: 5 }, L.money, "future")), []);
+  assert.deepStrictEqual(bareDollars("Sealant budget (an input) $1.3 million each round"), []);
+});
+
+test("no bare dollar: the replay table, its sentence and its count lines hold no lone dollar figure, for one district and for the state view", () => {
+  const data = realData(); data.published = { worstCaseRevenue: 367e6, valleyIrrigationAf: 1e6 };   // a stand-in value of water, so the figures are not all zero
+  const lg = L.makeLogic(data);
+  const hasCanals = (d) => data.canals.some((c) => c.district === data.HG.districts.indexOf(d) && c.rank != null);
+  const scopes = [[data.HG.districts.find(hasCanals)], data.HG.districts.filter((d) => hasCanals(d) && !L.usesElephantButte(d))];
+  for (const members of scopes) {
+    const scope = lg.replayScope(members), result = L.replayBands(scope, { budget: scope.canals.reduce((s, c) => s + c.usd, 0) + 1 }, { draws: 60 });
+    const table = L.replayBandsTable(result), lines = L.replayBandsLines(result);
+    assert.ok((table.match(/\$/g) || []).length >= 30, "the table does hold dollar figures");
+    assert.deepStrictEqual(bareDollars(table), []);
+    assert.deepStrictEqual(bareDollars(L.replayBandsSentence(result).text + lines.worse + lines.overBudget), []);
+    // Every figure cell in the table is a range cell; only "years sealed", "none" and the empty cell are not.
+    const cells = table.match(/<td class="r">.*?<\/td>/g);
+    cells.forEach((c) => assert.ok(/rmid/.test(c) || /^<td class="r">(\d+ of \d+|0|none|)<\/td>$/.test(c), c));
+    assert.strictEqual(cells.length, 5 * 5);
+  }
 });
 
 test("real data: the replay holds its invariants for one district and for the whole state view", () => {
@@ -746,16 +979,28 @@ test("real data: the replay holds its invariants for one district and for the wh
     });
     // The same inputs give the same result.
     assert.deepStrictEqual(L.replay(lg.replayScope(members), over), result);
-    const sentence = L.replaySentence(result);
-    assert.ok(["better", "same", "worse"].indexOf(sentence.vsD1) >= 0 && ["better", "same", "worse"].indexOf(sentence.vsAlways) >= 0);
-    assert.strictEqual(sentence.vsD1 === "better", by.forecast.cost < by.d1.cost && sentence.vsD1 !== "same");
+    // Across draws of the canal unknowns the decisions stay the same, and so do the years.
+    const bands = L.replayBands(scope, over, { draws: 40 });
+    bands.rows.forEach((row, i) => assert.deepStrictEqual(row.sealedYears, result.rows[i].sealedYears));
+    assert.deepStrictEqual(bands.years, result.years);
+    const sentence = L.replayBandsSentence(bands);
+    const verdicts = ["better", "worse", "same", "indistinct"];
+    assert.ok(verdicts.indexOf(sentence.vsD1) >= 0 && verdicts.indexOf(sentence.vsAlways) >= 0);
+    // The differing years of the forecast and the D1 rule are the years exactly one of them sealed.
+    const onlyOne = result.years.filter((y) => (by.forecast.sealedYears.indexOf(y) >= 0) !== (by.d1.sealedYears.indexOf(y) >= 0));
+    assert.deepStrictEqual(bands.pairs[0].differ.map((d) => d.year), onlyOne);
+    assert.deepStrictEqual(result.pairs[0].differ.map((d) => d.year), onlyOne);
+    close(result.pairs[0].differ.reduce((s, d) => s + d.gap, 0), by.d1.cost - by.forecast.cost);
+    // The sentence never says ahead or behind of the D1 rule unless they differ in three or more years.
+    if (onlyOne.length < 3) assert.ok(sentence.vsD1 === "same" || sentence.vsD1 === "indistinct");
+    assert.strictEqual(bands.counties, new Set([].concat.apply([], members.map((d) => d.fips))).size);
   }
 });
 
 test("the simulation's own scope is unchanged by the replay: it still reads the frozen model's forecasts", () => {
   const data = realData(), lg = L.makeLogic(data), d = data.HG.districts[0];
   const sim = lg.simScope([d]);
-  assert.deepStrictEqual(Object.keys(sim), ["weeks", "canals", "canalsUnranked", "demandAf", "revenueAtStake", "share", "system", "pNow", "ids", "outsideValley", "members"]);
+  assert.deepStrictEqual(Object.keys(sim), ["weeks", "canals", "canalsUnranked", "demandAf", "revenueAtStake", "share", "system", "pNow", "ids", "outsideValley", "members", "counties"]);
   assert.ok(sim.weeks.filter((w) => w.year < 2020).every((w) => w.forecast === null));   // the frozen model starts in 2020
   assert.ok(lg.replayScope([d]).weeks.filter((w) => w.year < 2020).every((w) => w.forecast !== null));
 });

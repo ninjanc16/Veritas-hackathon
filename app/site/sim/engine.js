@@ -416,7 +416,8 @@
 
     options: { startDate "YYYY-MM-DD", pctNow, pNow, years, draws, seed, cutoffYear,
                recall, falseAlarm, shocks: [{ year: 1.., month, points }], secondDryYear,
-               physics: true | false (default false), physicsOptions: passed to samplePhysics() }
+               physics: true | false (default false), physicsOptions: passed to samplePhysics(),
+               withFixed: false leaves out the second run with physics held fixed (it halves the work) }
     Returns { policies: [{ policy, draws, summary, losesToNothing }], sample: [simulate() result
               per policy for the middle future], cases: { best, likely, worst } (three futures to
               watch, each { sample, sourceYears }), fan: weekly low / mid / high storage,
@@ -434,13 +435,14 @@
               sets of bands is the part of the spread that is physical uncertainty, not weather.
       overBudget on each policy: in how many futures it sealed and a round cost more than the
               budget, because the canals were wider than assumed.
+      cases[...].sampleFixed: the future to watch, run with the physics at its median values.
     Note that the median physics is not the plain run. Uncalibrated, it takes about a third of
     the length as lined, so it keeps about two thirds of the water a plain run does.
   */
   function fromToday(scope, policies, overrides, options) {
     const opt = Object.assign({ years: 5, draws: 300, seed: 11, pNow: 0.3, pctNow: 50, cutoffYear: 2020,
                                 recall: 0.9, falseAlarm: 0.3, shocks: [], secondDryYear: false,
-                                physics: false, physicsOptions: null }, options || {});
+                                physics: false, physicsOptions: null, withFixed: true }, options || {});
     const rng = makeRng(opt.seed);
     const WEEK = 7 * 864e5;
 
@@ -507,8 +509,10 @@
       if (opt.physics) {
         future.physics = samplePhysics(physicsRng, opt.physicsOptions);   // once per future, before the policy loop
         physicsDraws.push(future.physics);
-        const fixed = Object.assign({}, future, { physics: central });
-        policies.forEach((policy, i) => { const run = simulate(fixed, policy, overrides); resultsFixed[i].push(run.totals); overBudgetFixed[i] += paidOver(run); });
+        if (opt.withFixed) {
+          const fixed = Object.assign({}, future, { physics: central });
+          policies.forEach((policy, i) => { const run = simulate(fixed, policy, overrides); resultsFixed[i].push(run.totals); overBudgetFixed[i] += paidOver(run); });
+        }
       }
       futures.push(future);
       policies.forEach((policy, i) => { const run = simulate(future, policy, overrides); results[i].push(run.totals); if (opt.physics) overBudget[i] += paidOver(run); });
@@ -536,8 +540,12 @@
     const order = results[0].map((t, i) => [t.cost, i]).sort((a, b) => a[0] - b[0]);
     const at = (q) => order[Math.min(order.length - 1, Math.floor(q * order.length))][1];
     const middle = at(0.5);
-    const showCase = (index) => ({ sample: policies.map((policy) => simulate(futures[index], policy, overrides)),
-                                   sourceYears: futures[index].sourceYears });
+    const showCase = (index) => {
+      const shown = { sample: policies.map((policy) => simulate(futures[index], policy, overrides)), sourceYears: futures[index].sourceYears };
+      // With physics on, the same future again with every unknown at its median: one fixed thing to draw.
+      if (opt.physics && opt.withFixed) shown.sampleFixed = policies.map((policy) => simulate(Object.assign({}, futures[index], { physics: central }), policy, overrides));
+      return shown;
+    };
     const out = {
       cases: { best: showCase(at(0.1)), likely: showCase(middle), worst: showCase(at(0.9)) },
       policies: summarise(results, opt.physics ? overBudget : null),
@@ -550,7 +558,7 @@
     };
     if (opt.physics) {
       out.physics = { regime: central.regime, calibrated: central.calibrated, central, draws: physicsDraws };
-      out.fixedPhysics = { policies: summarise(resultsFixed, overBudgetFixed) };
+      if (opt.withFixed) out.fixedPhysics = { policies: summarise(resultsFixed, overBudgetFixed) };
     }
     return out;
   }

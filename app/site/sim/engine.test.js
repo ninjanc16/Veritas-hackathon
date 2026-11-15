@@ -504,3 +504,64 @@ test("every physics range is listed in DEFAULTS with a tag, and only the sealant
   assert.strictEqual(E.DEFAULTS.cut.value, 0.575);                            // the page's slider still starts here
   assert.strictEqual(E.DEFAULTS.cut.tag, "assumption");                       // only the range is published, not its middle
 });
+
+test("with physics on, each future to watch also comes with the physics at its median, in the same weather", () => {
+  const policies = [{ trigger: "never" }, { trigger: "always" }];
+  const run = E.fromToday(history(), policies, {}, Object.assign({}, today, { physics: true }));
+  for (const key of ["best", "likely", "worst"]) {
+    const c = run.cases[key];
+    assert.deepStrictEqual(c.sampleFixed.map((r) => r.physics), [run.physics.central, run.physics.central]);
+    // The same weeks of weather as the sampled run, week for week.
+    assert.deepStrictEqual(c.sampleFixed[1].years.map((y) => y.weekly.map((w) => [w.date, w.pct, w.cls])), c.sample[1].years.map((y) => y.weekly.map((w) => [w.date, w.pct, w.cls])));
+    assert.deepStrictEqual(c.sampleFixed[0].totals, c.sample[0].totals);                 // doing nothing does not depend on the canals
+    close(c.sampleFixed[1].totals.spend * c.sample[1].physics.widthMult, c.sample[1].totals.spend);   // the bill at the median width is the nominal bill
+  }
+  assert.strictEqual(E.fromToday(history(), policies, {}, today).cases.likely.sampleFixed, undefined);   // not there with physics off
+});
+
+test("the lined share's triangle peaks at 0.3: its mean, median, quartiles and cumulative shares rule out a peak at 0.25 or 0.35", () => {
+  // Analytic values for a triangle on 0 to 0.7. With the peak at 0.30: mean 0.3333, share under 0.3 = 0.4286.
+  // With the peak at 0.25: mean 0.3167, share under 0.3 = 0.4921. At 0.35: mean 0.3500, share 0.3673.
+  const rng = E.makeRng(31337), lined = [], n = 200000;
+  for (let i = 0; i < n; i++) lined.push(E.samplePhysics(rng).linedShare);
+  const sorted = lined.slice().sort((a, b) => a - b), q = (p) => sorted[Math.floor(p * n)];
+  const below = (x) => lined.filter((v) => v < x).length / n;
+  assert.ok(Math.abs(mean(lined) - (0 + 0.3 + 0.7) / 3) < 0.0015, `mean ${mean(lined)}`);
+  assert.ok(Math.abs(below(0.3) - 0.3 / 0.7) < 0.004, `share under 0.3: ${below(0.3)}`);
+  assert.ok(Math.abs(below(0.2) - 0.2 * 0.2 / 0.21) < 0.003, `share under 0.2: ${below(0.2)}`);             // 0.1905
+  assert.ok(Math.abs(below(0.4) - (1 - 0.3 * 0.3 / 0.28)) < 0.004, `share under 0.4: ${below(0.4)}`);       // 0.6786
+  assert.ok(Math.abs(q(0.25) - Math.sqrt(0.25 * 0.21)) < 0.002, `lower quartile ${q(0.25)}`);               // 0.2291
+  assert.ok(Math.abs(q(0.5) - (0.7 - Math.sqrt(0.5 * 0.28))) < 0.002, `median ${q(0.5)}`);                  // 0.3258
+  assert.ok(Math.abs(q(0.75) - (0.7 - Math.sqrt(0.25 * 0.28))) < 0.002, `upper quartile ${q(0.75)}`);       // 0.4354
+  // The variance too: (a2 + b2 + c2 - ab - ac - bc) / 18 = (0.09 + 0.49 - 0.21) / 18.
+  const m = mean(lined), variance = mean(lined.map((v) => (v - m) * (v - m)));
+  assert.ok(Math.abs(variance - 0.37 / 18) < 0.0003, `variance ${variance}`);
+});
+
+test("Normal draws are independent of each other and 68.3% fall within one standard deviation", () => {
+  const rng = E.makeRng(271828), n = 400000, z = [];
+  for (let i = 0; i < n; i++) z.push(E.normal(rng));
+  const m = mean(z), sd = Math.sqrt(mean(z.map((v) => (v - m) * (v - m))));
+  const within = (x) => z.filter((v) => Math.abs(v) < x).length / n;
+  assert.ok(Math.abs(within(1) - 0.6827) < 0.003, `within 1 sd: ${within(1)}`);
+  assert.ok(Math.abs(within(0.5) - 0.3829) < 0.003, `within half an sd: ${within(0.5)}`);
+  assert.ok(Math.abs(within(2) - 0.9545) < 0.0015, `within 2 sd: ${within(2)}`);
+  assert.ok(Math.abs(within(2.5) - 0.9876) < 0.0008, `within 2.5 sd: ${within(2.5)}`);
+  // One draw says nothing about the next, or about the one after that; nor does its size.
+  const corr = (lag, f) => { let s = 0; for (let i = 0; i + lag < n; i++) s += f(z[i]) * f(z[i + lag]); return s / (n - lag); };
+  for (const lag of [1, 2, 3]) assert.ok(Math.abs(corr(lag, (v) => (v - m) / sd)) < 0.006, `lag ${lag} correlation ${corr(lag, (v) => (v - m) / sd)}`);
+  assert.ok(Math.abs(corr(1, (v) => v * v - 1) / 2) < 0.006, "sizes of successive draws are unrelated");
+  assert.ok(Math.abs(mean(z.map((v) => v * v * v * v)) - 3) < 0.06, "fourth moment 3");
+  assert.ok(Math.abs(mean(z.map((v) => Math.pow(v, 6))) - 15) < 0.6, "sixth moment 15");
+});
+
+test("withFixed: false leaves out the fixed-physics run and changes nothing else", () => {
+  const policies = [{ trigger: "never" }, { trigger: "always" }];
+  const full = E.fromToday(history(), policies, {}, Object.assign({}, today, { physics: true }));
+  const lean = E.fromToday(history(), policies, {}, Object.assign({}, today, { physics: true, withFixed: false }));
+  assert.strictEqual(lean.fixedPhysics, undefined);
+  assert.strictEqual(lean.cases.likely.sampleFixed, undefined);
+  assert.deepStrictEqual(lean.policies, full.policies);
+  assert.deepStrictEqual(lean.physics, full.physics);
+  assert.deepStrictEqual(lean.fan, full.fan);
+});

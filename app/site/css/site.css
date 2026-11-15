@@ -448,6 +448,10 @@ table.t tr.off td { opacity: .5; }
 .tableWrap { overflow-x: auto; max-width: 100%; }
 table.t.replay th { vertical-align: bottom; }
 table.t.replay th.r { white-space: normal; }
+/* A range in a table cell: the middle on its own line, the low and high in small text under it.
+   The small text may break at its spaces, so a column is never wider than one figure. */
+.rmid { display: block; }
+.rng { display: block; white-space: normal; font-size: .72rem; line-height: 1.3; color: var(--muted); }
 .scroll { border-radius: 0; }
 .saveHero span { letter-spacing: .1em; font-size: .7rem; }
 .saveHero b { font-weight: 600; font-variant-numeric: tabular-nums lining-nums; }

@@ -105,11 +105,33 @@
     saving = what doing nothing costs in all (lost crops) minus what this policy costs in all
     (lost crops plus sealant). It is a modelled figure and can be negative.
   */
+  /* The pairs of policies the page compares: [the one asked about, the one it is set against]. */
+  const REPLAY_PAIRS = [["forecast", "d1"], ["forecast", "always"], ["d1", "always"]];
+  const triggerIndex = (trigger) => REPLAY_POLICIES.findIndex((p) => p.trigger === trigger);
+  /*
+    Where two policies parted ways. Given each one's run from the engine, lists the years in which
+    one sealed and the other did not, and what each of those years adds to the gap in modelled
+    total cost (lost crops plus sealant; above zero means the first policy cost less that year).
+    A year in which both made the same decision adds nothing, so the gaps of the listed years add
+    up to the whole gap.
+  */
+  function decisionGap(runA, runB) {
+    const differ = [];
+    let gap = 0;
+    runA.years.forEach((ya, k) => {
+      const yb = runB.years[k], yearGap = (yb.loss + yb.spend) - (ya.loss + ya.spend);
+      gap += yearGap;
+      if (ya.acted !== yb.acted) differ.push({ year: ya.year, sealedA: ya.acted, sealedB: yb.acted, gap: yearGap });
+    });
+    return { differ, gap };
+  }
   function replay(scope, overrides) {
     const runs = REPLAY_POLICIES.map((pol) => ENGINE.simulate(scope, { trigger: pol.trigger }, overrides));
     const nothing = runs[0].totals;
     return {
       firstYear: scope.firstYear, lastYear: scope.lastYear, years: runs[0].years.map((y) => y.year),
+      // For each pair: the years the two decided differently, each year's share of the gap, and the whole gap.
+      pairs: REPLAY_PAIRS.map(([a, b]) => Object.assign({ a, b }, decisionGap(runs[triggerIndex(a)], runs[triggerIndex(b)]))),
       rows: runs.map((run, i) => ({
         trigger: REPLAY_POLICIES[i].trigger, name: REPLAY_POLICIES[i].name,
         yearsSealed: run.totals.yearsActed, sealedYears: run.years.filter((y) => y.acted).map((y) => y.year),
@@ -119,31 +141,152 @@
       })),
     };
   }
-  /* Two totals count as level when they differ by less than this share of the larger one. */
-  const REPLAY_LEVEL_SHARE = 0.002;
+  /* ---------- Ranges: every modelled figure is shown as a middle with a low and a high ---------- */
+  /* Low, middle and high of a list: its 10th, 50th and 90th percentiles (the engine's own rule). */
+  function band(values) {
+    const sorted = values.slice().sort((x, y) => x - y);
+    const at = (q) => sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))];
+    return { low: at(0.1), mid: at(0.5), high: at(0.9) };
+  }
+  /* A range in words: "$40.0M ($20.0M to $60.0M)". fmt turns a number into text. unit is what the
+     range runs across ("draw" or "future"), used only when low and high are the same. */
+  function rangeText(b, fmt, unit) {
+    return fmt(b.low) === fmt(b.high) ? fmt(b.mid) + " (the same in every " + (unit || "draw") + ")" : fmt(b.mid) + " (" + fmt(b.low) + " to " + fmt(b.high) + ")";
+  }
+  /* The same range for a table cell: the middle on one line, the range in small text under it. */
+  function rangeCell(b, fmt, unit) {
+    return '<span class="rmid">' + esc(fmt(b.mid)) + '</span><small class="rng">' +
+      (fmt(b.low) === fmt(b.high) ? "same in every " + esc(unit || "draw") : esc(fmt(b.low)) + " to " + esc(fmt(b.high))) + "</small>";
+  }
+  /* Acre-feet in thousands, for narrow table cells: 3,350 / 48.8 / 4.37. */
+  const thousandAf = (af) => num(af / 1000, Math.abs(af) >= 1e5 ? 0 : Math.abs(af) >= 1e4 ? 1 : 2);
+
   /*
-    One plain sentence set on how acting on the forecast compared, in this replay, with the D1
-    rule and with sealing every year. It is written from the numbers, whichever way they fall:
-    "better" means a lower modelled total cost (lost crops plus sealant).
-    Returns { text, vsD1, vsAlways }, each verdict "better", "same" or "worse".
+    The replay again, across many draws of what is not known about the canals (the engine's
+    samplePhysics). The weather, the reservoirs and the forecasts are the real record and do not
+    change; only the physical unknowns do. So years sealed is one number per policy, and the
+    money and water figures are ranges: low, middle and high across the draws.
+    options: { draws (300), seed, physicsOptions (handed to samplePhysics; a seepSd in it switches
+    to the calibrated regime) }.
+    Each row also has cost (one modelled total per draw, for comparing policies draw by draw),
+    losesToNothing (draws where its total is higher than doing nothing's) and overBudget (draws
+    where it sealed and a round cost more than the budget).
   */
-  function replaySentence(result) {
-    const row = (trigger) => result.rows.find((r) => r.trigger === trigger);
-    const forecast = row("forecast"), years = result.years.length;
-    const yearWord = (n) => n + (n === 1 ? " year" : " years");
-    const against = (other, label) => {
-      const gap = other.cost - forecast.cost;                                // above zero: the forecast cost less
-      const sameYears = forecast.sealedYears.join() === other.sealedYears.join();
-      if (sameYears && gap === 0) return { verdict: "same", text: "The forecast and " + label + " sealed in the same " + yearWord(forecast.yearsSealed) + " and gave the same modelled result." };
-      if (Math.abs(gap) <= REPLAY_LEVEL_SHARE * Math.max(forecast.cost, other.cost)) {
-        return { verdict: "same", text: "The forecast ended about level with " + label + " (" + yearWord(other.yearsSealed) + " sealed): the modelled totals differ by " + money(Math.abs(gap)) + "." };
-      }
-      return { verdict: gap > 0 ? "better" : "worse",
-               text: "The forecast ended " + money(Math.abs(gap)) + (gap > 0 ? " ahead of " : " behind ") + label + " (" + yearWord(other.yearsSealed) + " sealed) in modelled total cost." };
+  function replayBands(scope, overrides, options) {
+    const opt = Object.assign({ draws: 300, seed: 11, physicsOptions: null }, options || {});
+    const rng = ENGINE.makeRng(opt.seed), central = ENGINE.centralPhysics(opt.physicsOptions);
+    const nothing = ENGINE.simulate(scope, { trigger: "never" }, overrides);     // no canal is touched: the same in every draw
+    const lists = REPLAY_POLICIES.map(() => ({ spend: [], keptAf: [], loss: [], cost: [], saving: [], over: 0, first: null }));
+    const pairYears = REPLAY_PAIRS.map(() => ({})), runs = [];
+    for (let k = 0; k < opt.draws; k++) {
+      const drawn = Object.assign({}, scope, { physics: ENGINE.samplePhysics(rng, opt.physicsOptions) });
+      REPLAY_POLICIES.forEach((pol, i) => {
+        const run = i === 0 ? nothing : ENGINE.simulate(drawn, { trigger: pol.trigger }, overrides), t = run.totals, list = lists[i];
+        list.spend.push(t.spend); list.keptAf.push(t.savedAf); list.loss.push(t.loss); list.cost.push(t.cost); list.saving.push(nothing.totals.cost - t.cost);
+        if (run.plan.overBudget && t.yearsActed > 0) list.over += 1;
+        if (!list.first) list.first = run;
+        runs[i] = run;
+      });
+      REPLAY_PAIRS.forEach(([a, b], j) => {
+        const g = decisionGap(runs[triggerIndex(a)], runs[triggerIndex(b)]);
+        g.differ.forEach((d) => { (pairYears[j][d.year] = pairYears[j][d.year] || { year: d.year, sealedA: d.sealedA, sealedB: d.sealedB, gaps: [] }).gaps.push(d.gap); });
+      });
+    }
+    return {
+      firstYear: scope.firstYear, lastYear: scope.lastYear, years: nothing.years.map((y) => y.year),
+      draws: opt.draws, regime: central.regime, calibrated: central.calibrated,
+      districts: scope.members, counties: scope.counties,
+      // For each pair: the years the two decided differently (the same in every draw, because a
+      // decision never looks at the canals) and the range of what each such year adds to the gap.
+      pairs: REPLAY_PAIRS.map(([a, b], j) => ({ a, b,
+        differ: Object.keys(pairYears[j]).map(Number).sort((x, y) => x - y).map((year) => ({
+          year, sealedA: pairYears[j][year].sealedA, sealedB: pairYears[j][year].sealedB, gap: band(pairYears[j][year].gaps) })) })),
+      rows: REPLAY_POLICIES.map((pol, i) => ({
+        trigger: pol.trigger, name: pol.name,
+        yearsSealed: lists[i].first.totals.yearsActed, sealedYears: lists[i].first.years.filter((y) => y.acted).map((y) => y.year),
+        spend: band(lists[i].spend), keptAf: band(lists[i].keptAf), loss: band(lists[i].loss), saving: band(lists[i].saving),
+        cost: lists[i].cost, losesToNothing: lists[i].cost.filter((c, k) => c > lists[0].cost[k]).length, overBudget: lists[i].over,
+      })),
     };
-    const d1 = against(row("d1"), "the D1 rule"), always = against(row("always"), "sealing every year");
+  }
+
+  /* A policy is called ahead of another only if its modelled total cost is lower in at least this share of the draws, */
+  const REPLAY_CLEAR_SHARE = 0.9;
+  /* and the two decided differently in at least this many years, */
+  const REPLAY_MIN_YEARS_APART = 3;
+  /* and no single year supplies more than this share of the gap between them. */
+  const REPLAY_ONE_YEAR_SHARE = 0.5;
+  /* The scored test's result, as the team reported it. Fixed wording: it is not computed here. */
+  const SCORED_TEST_SENTENCE = "In the scored test on all 31 Rio Grande counties (558 county-years), the forecast and the 'already in moderate drought' rule could not be told apart.";
+  /*
+    How acting on the forecast compared with the D1 rule and with sealing every year. Written from
+    the numbers, whichever way they fall, and deliberately hard to read as a win:
+      - it always says in how many years the two policies decided differently;
+      - "ahead" or "behind" is used only if the modelled total cost (lost crops plus sealant) is
+        lower, or higher, in at least 9 draws in 10, AND the two decided differently in at least
+        3 years, AND no single year supplies more than half of the gap;
+      - otherwise it says "not distinguishable in this replay" and gives the reason. When one year
+        supplies more than half of the gap, that year is named.
+    Returns { text, vsD1, vsAlways }, each verdict "better", "worse", "same" or "indistinct".
+  */
+  function replayBandsSentence(result) {
+    const row = (trigger) => result.rows.find((r) => r.trigger === trigger);
+    const forecast = row("forecast"), n = result.draws, years = result.years.length;
+    const yearWord = (c) => c + (c === 1 ? " year" : " years");
+    const share = (count) => Math.round(100 * count / n) + "%";
+    const against = (other, label, better) => {
+      const pair = result.pairs.find((p) => p.a === "forecast" && p.b === other.trigger), apart = pair.differ;
+      const who = "Against " + label + " (" + yearWord(other.yearsSealed) + " sealed): ";
+      if (!apart.length) return { verdict: "same", text: who + "the two made the same decision in all " + yearWord(years) + ", so their modelled results are the same." };
+      const lower = forecast.cost.filter((c, k) => c < other.cost[k]).length, higher = forecast.cost.filter((c, k) => c > other.cost[k]).length;
+      // Which year, if any, supplies more than half of the gap (by the middle draw of each year's part).
+      const size = apart.map((d) => Math.abs(d.gap.mid)), total = size.reduce((x, y) => x + y, 0);
+      const top = size.indexOf(Math.max.apply(null, size)), oneYear = total > 0 && size[top] > REPLAY_ONE_YEAR_SHARE * total ? apart[top].year : null;
+      const differed = "the two decided differently in " + apart.length + " of " + yearWord(years) + " (" + apart.map((d) => d.year).join(", ") + "). ";
+      const leads = lower >= REPLAY_CLEAR_SHARE * n ? "lower" : higher >= REPLAY_CLEAR_SHARE * n ? "higher" : null;
+      const counted = "The forecast had the " + (leads || "lower") + " modelled total cost in " + (leads === "higher" ? higher : lower) + " of " + n + " draws (" + share(leads === "higher" ? higher : lower) + ")";
+      if (!leads) return { verdict: "indistinct", text: who + differed + counted + ", short of the 9 in 10 needed to call it either way: not distinguishable in this replay." };
+      if (oneYear != null) {
+        return { verdict: "indistinct", text: who + differed + counted + ", but " + oneYear + " alone supplies more than half of the gap, and one year is not evidence that " +
+          (leads === "lower" ? "the forecast" : better) + " is better: not distinguishable in this replay." };
+      }
+      if (apart.length < REPLAY_MIN_YEARS_APART) {
+        return { verdict: "indistinct", text: who + differed + counted + ", but " + yearWord(apart.length) + " of difference " + (apart.length === 1 ? "is" : "are") + " too few to tell two policies apart: not distinguishable in this replay." };
+      }
+      return { verdict: leads === "lower" ? "better" : "worse", text: who + differed + counted + ": in this replay it ended " + (leads === "lower" ? "ahead" : "behind") + "." };
+    };
+    const d1 = against(row("d1"), "the D1 rule", "the D1 rule"), always = against(row("always"), "sealing every year", "sealing every year");
     return { vsD1: d1.verdict, vsAlways: always.verdict,
              text: "In this replay, acting on the forecast sealed in " + forecast.yearsSealed + " of " + yearWord(years) + ". " + d1.text + " " + always.text };
+  }
+  /* For a view of several districts: how many counties' forecasts they share. Empty for one district. */
+  function sharedForecastSentence(result) {
+    if (!(result.districts > 1)) return "";
+    return "The " + result.districts + " districts in this view draw on the forecasts of " + result.counties + (result.counties === 1 ? " county" : " counties") +
+      ". Districts in the same county share one forecast, so they are not " + result.districts + " separate tests of it.";
+  }
+  /* Two plain lines from the counts: how often each policy ended worse than doing nothing, and
+     how often a sealing round cost more than the budget. */
+  function replayBandsLines(result) {
+    const n = result.draws, acting = result.rows.filter((r) => r.trigger !== "never");
+    const short = { declared: "waiting for a declaration", d1: "the D1 rule", forecast: "the forecast", always: "sealing every year" };
+    const over = Math.max.apply(null, acting.map((r) => r.overBudget));
+    return {
+      worse: "Ended worse than doing nothing (a higher modelled total cost), out of " + n + " draws: " +
+        acting.map((r) => short[r.trigger] + " in " + r.losesToNothing).join(", ") + ".",
+      overBudget: over === 0 ? "In none of the " + n + " draws did a sealing round cost more than the budget."
+        : "A sealing round cost more than the budget in " + over + " of " + n + " draws: the plan is made at the assumed canal width, and in those draws the canals were wider.",
+    };
+  }
+  /* The table of ranges, one row per policy. Every figure in it is modelled. */
+  function replayBandsTable(result) {
+    const cell = (b, fmt) => '<td class="r">' + rangeCell(b, fmt) + "</td>";
+    const rows = result.rows.map((r) => (r.trigger === "never"
+      ? "<tr><td>" + esc(r.name) + '</td><td class="r">0</td><td class="r">none</td><td class="r">none</td>' + cell(r.loss, money) + '<td class="r"></td></tr>'
+      : "<tr><td>" + esc(r.name) + '</td><td class="r">' + esc(r.yearsSealed) + " of " + esc(result.years.length) + "</td>" +
+        cell(r.spend, money) + cell(r.keptAf, thousandAf) + cell(r.loss, money) + cell(r.saving, money) + "</tr>")).join("");
+    return '<div class="tableWrap"><table class="t replay"><tr><th>Policy</th><th class="r">Years sealed</th><th class="r">Sealant</th><th class="r">Water kept (1,000 af)</th><th class="r">Crop loss</th><th class="r">Saving vs nothing</th></tr>' +
+      rows + "</table></div>";
   }
 
   /*
@@ -255,7 +398,8 @@
       const pNow = members.reduce((s, x) => s + pOf(x) * x.canalKm, 0) / (kmHere || 1);
       return { weeks, canals: list.slice().sort((a, b) => a.rank - b.rank), canalsUnranked: list,
                demandAf: PUBLISHED.valleyIrrigationAf * share, revenueAtStake: PUBLISHED.worstCaseRevenue * share,
-               share, system, pNow, ids: Array.from(ids), outsideValley: members.some((x) => !x.fips.some((f) => SIM.valley.indexOf(f) >= 0)), members: members.length };
+               share, system, pNow, ids: Array.from(ids), outsideValley: members.some((x) => !x.fips.some((f) => SIM.valley.indexOf(f) >= 0)), members: members.length,
+               counties: fips.length };                               // how many distinct counties, and so how many forecasts, the members draw on
     }
 
     /* The scope the simulation's futures are built from: forecasts from the frozen model (trained
@@ -300,9 +444,19 @@
       return { recall: t.recall, falseAlarm: t.falseAlarms / Math.max(1, t.rows - t.droughtSeasons) };
     }
 
-    return { actionFor, tierFor, planFor, canalNumbers, USD_PER_AF, scopeP, simScope, replayScope, hitRates };
+    /* What to hand the engine's samplePhysics. If the pipeline has put a calibration spread into
+       the data (HG.calibration.seepSd, a number), it is passed through and the runs use the
+       calibrated regime. Today the data has none, so this is empty and the runs are uncalibrated. */
+    function physicsOptions() {
+      const c = HG.calibration;
+      return c && typeof c.seepSd === "number" && isFinite(c.seepSd) && c.seepSd >= 0 ? { seepSd: c.seepSd } : {};
+    }
+
+    return { actionFor, tierFor, planFor, canalNumbers, USD_PER_AF, scopeP, simScope, replayScope, hitRates, physicsOptions };
   }
 
   return { usd, num, pct, niceDate, esc, safeUrl, safeDecode, cssClass, TIER_CLASSES, SEVERITY_CLASSES, finiteOrNull, percentOrNull, csvText, csvNumber,
-           workTime, gal, money, usesElephantButte, REPLAY_POLICIES, replay, replaySentence, makeLogic };
+           workTime, gal, money, usesElephantButte, REPLAY_POLICIES, replay,
+           band, rangeText, rangeCell, thousandAf, replayBands, replayBandsSentence, replayBandsLines, replayBandsTable,
+           sharedForecastSentence, SCORED_TEST_SENTENCE, makeLogic };
 });

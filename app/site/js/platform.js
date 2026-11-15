@@ -18,7 +18,7 @@
   "use strict";
   const HG = window.HG, SIM = window.HG_SIM, U = window.HGU, E = window.HGEngine;
   const L = U.logic;                                    // the rules with no page code (js/logic.js), bound to the data
-  const { gal, money, usesElephantButte, safeUrl, cssClass, finiteOrNull, percentOrNull } = window.HGLogic, hitRates = L.hitRates;
+  const { gal, money, usesElephantButte, safeUrl, cssClass, finiteOrNull, percentOrNull, band, rangeText, rangeCell } = window.HGLogic, hitRates = L.hitRates;
   const $ = (id) => document.getElementById(id);
   const STATE = -1;
   const FROZEN = SIM.pre2020;                           // the forecast model trained only on data before 2020
@@ -356,8 +356,9 @@
     { trigger: "declared", name: "Wait for an official drought declaration", css: "react", blurb: "Seal only after 8 straight weeks of severe drought, plus paperwork." },
     { trigger: "forecast", name: "Seal early, when the forecast warns", css: "act", blurb: "Seal before the season whenever the forecast warns." },
   ];
+  // The share of seepage the sealant stops is not here: every run draws it from its published
+  // range (see unknownsHtml), so a slider for it would do nothing.
   const SLIDERS = [   // the assumptions the user can move: [parameter, min, max, step, how to show it]
-    ["cut", 0.28, 0.87, 0.01, (v) => Math.round(v * 100) + "%"],
     ["widthFt", 10, 40, 1, (v) => v + " ft"],
     ["fullAt", 30, 80, 1, (v) => v + "%"],
     ["zeroAt", 0, 29, 1, (v) => v + "%"],
@@ -406,9 +407,9 @@
       '<div id="simLead"></div>' +
       '<div class="controls"><div class="field"><label for="simBudget">Sealant budget, each round <output id="simBudgetOut"></output></label><input id="simBudget" type="range" min="0" max="' + maxBudget() + '" step="' + budgetStep() + '" value="' + state.budget + '"></div><div id="shockRow"></div></div>' +
       '<div id="simResult"></div>' +
-      '<details class="more"><summary>Assumptions (' + SLIDERS.length + " sliders)</summary>" +
+      '<details class="more"><summary>Assumptions (' + SLIDERS.length + " sliders, and the unknowns drawn in every run)</summary>" +
       SLIDERS.map(([k, min, max, step, show]) => '<div class="field"><label for="a_' + k + '"><span>' + E.DEFAULTS[k].label + ' <span class="tag ' + E.DEFAULTS[k].tag + '">' + E.DEFAULTS[k].tag + '</span></span><output id="o_' + k + '">' + show(p[k]) + '</output></label><input type="range" data-param="' + k + '" id="a_' + k + '" min="' + min + '" max="' + max + '" step="' + step + '" value="' + p[k] + '"></div>').join("") +
-      '<button class="btn small ghost" data-act="resetAssume">Reset to defaults</button></details>' +
+      '<button class="btn small ghost" data-act="resetAssume">Reset to defaults</button><div id="simUnknowns"></div></details>' +
       '<div id="simNotes"></div>';
     renderSimResult();
   }
@@ -482,183 +483,199 @@
   function districtTable(over, hit, on) {
     const key = JSON.stringify([over, state.live && state.live.systems, on.map((s) => s.key)]);
     if (key !== tableKey) {
-      const median = (list) => list.slice().sort((a, b) => a - b)[Math.floor(list.length / 2)];
       tableCache = HG.districts.map((d, i) => ({ d, i })).filter((r) => APPLICABLE[r.i]).map(({ d, i }) => {
         const scope = simScope([d]), res = reservoirFor(d);
         const budget = scope.canals.reduce((s, c) => s + c.usd, 0) + 1;
         const r = E.fromToday(scope, [{ trigger: "never" }, { trigger: "forecast" }], Object.assign({}, over, { budget }), {
           startDate: TODAY, pctNow: res.pct == null ? 50 : res.pct, pNow: scope.pNow, years: 5, draws: 100, seed: 11, cutoffYear: 2020,
-          recall: hit.recall, falseAlarm: hit.falseAlarm, shocks: on.filter((x) => x.shock).map((x) => x.shock), secondDryYear: on.some((x) => x.secondDryYear) });
-        return { d, i, alone: usesElephantButte(d), loss: r.policies[0].summary.loss.mid, saved: median(r.policies[1].draws.map((t, k) => r.policies[0].draws[k].cost - t.cost)) };
-      }).sort((a, b) => b.saved - a.saved);
+          recall: hit.recall, falseAlarm: hit.falseAlarm, shocks: on.filter((x) => x.shock).map((x) => x.shock), secondDryYear: on.some((x) => x.secondDryYear),
+          physics: true, physicsOptions: L.physicsOptions(), withFixed: false });
+        return { d, i, alone: usesElephantButte(d), loss: r.policies[0].summary.loss, saved: band(r.policies[1].draws.map((t, k) => r.policies[0].draws[k].cost - t.cost)) };
+      }).sort((a, b) => b.saved.mid - a.saved.mid);
       tableKey = key;
     }
     const n = simMembers().length, q = (state.simQuery || "").toLowerCase();
     const rows = tableCache.filter((r) => !q || r.d.name.toLowerCase().indexOf(q) >= 0 || r.d.counties.join(" ").toLowerCase().indexOf(q) >= 0);
     return '<div class="rowBtns"><button class="btn" data-act="simRun"' + (n ? "" : " disabled") + ">Run the simulation: " + (n === 1 ? U.esc(simMembers()[0].name) : n === GROUPABLE.length ? "all " + n + " districts" : n + " districts") + ' &rarr;</button></div>' +
       '<div class="pickBar"><input id="simSearch" type="search" placeholder="Search for a district or county" value="' + U.esc(state.simQuery || "") + '"><button class="btn ghost small" data-act="simAll">Tick all</button><button class="btn ghost small" data-act="simNone">Clear</button></div>' +
-      "<div class=\"scroll\" style=\"max-height:330px\"><table class=\"t\"><tr><th></th><th>District</th><th class=\"r\">Crops lost if nothing is done</th><th class=\"r\">Saved by sealing early</th></tr>" +
+      "<div class=\"scroll\" style=\"max-height:330px\"><table class=\"t replay\"><tr><th></th><th>District</th><th class=\"r\">Crop loss if nothing is done</th><th class=\"r\">Modelled saving from sealing early</th></tr>" +
       rows.map((r) => r.alone
-        ? '<tr class="go" data-act="district" data-i="' + U.esc(r.i) + '"><td>&rarr;</td><td>' + U.esc(r.d.name) + ' <span class="muted">opens on its own (different reservoir)</span></td><td class="r">' + money(r.loss) + '</td><td class="r save">' + money(r.saved) + "</td></tr>"
-        : '<tr class="go" data-act="simPick" data-i="' + U.esc(r.i) + '"><td><input type="checkbox" tabindex="-1"' + (state.simSel.has(r.i) ? " checked" : "") + "></td><td>" + U.esc(r.d.name) + ' <span class="muted">' + U.esc(r.d.counties.join(", ")) + '</span></td><td class="r">' + money(r.loss) + '</td><td class="r save">' + money(r.saved) + "</td></tr>").join("") +
+        ? '<tr class="go" data-act="district" data-i="' + U.esc(r.i) + '"><td>&rarr;</td><td>' + U.esc(r.d.name) + ' <span class="muted">opens on its own (different reservoir)</span></td><td class="r">' + rangeCell(r.loss, money, "future") + '</td><td class="r">' + rangeCell(r.saved, money, "future") + "</td></tr>"
+        : '<tr class="go" data-act="simPick" data-i="' + U.esc(r.i) + '"><td><input type="checkbox" tabindex="-1"' + (state.simSel.has(r.i) ? " checked" : "") + "></td><td>" + U.esc(r.d.name) + ' <span class="muted">' + U.esc(r.d.counties.join(", ")) + '</span></td><td class="r">' + rangeCell(r.loss, money, "future") + '</td><td class="r">' + rangeCell(r.saved, money, "future") + "</td></tr>").join("") +
       (rows.length ? "" : '<tr><td colspan="4" class="muted">No district matches.</td></tr>') +
-      '</table></div><p class="fn">Five years, typical future, each district on its own. Ticked districts run together.</p>';
+      '</table></div><p class="fn">Modelled, not measured. Five years, 100 possible futures for each district on its own: the middle future, with the range 8 in 10 futures fall in beneath it. Ticked districts run together.</p>';
   }
 
+  /* ---------- What the Simulation step shows ----------
+     Every modelled figure on this step is a range: the middle, with the low and high that 8 in 10
+     runs fall between. Nothing here is a single dollar or water figure, and nothing is measured. */
+  const DRAWS = 300;                                         // draws of the canal unknowns in the replay, and futures in the stress test
+  const TAG_MODELLED = ' <span class="tag assumption">modelled, not measured</span>';
+  const pctOf = (v) => Math.round(v * 100) + "%";
+  /* Which of the two regimes the runs are in (see samplePhysics in sim/engine.js), in a sentence. */
+  const regimeSentence = (calibrated) => (calibrated
+    ? "Leak rates are calibrated to each district's published loss, so the share of that loss that is seepage is drawn too."
+    : "Leak rates are the published rates for each soil; they are not yet calibrated to district losses.");
+  /* The unknowns every run draws, with their ranges. Shown next to the sliders. */
+  function unknownsHtml(P, calibrated) {
+    const D = E.DEFAULTS, item = (text, tag, label) => "<li>" + text + ' <span class="tag ' + tag + '">' + label + "</span></li>";
+    const ft = (v) => U.num(v, v % 1 ? 1 : 0);
+    return '<p class="fn"><b>Drawn afresh in every run, not set by a slider</b></p><ul class="plain">' +
+      item("Share of seepage the sealant stops: " + pctOf(D.cutLow.value) + " to " + pctOf(D.cutHigh.value) + ". This used to be a slider; a slider would now do nothing, so it is gone.", "published", "published range") +
+      item("Wetted canal width: " + ft(P.widthFt * D.widthMultLow.value) + " to " + ft(P.widthFt * D.widthMultHigh.value) + " ft (" + D.widthMultLow.value + " to " + D.widthMultHigh.value + " times the width set above). No width is measured." +
+        (calibrated ? " Once calibrated, it changes the sealant bill only." : ""), "assumption", "our assumption") +
+      (calibrated
+        ? item("Share of a district's canal loss that is seepage: " + pctOf(D.seepShareLow.value) + " to " + pctOf(D.seepShareHigh.value) + ".", "assumption", "our assumption")
+        : item("Share of canal length already lined: " + pctOf(D.linedShareLow.value) + " to " + pctOf(D.linedShareHigh.value) + ", most likely " + pctOf(D.linedShareMode.value) + ". No public record says which canals are lined.", "assumption", "our assumption")) +
+      "</ul><p class=\"fn\">" + regimeSentence(calibrated) + " Where a figure is given with each unknown at the middle of its range, these are the unknowns meant.</p>";
+  }
+
+  /* The replay across the draws is the slow part of this step, so it is kept until its inputs change. */
+  const bandsCache = {};
+  function bandsFor(name, scope, over) {
+    const key = JSON.stringify([scope.ids, scope.firstYear, scope.lastYear, over, L.physicsOptions()]);
+    if (!bandsCache[name] || bandsCache[name].key !== key) {
+      bandsCache[name] = { key, result: window.HGLogic.replayBands(scope, over, { draws: DRAWS, physicsOptions: L.physicsOptions() }) };
+    }
+    return bandsCache[name].result;
+  }
+  /* A table of ranges for the five policies, the sentence written from it, and the two count lines. */
+  function bandsBlock(result, withScoredTest) {
+    const lines = window.HGLogic.replayBandsLines(result), shared = window.HGLogic.sharedForecastSentence(result);
+    return window.HGLogic.replayBandsTable(result) +
+      '<p class="fn">Each figure is the middle of ' + U.esc(result.draws) + " draws of what is not known about the canals; under it, the range 8 in 10 draws fall in. Sealant spent, water kept (in thousands of acre-feet), crop loss and saving against doing nothing are all modelled.</p>" +
+      '<p class="rec">' + U.esc(window.HGLogic.replayBandsSentence(result).text) + "</p>" +
+      (withScoredTest ? '<p class="rec">' + U.esc(window.HGLogic.SCORED_TEST_SENTENCE) + "</p>" : "") +
+      (shared ? '<p class="fn">' + U.esc(shared) + "</p>" : "") +
+      '<p class="fn">' + U.esc(lines.worse) + "<br>" + U.esc(lines.overBudget) + "</p>";
+  }
   /*
     The replay that leads the Simulation step: the real years that have forward-chained forecasts,
-    run through five policies (js/logic.js does the sums with the engine). Everything in it is
-    modelled, not measured, and the page says so beside the table.
+    run through five policies (js/logic.js does the sums with the engine), once for every draw of
+    the canal unknowns.
   */
   function replayHtml(over) {
     const scope = L.replayScope(simMembers());
     if (!scope) return "";                                   // the data holds no year with forecasts
-    const result = window.HGLogic.replay(scope, over), P = E.makeParams(over);
-    const rows = result.rows.map((r) => "<tr><td>" + U.esc(r.name) + '</td><td class="r">' + (r.trigger === "never" ? "0" : U.esc(r.yearsSealed) + " of " + U.esc(result.years.length)) +
-      '</td><td class="r">' + money(r.spend) + '</td><td class="r">' + U.num(r.keptAf) + '</td><td class="r">' + money(r.loss) +
-      '</td><td class="r' + (r.saving > 0 ? " save" : "") + '">' + (r.trigger === "never" ? "" : money(r.saving)) + "</td></tr>").join("");
-    return '<section class="replay"><h3>Replay of the real record, ' + U.esc(result.firstYear) + " to " + U.esc(result.lastYear) + ' <span class="tag assumption">modelled, not measured</span></h3>' +
+    const result = bandsFor("replay", scope, over), P = E.makeParams(over);
+    return '<section class="replay"><h3>Replay of the real record, ' + U.esc(result.firstYear) + " to " + U.esc(result.lastYear) + TAG_MODELLED + "</h3>" +
       '<p class="fn">What each policy would have done in the years that really happened: the real weekly drought record, the real reservoir levels, and each year\'s forecast as it was really made, by a model trained only on earlier years. ' +
-      "Canal seepage and the sealant's effect are assumptions, shown here as single values until the uncertainty bands are switched on.</p>" +
-      // Short headings so six columns fit the panel; the line under the table says what they are.
-      '<div class="tableWrap"><table class="t replay"><tr><th>Policy</th><th class="r">Years sealed</th><th class="r">Sealant</th><th class="r">Water kept (af)</th><th class="r">Crop loss</th><th class="r">Saving vs nothing</th></tr>' +
-      rows + "</table></div>" +
-      '<p class="fn">Sealant spent, water kept (af = acre-feet), crop loss and saving against doing nothing are all modelled.</p>' +
-      '<p class="rec">' + U.esc(window.HGLogic.replaySentence(result).text) + "</p>" +
+      "The weather is fixed, so the ranges come only from what is not known about the canals: how well the sealant works, how wide the canals are and how much of them is already lined. " + regimeSentence(result.calibrated) + "</p>" +
+      bandsBlock(result, true) +
       '<p class="fn">Modelled, not measured: none of these savings happened. Modelled saving is the crop loss avoided minus the sealant spent, against doing nothing. ' +
       "Water kept counts every week the sealant was working; it lowers the crop loss only in weeks with a shortage. " +
-      "Sealant budget " + U.usd(over.budget) + " each round, up to " + U.esc(P.applications) + (P.applications === 1 ? " round" : " rounds") + " in a year a policy seals.</p></section>";
+      "Sealant budget (an input) " + U.usd(over.budget) + " each round, up to " + U.esc(P.applications) + (P.applications === 1 ? " round" : " rounds") + " in a year a policy seals.</p></section>";
   }
 
   function renderSimResult() {
     if (!simMembers().length) {                                // nothing ticked: show the list only
-      $("simLead").innerHTML = districtTable(state.overrides, hitRates(), []); $("simResult").innerHTML = ""; $("simNotes").innerHTML = ""; $("shockRow").innerHTML = "";
+      $("simLead").innerHTML = districtTable(state.overrides, hitRates(), []); $("simResult").innerHTML = ""; $("simNotes").innerHTML = ""; $("shockRow").innerHTML = ""; $("simUnknowns").innerHTML = "";
       return;
     }
     const scope = simScope(), over = Object.assign({}, state.overrides, { budget: state.budget }), P = E.makeParams(over);
     $("simBudgetOut").textContent = U.usd(state.budget);
-    const plan = E.fundCanals(scope.canals, state.budget, P), planN = U.canalNumbers(plan.funded, P);
-    const li = (cls, text, tag) => '<li class="' + cls + '">' + text + (tag ? ' <span class="tag ' + tag + '">' + tag + "</span>" : "") + "</li>";
+    const plan = E.fundCanals(scope.canals, state.budget, P);
     const who = scope.members > 1 ? scope.members + " districts on the " + scope.system + " system" : "this district";
-    let html = "<h3>What acting means each year you act</h3>" + triple(planN);
-    const d = district(), which = caseOf(state.simCase), hit = hitRates(), on = SHOCKS.filter((s) => state.shocks[s.key]);
+    const which = caseOf(state.simCase), hit = hitRates(), on = SHOCKS.filter((s) => state.shocks[s.key]);
     const showCheck = state.simStep === 3 && state.simCase === "check";
+    const physicsOptions = L.physicsOptions(), central = E.centralPhysics(physicsOptions);   // central: each canal unknown at the middle of its range
+    $("simUnknowns").innerHTML = unknownsHtml(P, central.calibrated);
     // The real 2020 to 2025 record, with the forecasts the frozen model made for those years.
-    const test = Object.assign({}, scope, { weeks: scope.weeks.filter((w) => w.year >= 2020 && w.year <= 2025) });
-    const runs = POLICIES.map((pol) => E.simulate(test, { trigger: pol.trigger }, over));
-    const endYear = Number(TODAY.slice(0, 4)) + 5;
-    let run = null, lead = "";
+    const test = Object.assign({}, scope, { weeks: scope.weeks.filter((w) => w.year >= 2020 && w.year <= 2025), firstYear: 2020, lastYear: 2025 });
+    let run = null, html = "", pair = null, note = "";
 
     if (!showCheck) {
       const res = reservoirFor(district());
-      run = E.fromToday(scope, POLICIES.map((pol) => ({ trigger: pol.trigger })), over, {
-        startDate: TODAY, pctNow: res.pct == null ? 50 : res.pct, pNow: scope.pNow, years: 5, draws: 300, seed: 11,
+      const futures = (policies, budget, draws, withFixed) => E.fromToday(scope, policies, Object.assign({}, over, { budget }), {
+        startDate: TODAY, pctNow: res.pct == null ? 50 : res.pct, pNow: scope.pNow, years: 5, draws, seed: 11,
         cutoffYear: 2020, recall: hit.recall, falseAlarm: hit.falseAlarm,
-        shocks: on.filter((s) => s.shock).map((s) => s.shock), secondDryYear: on.some((s) => s.secondDryYear) });
-      const base = run.policies[0].draws;
-      // The headline: what acting saves in the middle future, and what each sealant dollar returns.
-      const median = (list) => list.slice().sort((a, b) => a - b)[Math.floor(list.length / 2)];
-      const actDraws = run.policies[2].draws;
-      const saved = median(actDraws.map((t, k) => base[k].cost - t.cost)), kept = median(actDraws.map((t, k) => base[k].loss - t.loss));
-      const spent = run.policies[2].summary.spend.mid, behind = actDraws.filter((t, k) => t.cost > base[k].cost).length;
+        shocks: on.filter((s) => s.shock).map((s) => s.shock), secondDryYear: on.some((s) => s.secondDryYear),
+        physics: true, physicsOptions, withFixed });
+      run = futures(POLICIES.map((pol) => ({ trigger: pol.trigger })), state.budget, DRAWS, true);
+      // What each policy gains over doing nothing, future by future: with the canal unknowns drawn, and with them at the middle.
+      const gain = (set, i) => band(set[i].draws.map((t, k) => set[0].draws[k].cost - t.cost));
+      const act = run.policies[2], base = run.policies[0];
+      const kept = band(act.draws.map((t, k) => base.draws[k].loss - t.loss));
+      const mult = U.PUBLISHED.worstCaseOutput / U.PUBLISHED.worstCaseRevenue;      // total economic output per $1 of crop revenue (Texas A&M)
       // The same question at other budgets (fewer futures, to stay quick): does more sealing still pay?
       const top = maxBudget(), levels = [0, 0.1, 0.25, 0.5, 0.75, 1].map((f) => Math.round(top * f));
       const curve = levels.map((b) => {
-        if (b === 0) return 0;
-        const r = E.fromToday(scope, [{ trigger: "never" }, { trigger: "forecast" }], Object.assign({}, over, { budget: b }), {
-          startDate: TODAY, pctNow: res.pct == null ? 50 : res.pct, pNow: scope.pNow, years: 5, draws: 120, seed: 11, cutoffYear: 2020,
-          recall: hit.recall, falseAlarm: hit.falseAlarm, shocks: on.filter((x) => x.shock).map((x) => x.shock), secondDryYear: on.some((x) => x.secondDryYear) });
-        return median(r.policies[1].draws.map((t, k) => r.policies[0].draws[k].cost - t.cost));
+        if (b === 0) return { low: 0, mid: 0, high: 0 };
+        const r = futures([{ trigger: "never" }, { trigger: "forecast" }], b, 120, false);
+        return gain(r.policies, 1);
       });
-      const mult = U.PUBLISHED.worstCaseOutput / U.PUBLISHED.worstCaseRevenue;      // total economic output per $1 of crop revenue (Texas A&M)
-      const heroHtml = '<div class="saveHero"><span>Money saved by sealing early, typical future</span><b>' + money(saved) + "</b></div>" +
-        stats([
-          ["Crops kept", money(kept), "farm income that would have been lost"],
-          ["Value to the wider economy", money(kept * mult), "jobs, suppliers, processing (Texas A&amp;M, " + mult.toFixed(1) + "x)"],
-          ["Sealant spent", money(spent), spent > 0 ? "$" + U.num(kept / spent) + " kept per $1" : ""],
-          ["Futures where sealing does not pay", behind + " of 300", "wet years: the sealant was not needed"],
-        ]);
-      const curveHtml = "<h3>Net saving by budget</h3><div class=\"chart\">" +
-        lineChart([{ name: "Five-year net saving, middle future", color: U.TIER_COLOR.Low, values: curve }], levels.map((b) => money(b)), money) + "</div>" +
-        (state.budget < top ? '<div class="rowBtns"><button class="btn small" data-act="fullBudget">Fund every rankable canal: ' + U.usd(top) + "</button></div>" : "");
-      const policyRows = POLICIES.map((pol, i) => {
-        const c = run.policies[i].summary.cost, gains = run.policies[i].draws.map((t, k) => base[k].cost - t.cost).sort((a, b) => a - b);
-        return "<tr><td>" + pol.name + '</td><td class="r">' + money(c.mid) + '</td><td class="r save">' + (i ? money(gains[Math.floor(gains.length / 2)]) : "") + '</td><td class="r">' + (i ? gains.filter((g) => g < 0).length + " / 300" : "") + "</td></tr>";
-      }).join("");
-      const keptYear = E.savedAcreFeet(plan.gallonsPerDay, Math.min(273, P.daysLast * P.applications), P.cut);
+      const curveHtml = "<h3>Modelled net saving by budget</h3><div class=\"chart\">" +
+        lineChart([{ name: "Five-year modelled net saving: middle future (line) and 8 in 10 futures (shaded)", color: U.TIER_COLOR.Low, values: curve.map((c) => c.mid) }], levels.map((b) => money(b)), money,
+                  { low: curve.map((c) => c.low), high: curve.map((c) => c.high), color: U.TIER_COLOR.Low }) + "</div>" +
+        (state.budget < top ? '<div class="rowBtns"><button class="btn small" data-act="fullBudget">Fund every rankable canal</button></div>' : "");
+      const cell = (b) => '<td class="r">' + rangeCell(b, money, "future") + "</td>";
+      const policyRows = POLICIES.map((pol, i) => "<tr><td>" + U.esc(pol.name) + "</td>" + cell(run.policies[i].summary.cost) +
+        (i ? cell(gain(run.policies, i)) + cell(gain(run.fixedPhysics.policies, i)) + '<td class="r">' + U.esc(run.policies[i].losesToNothing) + " of " + DRAWS + "</td>"
+           : '<td class="r"></td><td class="r"></td><td class="r"></td>') + "</tr>").join("");
+      const keptYear = E.savedAcreFeet(plan.gallonsPerDay * (central.calibrated ? central.seepMult : central.widthMult * (1 - central.linedShare)), Math.min(273, P.daysLast * P.applications), central.cut);
       simFacts = {
         start: U.niceDate(TODAY), system: scope.system, pct: res.pct, live: res.live, pNow: scope.pNow, library: run.libraryYears, dry: run.dryYears,
         recall: hit.recall, falseAlarm: hit.falseAlarm, shocks: on.map((x) => x.label + " (" + x.note + ")"), keptYear, wrongWarning: plan.spent * P.applications,
         cases: state.simStep > 1 ? CASES.filter((c) => c.key !== "check").map((c) => c.name + ": " + run.cases[c.key].sourceYears.join(", ")) : [], share: scope.share,
         outsideValley: scope.outsideValley, who, P,
       };
-      html = "<h3>Across 300 possible futures, to " + endYear + "</h3>" + heroHtml +
-        "<table class=\"t\"><tr><th>Policy</th><th class=\"r\">Total cost</th><th class=\"r\">Saves</th><th class=\"r\">Worse in</th></tr>" + policyRows + "</table>" +
-        more("Net saving by budget", curveHtml) +
-        more("Reservoir storage in the 300 futures", '<div class="chart">' +
+      html = '<p class="fn">' + DRAWS + " possible futures to " + (Number(TODAY.slice(0, 4)) + 5) + ", built from real past years and started from today's reservoir level. Each future also draws what is not known about the canals. " +
+        "Each figure is the middle future, with the range 8 in 10 futures fall in beneath it.</p>" +
+        '<div class="tableWrap"><table class="t replay"><tr><th>Policy</th><th class="r">Total cost</th><th class="r">Saving vs nothing</th><th class="r">Same, each unknown at the middle</th><th class="r">Worse than nothing in</th></tr>' + policyRows + "</table></div>" +
+        '<p class="fn">Total cost is lost crops plus sealant; all of it is modelled. The first saving column includes what is not known about the canals. The second holds each canal unknown at the middle of its range, so its spread is the weather alone. ' +
+        "The difference between the two is what we do not know about the canals, as opposed to the weather.</p>" +
+        "<ul class=\"plain\">" +
+        "<li>Modelled crop loss avoided by sealing when the forecast warns: " + rangeText(kept, money, "future") + ".</li>" +
+        "<li>Modelled value of that to the wider economy (jobs, suppliers, processing; Texas A&amp;M, " + mult.toFixed(1) + " times crop revenue): " + rangeText(kept, (v) => money(v * mult), "future") + ".</li>" +
+        "<li>Sealant spent when the forecast warns: " + rangeText(act.summary.spend, money, "future") + ".</li>" +
+        "<li>Sealing when the forecast warns ended worse than doing nothing in " + U.esc(act.losesToNothing) + " of " + DRAWS + " futures (wet years: the sealant was not needed); with each unknown at the middle of its range, in " + U.esc(run.fixedPhysics.policies[2].losesToNothing) + ".</li>" +
+        "<li>" + (act.overBudget ? "A sealing round cost more than the budget in " + U.esc(act.overBudget) + " of " + DRAWS + " futures: the plan is made at the assumed canal width, and in those futures the canals were wider."
+                                 : "In none of the " + DRAWS + " futures did a sealing round cost more than the budget.") + "</li></ul>" +
+        more("Modelled net saving by budget", curveHtml) +
+        more("Reservoir storage in the " + DRAWS + " futures", '<div class="chart">' +
           lineChart([{ name: "Middle future", color: U.TIER_COLOR.Low, values: run.fan.map((w) => w.mid) },
                      { name: "Full supply above", color: U.LEVEL_COLOR["Unknown soil"], values: run.fan.map(() => P.fullAt), dash: true },
                      { name: "No supply below", color: U.TIER_COLOR.Warning, values: run.fan.map(() => P.zeroAt), dash: true }],
                     run.fan.map((w) => w.date.slice(0, 4)), (v) => Math.round(v) + "%", { low: run.fan.map((w) => w.low), high: run.fan.map((w) => w.high), color: U.TIER_COLOR.Low }) + "</div>");
+      if (state.simStep === 3) {
+        pair = [run.cases[which.key].sampleFixed[0], run.cases[which.key].sampleFixed[2]];
+        note = "Weather borrowed from " + run.cases[which.key].sourceYears.join(", ") + ", started from today's reservoir level";
+      }
     } else {
-      const d1 = E.simulate(test, { trigger: "d1" }, over), always = E.simulate(test, { trigger: "always" }, over);
-      const [nothing, react, act] = runs, years = nothing.years.map((y) => y.year);
-      const diff = (a, b) => a.totals.cost - b.totals.cost;
-      const better = (v, other) => (Math.abs(v) < 0.002 * act.totals.cost ? "ended level with " + other : v > 0 ? "ended " + money(v) + " ahead of " + other : "ended " + money(-v) + " behind " + other);
-      const t = FROZEN && FROZEN.test.preSeason;
-      html =
-        "<h3>Total cost, 2020 to 2025</h3><table class=\"t\"><tr><th>Policy</th><th class=\"r\">Crops lost</th><th class=\"r\">Sealing</th><th class=\"r\">Total</th><th class=\"r\">Saves</th></tr>" + POLICIES.map((pol, i) => {
-          const tt = runs[i].totals;
-          return "<tr><td>" + pol.name + '</td><td class="r">' + money(tt.loss) + '</td><td class="r">' + money(tt.spend) + '</td><td class="r">' + money(tt.cost) + '</td><td class="r save">' + (i ? money(nothing.totals.cost - tt.cost) : "") + "</td></tr>";
-        }).join("") + "</table>" +
-
-        "<h3>Running gain over doing nothing</h3><div class=\"chart\">" +
-        lineChart(POLICIES.slice(1).map((pol, i) => { let sum = 0; return { name: pol.name, color: i ? U.LEVEL_COLOR.Low : U.TIER_COLOR.Watch, values: runs[i + 1].years.map((y, k) => (sum += nothing.years[k].loss - y.loss - y.spend)) }; }), years, money) +
-        '</div>' +
+      // The same five policies on 2020 to 2025, across the same draws of the canal unknowns.
+      const result = bandsFor("check", test, over), t = FROZEN && FROZEN.test.preSeason;
+      const fixed = Object.assign({}, test, { physics: central });
+      pair = [E.simulate(fixed, { trigger: "never" }, over), E.simulate(fixed, { trigger: "forecast" }, over)];
+      note = "The real record: real drought, real reservoir levels, the forecasts the frozen model made";
+      html = '<p class="fn">Real drought and real reservoir levels, 2020 to 2025, with the forecasts made by the model frozen at the end of 2019, which never saw these years. ' +
+        "The ranges come from what is not known about the canals.</p>" +
+        bandsBlock(result) +
         (t ? "<h3>Forecast accuracy, January to March warnings</h3><div class=\"scroll\" style=\"max-height:none\"><table class=\"t\"><tr><th>Rule</th><th class=\"r\">Drought seasons caught</th><th class=\"r\">Warnings that were right</th></tr>" +
           "<tr><td><b>Our forecast</b> (trained before 2020)</td><td class=\"r\">" + U.esc(t.forecast.caught) + " of " + U.esc(t.forecast.droughtSeasons) + " (" + Math.round(t.forecast.recall * 100) + "%)</td><td class=\"r\">" + Math.round(t.forecast.precision * 100) + "%</td></tr>" +
           "<tr><td>Simple rule: already in moderate drought</td><td class=\"r\">" + U.esc(t.d1Rule.caught) + " of " + U.esc(t.d1Rule.droughtSeasons) + " (" + Math.round(t.d1Rule.recall * 100) + "%)</td><td class=\"r\">" + Math.round(t.d1Rule.precision * 100) + "%</td></tr></table></div>" +
           '<p class="fn">' + U.esc(t.forecast.rows) + " county-months, 14 Texas river counties, " + U.niceDate(FROZEN.test.from) + " to " + U.niceDate(FROZEN.test.to) + ". The two are close.</p>" : "") +
-        "<h3>Result</h3><ul class=\"plain\">" +
-        li(diff(nothing, act) >= 0 ? "for" : "against", "<b>Acting on the forecast " + better(diff(nothing, act), "doing nothing") + ".</b> It sealed in " + act.totals.yearsActed + " of " + years.length + " years.", "assumption") +
-        li(diff(react, act) > 0 ? "for" : "against", "<b>Acting on the forecast " + better(diff(react, act), "waiting for a declaration") + ".</b> Waiting sealed in " + react.totals.yearsActed + " years.", "assumption") +
-        li(diff(d1, act) > 0 ? "for" : "against", "<b>The forecast " + better(diff(d1, act), "the simple rule \"seal if already in moderate drought\"") + ".</b>", "pipeline") +
-        li(diff(always, act) > 0 ? "for" : "against", "<b>The forecast " + better(diff(always, act), "sealing every single year") + ".</b> Sealant is cheap next to lost crops, so sealing every year is hard to beat.", "assumption") +
-        li("against", "<b>False alarms: " + act.totals.falseAlarms + " of " + act.totals.yearsActed + " years acted.</b> In those years sealing was paid for and there was no shortage for the saved water to fill.", "pipeline") +
-        "</ul>";
+        '<p class="fn">False alarms: in ' + U.esc(pair[1].totals.falseAlarms) + " of the " + U.esc(pair[1].totals.yearsActed) + " years the forecast policy sealed, there was no shortage for the kept water to fill.</p>";
     }
 
-    // What the stage shows, and the few lines that lead the panel, for the current sub-step.
+    // What the stage shows, and what leads the panel, for the current sub-step.
+    let lead = "", watching = "";
     if (state.simStep === 1) lead = districtTable(over, hit, on);
-    else if (state.simStep === 2) {
-      lead = "";
-    } else {
-      const pair = showCheck ? [runs[0], runs[2]] : [run.cases[which.key].sample[0], run.cases[which.key].sample[2]];
-      const gain = pair[0].totals.cost - pair[1].totals.cost;
-      const note = showCheck ? "The real record: real drought, real reservoir levels, the forecasts the frozen model made"
-                             : "Weather borrowed from " + run.cases[which.key].sourceYears.join(", ") + ", started from today's reservoir level";
+    else if (state.simStep === 3) {
       loadTwin(pair[0], pair[1], scope, P, plan, which, note);
-      const end = twinWeeks[twinWeeks.length - 1];
       simFacts = Object.assign(simFacts || {}, { watching: which.name + ": " + note });
-      lead = stats([
-          ["Money saved by sealing early", (gain >= 0 ? "" : "-") + money(Math.abs(gain)), "after paying " + money(pair[1].totals.spend) + " for sealant", gain >= 0 ? "good" : "bad"],
-          ["Water saved from leaking", gal(end.sumR.saved, true), U.num(plan.km) + " km of canal sealed", "good"],
-          ["Crops lost if nothing is done", money(pair[0].totals.loss), "over five years", "bad"],
-          ["Water leaked if nothing is done", gal(end.sumL.leak, true), "soaks into the ground through canal beds", "bad"],
-        ]) +
+      // The picture is one future. It carries no figures of its own: the ranges are in the tables.
+      watching = '<p class="fn">The picture shows one case, ' + U.esc(which.name.toLowerCase()) + " (" + U.esc(which.note) + "), with each canal unknown held at the middle of its range. " + U.esc(note) + ".</p>" +
         more("How to read the picture", '<dl class="key">' +
           "<dt>Reservoir</dt><dd>The lakes on the river that feed the canals. The bar at the top shows how full they are. Below " + P.fullAt + "% full, farms get less water than they asked for.</dd>" +
           "<dt>Green and brown</dt><dd>Each district shape fills with green for the share of water that reached its farms that week. Brown is water that did not arrive.</dd>" +
           "<dt>Red and white lines</dt><dd>Canals. Red canals are unsealed and leak into the soil. White canals have been sealed.</dd>" +
           "<dt>Scenario</dt><dd>" + which.name + ": " + which.note + ".</dd></dl>");
     }
-    // The replay of real years leads the results. The random futures follow as a stress test; on
-    // the picture step, the figures for the future being watched sit under that heading.
-    const watching = state.simStep === 3 ? lead : "";
-    $("simLead").innerHTML = state.simStep === 3 ? "" : lead;
-    $("shockRow").innerHTML = showCheck ? "" : '<div class="shocks"><span>What if things get worse or better? (our assumptions)</span>' + SHOCKS.map((s) => '<button class="sbtn ' + (state.shocks[s.key] ? "on" : "") + '" data-shock="' + s.key + '" title="' + s.note + '">' + s.label + "</button>").join("") + "</div>";
+    // The replay of real years leads the results. The random futures follow as a stress test.
+    $("simLead").innerHTML = lead;
+    $("shockRow").innerHTML = showCheck ? "" : '<div class="shocks"><span>What if things get worse or better? (our assumptions; they change the stress test, not the replay)</span>' + SHOCKS.map((s) => '<button class="sbtn ' + (state.shocks[s.key] ? "on" : "") + '" data-shock="' + s.key + '" title="' + s.note + '">' + s.label + "</button>").join("") + "</div>";
     $("simResult").innerHTML = replayHtml(over) +
-      (showCheck ? "<h3>" + U.esc(which.name) + ", 2020 to 2025</h3>" : "<h3>Stress test: random futures</h3>") + watching + html;
+      "<h3>" + (showCheck ? U.esc(which.name) + ", 2020 to 2025" : "Stress test: random futures") + TAG_MODELLED + "</h3>" + watching + html;
 
     $("simNotes").innerHTML = '<div class="rowBtns"><button class="btn ghost" data-act="go" data-step="sources">Data and sources &rarr;</button></div>';
   }
@@ -699,7 +716,7 @@
       '<p class="fn">Leakage counts only weeks when water is released, and never more than was released. It assumes every ranked canal is unlined, because no source records lining. Treat it as an upper estimate.</p>' +
       "<h3>4. Sealant</h3>" + table([
         ["Price", "$" + U.esc(a.sealant_usd_per_sqft) + " per sq ft, materials only", link("U.S. Bureau of Reclamation", "https://www.usbr.gov/research/projects/detail.cfm?id=845")],
-        ["Share of leakage stopped", Math.round(a.sealant_cut_low * 100) + "% to " + Math.round(a.sealant_cut_high * 100) + "% in field trials; the simulation uses " + Math.round(P.cut * 100) + "%", "Desert Research Institute field trials"],
+        ["Share of leakage stopped", Math.round(a.sealant_cut_low * 100) + "% to " + Math.round(a.sealant_cut_high * 100) + "% in field trials; every simulation run draws a value from this range", "Desert Research Institute field trials"],
         ["How long it lasts", "About " + U.esc(a.days_one_application_lasts) + " days; " + P.applications + " applications cover a season", "Lund et al., 2021"],
         ["Crew speed", P.kmPerCrewDay + " km per crew per day, " + P.crews + " crews", "Ours" + tag("assumption")],
       ]) +
@@ -785,13 +802,21 @@
     if (sev) { state.severity = sev.dataset.p === "" ? null : Number(sev.dataset.p); renderBudget(); }
     if (shock) { state.shocks[shock.dataset.shock] = !state.shocks[shock.dataset.shock]; renderSimResult(); if (state.simStep === 3) twin.play(); }
   });
+  /* On the Simulation step a slider redraws the results a moment after it stops moving, not on
+     every step of the drag: the runs behind them take a noticeable fraction of a second. */
+  let simTimer = null;
+  function laterSim() {
+    clearTimeout(simTimer);
+    simTimer = setTimeout(() => { if (state.step !== "sim" || !$("simResult")) return; renderSimResult(); if (state.simStep === 3) twin.play(); }, SLIDER_PAUSE_MS);
+  }
+  const SLIDER_PAUSE_MS = 250;
   $("view").addEventListener("input", (e) => {
     if (e.target.id === "budget") { state.budget = Number(e.target.value); renderBudgetResult(); }
     if (e.target.id === "simSearch") {                          // filter the list as you type, keeping the cursor in the box
       state.simQuery = e.target.value; renderSimResult();
       const box = $("simSearch"); box.focus(); box.setSelectionRange(box.value.length, box.value.length);
     }
-    if (e.target.id === "simBudget") { state.budget = Number(e.target.value); renderSimResult(); if (state.simStep === 3) twin.play(); }
+    if (e.target.id === "simBudget") { state.budget = Number(e.target.value); $("simBudgetOut").textContent = U.usd(state.budget); laterSim(); }
     if (e.target.dataset.param) {
       const k = e.target.dataset.param, row = SLIDERS.find((s) => s[0] === k);
       state.overrides[k] = Number(e.target.value);
@@ -800,7 +825,7 @@
         if (p.zeroAt >= p.fullAt) state.overrides.zeroAt = p.fullAt - 1;
       }
       $("o_" + k).textContent = row[4](state.overrides[k]);
-      if (state.step === "sim") renderSimResult(); else renderBudgetResult();
+      if (state.step === "sim") laterSim(); else renderBudgetResult();
     }
   });
   $("stepper").addEventListener("click", (e) => {
