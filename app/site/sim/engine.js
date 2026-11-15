@@ -54,7 +54,9 @@
     jobsPerMillion:{ value: 16.95,  tag: "published",  label: "Jobs at risk per $1 million of crop revenue lost" },
     kmPerCrewDay:  { value: 6,      tag: "assumption", label: "Kilometres of canal one crew seals in a working day" },
     crews:         { value: 2,      tag: "assumption", label: "Crews working at the same time" },
-    applications:  { value: 1,      tag: "assumption", label: "Sealant applications in a season you act (each lasts about 90 days)" },
+    // One application lasts about 90 days and the season is about nine months, so three
+    // applications keep the canals sealed for the whole season. Each one is paid for in full.
+    applications:  { value: 3,      tag: "assumption", label: "Sealant applications in a season you act (each lasts about 90 days)" },
   };
 
   /* Plain values out of DEFAULTS, with any overrides on top. */

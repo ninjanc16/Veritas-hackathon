@@ -221,8 +221,8 @@
       text(share == null ? "off season" : Math.round(share * 100) + "%", p.w - 12, base + 22, p.narrow ? 19 : 22, bad ? C.warning : C.head, { weight: 700, align: "right" });
       text(share == null ? "canals are not running" : "of the water farms asked for arrives", p.w - 12, base + (p.narrow ? 42 : 46), 13, C.muted, { italic: true, align: "right" });
       if (!p.narrow) {
-        text(right ? "Sealing so far: " + money(sum.spend) + ". Water kept: " + num(sum.saved) + " acre-feet, " + num(sum.recovered) + " in a shortage."
-                   : "Sealing so far: $0. Every canal keeps seeping.", 12, p.h - 18, 13, C.muted);
+        text(right ? "Sealing " + money(sum.spend) + " · kept " + num(sum.saved) + " af · " + num(sum.recovered) + " af filled a shortage"
+                   : "Sealing $0 · every canal keeps seeping", 12, p.h - 18, 13, C.muted);
       }
       ctx.restore();
     }

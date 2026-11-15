@@ -31,10 +31,10 @@
   /* map-only colours */
   --map: #081216; --casing: #0b2c38; --flow: #d5f1fa; --hl: #ffffff; --cline: #4a6a73; --vig: 1;
   --wet: #25b58f; --dry: #c4944f; --dead: #5a3418;   /* simulation fields: watered, dry, long dry */
-  --radius: 10px;
+  --radius: 3px;
   --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .28);
-  --sans: "Public Sans", -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --serif: "Times New Roman", Times, "Liberation Serif", Georgia, serif;
+  --sans: "IBM Plex Sans", -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --serif: "Source Serif 4", "Source Serif Pro", Georgia, "Times New Roman", serif;
 }
 /* Light theme: switched on with the button in the platform's top bar. */
 :root[data-theme="light"] {
@@ -398,10 +398,58 @@ input[type=range] { width: 100%; accent-color: var(--blue); }
 details.assume { padding: 10px 14px; margin: 12px 0; }
 details.assume summary { font-weight: 700; cursor: pointer; }
 .back { background: none; border: 0; color: var(--blue); padding: 0; font-weight: 600; font-size: .86rem; margin-bottom: 8px; }
+
+/* The panel as a statistical bulletin: figures first, hairline rules, no boxes around everything.
+   Written for agency staff and researchers who want the number, its unit and its source. */
+.view { padding: 22px 26px 60px; font-size: .92rem; }
+.view h2 { font-size: 1.7rem; font-weight: 600; letter-spacing: -.01em; margin-bottom: 2px; }
+.view h3 { font: 600 .7rem var(--sans); letter-spacing: .13em; margin: 26px 0 8px; padding-top: 10px; border-top: 1px solid var(--line); }
+.sub { font-size: .82rem; margin-bottom: 10px; }
+.stepper { background: var(--bg); }
+.stepper button { font-weight: 600; font-size: .8rem; letter-spacing: .06em; text-transform: uppercase; }
+.stepper button b { background: none; width: auto; height: auto; font: 600 .95rem var(--serif); color: var(--muted); }
+.stepper button.on b { background: none; color: var(--blue); }
+.stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0 18px; margin: 12px 0 14px; border-top: 2px solid var(--head); }
+.stats div { padding: 9px 0 10px; border-bottom: 1px solid var(--line); min-width: 0; }
+.stats dt { font-size: .72rem; color: var(--muted); letter-spacing: .02em; }
+.stats dd { margin: 0; font: 600 1.6rem/1.2 var(--serif); color: var(--head); font-variant-numeric: tabular-nums lining-nums; }
+.stats small { display: block; font-size: .73rem; color: var(--muted); line-height: 1.35; }
+.stats.three { grid-template-columns: repeat(3, 1fr); }
+.stats.three dd { font-size: clamp(1.15rem, 1.55vw, 1.5rem); }
+.stats.three .cost dd { color: var(--watch); } .stats.three .time dd { color: var(--blue); } .stats.three .save dd { color: var(--low); }
+.rec { border-left: 3px solid var(--blue); padding: 1px 0 1px 12px; margin: 14px 0; font-size: .88rem; color: var(--ink); }
+.rec.seal { border-left-color: var(--warning); } .rec.inspect { border-left-color: var(--watch); } .rec.none { border-left-color: var(--low); }
+.rec b { color: var(--head); }
+.fn { font-size: .75rem; color: var(--muted); margin: 8px 0; line-height: 1.45; }
+.fn.warn { color: var(--watch); }
+.controls { border: 1px solid var(--line); border-radius: 3px; padding: 2px 14px; margin: 12px 0; background: var(--card); }
+details.more { border-top: 1px solid var(--line); padding: 10px 0; }
+details.more:last-of-type { border-bottom: 1px solid var(--line); }
+details.more summary { font-weight: 600; font-size: .84rem; cursor: pointer; color: var(--ink); }
+details.more[open] summary { margin-bottom: 8px; }
+details.more h3 { display: none; }
+table.t { background: none; border: 0; border-top: 2px solid var(--head); border-radius: 0; font-size: .82rem; }
+table.t th { background: var(--bg); border-bottom: 1px solid var(--head); padding: 6px 8px 6px 0; font-weight: 600; }
+table.t td { padding: 6px 8px 6px 0; }
+table.t td.r, table.t th.r { padding-right: 0; padding-left: 8px; }
+table.t td.save { color: var(--low); font-weight: 600; }
+table.t tr.off td { opacity: .5; }
+.scroll { border-radius: 0; }
+.saveHero span { letter-spacing: .1em; font-size: .7rem; }
+.saveHero b { font-weight: 600; font-variant-numeric: tabular-nums lining-nums; }
+.saveHero + .stats { border-top: 1px solid var(--line); margin-top: 6px; }
+.chart { background: none; border: 0; padding: 4px 0; }
+ul.plain { margin: 0; padding-left: 18px; font-size: .84rem; } ul.plain li { margin: 6px 0; }
+.watching { border-left: 3px solid var(--watch); padding-left: 12px; margin: 12px 0 0; font-size: .88rem; }
+.src p { font-size: .8rem; margin-bottom: .7em; }
+.stack { border-radius: 2px; height: 10px; } .gauge, .gauge i { border-radius: 2px; } .gauge { height: 6px; margin: -6px 0 12px; }
+.seg, .seg button { border-radius: 3px; }
+.btn { border-radius: 3px; }
+.role, .pickList button, .pick input, .scopeBtn, .topBtn { border-radius: 4px; }
 .flag { display: inline-block; font-size: .7rem; font-weight: 700; border-radius: 4px; padding: 1px 6px; border: 1px solid var(--watch); color: var(--watch); margin-left: 6px; white-space: nowrap; }
 
 /* The simulation's headline: what acting saves. */
-.saveHero { background: color-mix(in srgb, var(--low) 10%, var(--card)); border: 1px solid var(--low); border-radius: var(--radius); padding: 16px 18px; margin: 12px 0; }
+.saveHero { border-top: 2px solid var(--low); padding: 10px 0 0; margin: 14px 0 0; }
 .saveHero span { display: block; font-size: .76rem; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); }
 .saveHero b { display: block; font-family: var(--serif); font-size: clamp(2.4rem, 4vw, 3.4rem); line-height: 1.1; color: var(--low); }
 .saveHero small { display: block; color: var(--muted); font-size: .84rem; }
@@ -442,7 +490,7 @@ details.assume summary { font-weight: 700; cursor: pointer; }
   #simCards { width: 52%; top: 108px; gap: 6px; } .stage.cards #simPrompt { left: 50%; width: 92%; } .scase p, .scase svg, .scase .go { display: none; } .scase .big { font-size: 20px; } .scase h3 { font-size: 15px; }
   #simSteps button { padding: 5px 8px; font-size: 13.5px; } #simSkip { display: none; } #simPrompt { top: 54px; } #simPrompt span { display: none; }
   #legend { display: none; }
-  .futures, .triple { grid-template-columns: 1fr; }
+  .futures, .triple { grid-template-columns: 1fr; } .stats dd { font-size: 1.3rem; } .stats.three dd { font-size: 1.05rem; }
   .nav nav a:not(.btn) { display: none; }
   .live span { display: none; }
 }
