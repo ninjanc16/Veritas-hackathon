@@ -1,9 +1,9 @@
 # RioIQ rebuild: architecture
 
 Written 2026-11-15 against `upstream/app` at commit `c10655d`. This is the build plan for the
-last stretch of the hackathon. It is meant to be handed to Claude Code agents, one section each.
+last stretch of the hackathon. It is meant to be handed out one section at a time.
 
-**Status of this document.** Three reviewer agents (evaluation, physics, engineering) drafted it.
+**Status of this document.** This is the plan as written before the build. It has since been carried out; section 12 at the end lists where the plan was wrong and what was built instead. Read section 12 before relying on anything above it.
 It was then checked three times: every path and number against the repo; a cross-review in which
 each reviewer read the others' sections; and a final read. The cross-review found 30 problems,
 all corrected here. Section 11 lists what was checked and what was not. Nothing in this plan has
@@ -595,3 +595,29 @@ codes, where the map matching lives, and which tests import the demo loader.
   and `streamlit_app.py` were not read in full by any reviewer.
 - Nothing in section 9 has been verified.
 - The probabilities quoted are reviewers' judgement, not measurements.
+
+---
+
+## 12. Corrections after the build (added Nov 15, 2026)
+
+The sections above are left as they were written. This section says where they turned out wrong and what the repo holds instead. Results are in `reports/decision.md` and `reports/frozen/`.
+
+**Errors in the plan**
+- **Section 5.3, "pytest tests".** The two test folders cannot be collected together: both hold a file named `test_contract.py`. CI runs `tests/app` and `tests/pipeline` as two steps.
+- **Section 5.1, the delete order.** Step 6 had to come before step 4: `tests/app/test_contract.py` needed its fixture path built before the demo loader could go. The end state is as listed.
+- **Section 3.0, the freeze.** The frozen files were scored on a laptop (macOS, Python 3.13), not on the CI runner. The laptop gives 2,324 for the 6-month cost and the runner gave 2,328 earlier. CI now retrains version 1 on every push (`tools/reproduce.py`) and requires each headline number to be within 1% of the frozen one.
+- **Section 4.3, "18 usable rows".** Only 14 districts could be fitted: four names in the 1998 table have no match in the district map under the no-guess rule (Adams Garden, HCMUD, HCWID#3, Santa Maria).
+- **Section 4.4, the fallback wording.** "Only the ranking order is shown" was the declared fallback if the held-out test failed. The test failed and the ranking was not supported either (canal length alone orders the districts at 0.92), so the site says neither the volumes nor the order is a tested result.
+- **Section 1.2.** The headline 6-month number that the frozen run reproduces is 2,324, not 2,328.
+
+**Declared and delivered differently**
+- **Section 3.5 (daily inputs) and the GRU in 3.6** were not built. Monthly NOAA county rain, temperature and Palmer drought index were used instead (`src/farmdrought/climate.py`), in the round-4 holdout test.
+- **Section 3.6** was run in a cheap form: default gradient boosting against the forest (`boosting.py`). It lost.
+- **Section 3.7 (the six-river holdout)** was run in round 4 (`holdout.py`), with one general model declared first. It tied the simple rule.
+- **Section 4.6 (satellite greenness)** was not started.
+- **New in round 4, not in this plan:** a check of the leak model against 16 measured canal tests (`ponding.py`, `data/round4/ponding_tests.csv`).
+- **New files not in section 2:** `manifest.py`, `round3.py`, `boosting.py`, `climate.py`, `holdout.py`, `ponding.py`, `tools/reproduce.py`, `tools/hash_list_gate.py`, `tools/site_size.py`, `vercel.json`, `api/live.js`.
+
+**Still open, and only people can close them**
+- Section 9: the meaning of USGS code 33601; whether the 44,000 acre-feet figure is per year; the sealant price link; the district crosswalk (Donna, Bayview).
+- Section 10: emails to districts, the write-up, the video, `docs/OWNERS.md`, and the names and tools list in `README.md`.

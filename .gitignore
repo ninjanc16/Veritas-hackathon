@@ -14,3 +14,7 @@ node_modules/
 
 # Vercel's local folder (created by the Vercel command-line tool)
 .vercel/
+
+# Local assistant settings and notes: never part of the repo
+CLAUDE.md
+.claude/
