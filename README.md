@@ -6,13 +6,13 @@
 
 ## The problem
 
-> "My farm is a hundred percent irrigated, or at least it's supposed to be. I just harvested the 38th crop of my career, and never before in those 38 years have I not had irrigation water for my farm."
+> "Without water, what are we using to grow our crops? What are we able to pay back those loans with?"
 >
-> Brian Jones, fourth-generation Rio Grande Valley farmer and Texas Farm Bureau state director for District 13, at a roundtable with Senators Cornyn and Boozman, August 2024 ([Texas Border Business](https://texasborderbusiness.com/rio-grande-valleys-struggle-with-water-shortages-and-government-inaction))
+> Brian Jones, a fourth-generation Rio Grande Valley farmer, to the Texas Tribune, April 2024 ([Texas Tribune](https://www.texastribune.org/2024/04/18/south-texas-drought-agriculture/))
 
-Thirty-eight harvests, and the first one with no water in the canal. Jones blames Mexico's missed deliveries under the 1944 water treaty, not a lack of rain. Whatever the cause, the result in the field is the same: the crop a family planned for does not get its water, and the people who work it feel it first.
+That spring Jones planted only half of his farm. He laid off some of his workers entirely and cut the hours of others, the Tribune reported. By August he had harvested "the 38th crop of my career," and "never before in those 38 years have I not had irrigation water for my farm" ([Texas Border Business](https://texasborderbusiness.com/rio-grande-valleys-struggle-with-water-shortages-and-government-inaction)). He blames Mexico's missed deliveries under the 1944 water treaty, not a lack of rain.
 
-RioIQ cannot make it rain or make a treaty work. What it can do is help a district make sure that the little water it does receive reaches the field instead of seeping into the bed of an earth canal on the way.
+Whatever the cause, the result in the field is the same: the crop a family planned for does not get its water, the loans still come due, and the people who work the land feel it first. RioIQ cannot make it rain or make a treaty work. What it can do is help a district make sure that the little water it does receive reaches the field instead of seeping into the bed of an earth canal on the way.
 
 RioIQ helps Rio Grande irrigation districts decide when to temporarily seal leaking earth canals and which ones to prioritize to minimize water waste and maximize community impact. Farms and towns along the Texas Rio Grande get their water through about 4,800 km of earth canals, and some of that water soaks into the ground before it arrives. By our upper estimate, as much as 810 million gallons a day can leak out. In a dry year, that lost water can be the difference between a harvest and a field that is ploughed under: Texas A&M puts the crop loss from a year without irrigation water at $495.8 million in the Lower Valley alone.
 
