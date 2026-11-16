@@ -6,6 +6,14 @@
 
 ## The problem
 
+> "My farm is a hundred percent irrigated, or at least it's supposed to be. I just harvested the 38th crop of my career, and never before in those 38 years have I not had irrigation water for my farm."
+>
+> Brian Jones, fourth-generation Rio Grande Valley farmer and Texas Farm Bureau state director for District 13, at a roundtable with Senators Cornyn and Boozman, August 2024 ([Texas Border Business](https://texasborderbusiness.com/rio-grande-valleys-struggle-with-water-shortages-and-government-inaction))
+
+Thirty-eight harvests, and the first one with no water in the canal. Jones blames Mexico's missed deliveries under the 1944 water treaty, not a lack of rain. Whatever the cause, the result in the field is the same: the crop a family planned for does not get its water, and the people who work it feel it first.
+
+RioIQ cannot make it rain or make a treaty work. What it can do is help a district make sure that the little water it does receive reaches the field instead of seeping into the bed of an earth canal on the way.
+
 RioIQ helps Rio Grande irrigation districts decide when to temporarily seal leaking earth canals and which ones to prioritize to minimize water waste and maximize community impact. Farms and towns along the Texas Rio Grande get their water through about 4,800 km of earth canals, and some of that water soaks into the ground before it arrives. By our upper estimate, as much as 810 million gallons a day can leak out. In a dry year, that lost water can be the difference between a harvest and a field that is ploughed under: Texas A&M puts the crop loss from a year without irrigation water at $495.8 million in the Lower Valley alone.
 
 An irrigation district can seal its leakiest canals before the season starts. Sealant for every rankable canal costs about $1.3 million per application. But the district has to decide months ahead, on a small budget, which canals to seal and whether this is the year to do it.
